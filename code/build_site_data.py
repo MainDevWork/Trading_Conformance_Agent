@@ -3,7 +3,7 @@
 Run: python code/build_site_data.py
 Writes one Parquet file per table plus manifest.json, which lists the tables, their columns and source files.
 The web page loads these files into DuckDB-WASM (the version of DuckDB that runs inside a web browser).
-Re-run it and commit data/ whenever the Excel files change.
+Re-run it whenever the Excel files change, then run code/upload_to_supabase.py to send data/ to Supabase.
 """
 
 import json

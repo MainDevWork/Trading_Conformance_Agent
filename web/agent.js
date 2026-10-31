@@ -28,16 +28,14 @@ Tables by FIX MsgType (tag 35):
 A logon | B logon_response | 5 logout | D new_order_single | F order_cancel_request |
 G order_cancel_replace_request | 8 execution_report | 9 order_cancel_reject | 3 reject (session-level reject) |
 q order_mass_cancel_request | r order_mass_cancel_report.
-In reject tables, ref_message_type is the type of the message that was rejected (FIX tag 372, RefMsgType).
+In reject tables, ref_message_type is the type of the message that was rejected.
 A file's name does not always match its contents (for example July_2026/'Logout [B].xlsx' contains Logon Response
 messages); tables were assigned from the message_type column, not the file name. Not every month has every column.
 
-Standard FIX code values (these are the standard FIX meanings; the JSE trading interface specification may define
-JSE-specific values, so say when you are relying on the standard meaning):
-Side (54): 1 Buy, 2 Sell. OrdType (40): 1 Market, 2 Limit, 3 Stop, 4 Stop limit.
-TimeInForce (59): 0 Day, 1 Good till cancel, 3 Immediate or cancel, 4 Fill or kill, 6 Good till date.
-ExecType (150): 0 New, 4 Canceled, 5 Replaced, 8 Rejected, C Expired, F Trade, D Restated.
-OrdStatus (39): 0 New, 1 Partially filled, 2 Filled, 4 Canceled, 6 Pending cancel, 8 Rejected, C Expired.
+The messages come from the JSE Basic Native Trading Gateway, not FIX. The core of the JSE conformance reference is at
+the end of these instructions. The rest is split into topics: before you interpret a code, a test or a time, call
+read_reference for the topic that covers it, and call lookup_reject_codes for any reject code. Do not use standard FIX
+tag numbers or code meanings, and do not state a code meaning or test rule from memory.
 
 How to work:
 - Always get numbers from the tools. Never estimate or invent a count, a value or a column name.
@@ -49,6 +47,18 @@ How to work:
   the analyst check it. If the data cannot answer the question, say so and say what data would be needed.
 - Write plainly for an operations analyst. Format money in South African Rand and dates as day/month/year.
 `;
+
+// The topics of knowledge/*.md that read_reference can return (core.md is always in the system prompt).
+const REFERENCE_TOPICS = {
+  tests: "each conformance test (T1-T25, G1, OT1): what the client does, which messages and codes the data must show, and which tests these exports cannot check",
+  field_codes: "meaning of every code value in the columns (execution_type, order_status, time_in_force, order_type, working_indicator, liquidity_indicator, mass cancel types, logon fields, logout reasons, FIX-to-Native translation)",
+  reject_codes: "where reject codes appear and the meaning of every reject code seen in these exports",
+  trading_sessions: "JSE equity segments and session times (SAST) per segment, and what each session allows or rejects",
+  orders: "order types (market, limit, stop, pegged, iceberg, cross), order states, amendment rules, matching priority",
+  identifiers: "how client_order_id, order_id, execution_id and public_order_id link messages; firm, trader and partition structure",
+  gateway_rules: "logon timing, heartbeats, message rate limit, cancel on disconnect, recovery, circuit breakers, self-match prevention",
+  conformance_process: "JSE conformance rules (slots, retests, CTA role), the Volume 202 report layout, exemptions, who must conform",
+};
 
 const TOOLS = [
   {
@@ -80,6 +90,31 @@ const TOOLS = [
         type: "object",
         properties: { sql: { type: "string", description: "A single SELECT or WITH ... SELECT statement" } },
         required: ["sql"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_reference",
+      description: "Read one topic of the JSE conformance reference. Read a topic before relying on the facts it covers.",
+      parameters: {
+        type: "object",
+        properties: { topic: { type: "string", enum: Object.keys(REFERENCE_TOPICS),
+          description: Object.entries(REFERENCE_TOPICS).map(([k, v]) => `${k}: ${v}`).join(" | ") } },
+        required: ["topic"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "lookup_reject_codes",
+      description: "Look up the meaning of reject codes in JSE Volume 10 (Reject Codes and Reasons). Pass every code you need in one call.",
+      parameters: {
+        type: "object",
+        properties: { codes: { type: "array", items: { type: "string" }, description: "Reject codes as they appear in the data, e.g. [\"1202\", \"2000\"]" } },
+        required: ["codes"],
       },
     },
   },
@@ -138,6 +173,8 @@ async function runTool(store, name, args) {
   if (name === "list_tables") return listTables(store);
   if (name === "describe_table") return describeTable(store, args.table || "");
   if (name === "run_sql") return runSql(store, args.sql || "");
+  if (name === "read_reference") return readReference(args.topic || "");
+  if (name === "lookup_reject_codes") return lookupRejectCodes(args.codes);
   return { error: `Unknown tool ${name}` };
 }
 
@@ -158,11 +195,43 @@ async function callModel(apiKey, messages, model) {
   return body.choices[0].message;
 }
 
+// knowledge/ holds the reference taken from JSE Volumes 00E, 01E, 10, 201 and 202 and the project brief.
+// core.md is added to every system prompt; the other files are read only when the model calls read_reference,
+// and reject_codes.json only when it calls lookup_reject_codes. Each file is downloaded once.
+// The address is taken relative to this file (web/agent.js), not to the page, so it works wherever index.html is served.
+const KNOWLEDGE_URL = new URL("./knowledge/", import.meta.url);
+const fileCache = new Map();
+function loadKnowledge(name, asJson = false) {
+  if (!fileCache.has(name)) {
+    fileCache.set(name, fetch(new URL(name, KNOWLEDGE_URL))
+      .then((r) => { if (!r.ok) throw new Error(`knowledge/${name} returned ${r.status}`); return asJson ? r.json() : r.text(); })
+      .catch((err) => { fileCache.delete(name); throw err; }));
+  }
+  return fileCache.get(name);
+}
+
+async function readReference(topic) {
+  if (!REFERENCE_TOPICS[topic]) return { error: `Unknown topic '${topic}'. Topics: ${Object.keys(REFERENCE_TOPICS).join(", ")}` };
+  return { topic, text: await loadKnowledge(`${topic}.md`) };
+}
+
+async function lookupRejectCodes(codes) {
+  const { codes: table } = await loadKnowledge("reject_codes.json", true);
+  const found = {};
+  for (const raw of [].concat(codes || []).slice(0, 50)) {
+    const code = String(raw).trim().replace(/^0+(?=\d)/, "");
+    found[code] = table[code] || "Not in Volume 10";
+  }
+  return { source: "JSE Volume 10 - Reject Codes and Reasons", codes: found,
+           note: "A code can have several entries; use the one whose messages and system match where the code was seen (Native Trading Gateway, Matching Engine or AuthServer for these exports)." };
+}
+
 // history is the visible conversation: [{role: "user"|"assistant", content}, ...].
 // Returns the agent's answer and the tool calls it made to reach it.
 export async function chat(store, apiKey, history, model) {
   model = model || DEFAULT_MODEL;
-  const messages = [{ role: "system", content: SYSTEM_PROMPT },
+  const core = await loadKnowledge("core.md");
+  const messages = [{ role: "system", content: `${SYSTEM_PROMPT}\n\n${core}` },
     ...history.filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content }))];
   const steps = [];
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {

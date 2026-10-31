@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conformance Agent Architecture</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --text: #1c2430;
+    --muted: #5f6b7a;
+    --border: #cfd6de;
+    --line: #44505e;
+    --web: #e6f0fa;     --web-edge: #0b5cad;
+    --ai: #efe9fb;      --ai-edge: #6a3fc1;
+    --data: #e5f4ec;    --data-edge: #1d7a4b;
+    --config: #fbf1e2;  --config-edge: #a8650a;
+    --badge: #1c2430;   --badge-text: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c;
+      --panel: #1a2029;
+      --text: #e4e8ee;
+      --muted: #98a3b1;
+      --border: #2c3542;
+      --line: #aab4c0;
+      --web: #16283d;     --web-edge: #4c9be8;
+      --ai: #251b3d;      --ai-edge: #a785ea;
+      --data: #13291f;    --data-edge: #4fbf86;
+      --config: #2e2312;  --config-edge: #e0a14a;
+      --badge: #e4e8ee;   --badge-text: #12161c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1160px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  h2 { font-size: 17px; margin: 32px 0 10px; }
+  .figure { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; overflow-x: auto; }
+  svg { display: block; width: 100%; min-width: 760px; height: auto; }
+  svg text { fill: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  svg .title { font-size: 15px; font-weight: 600; }
+  svg .file { font: 11.5px ui-monospace, Consolas, monospace; fill: var(--muted); }
+  svg .desc { font-size: 12px; }
+  svg .note { font-size: 12px; fill: var(--muted); }
+  svg .group { font-size: 11px; font-weight: 600; letter-spacing: .06em; fill: var(--muted); }
+  .box-web { fill: var(--web); stroke: var(--web-edge); }
+  .box-ai { fill: var(--ai); stroke: var(--ai-edge); }
+  .box-data { fill: var(--data); stroke: var(--data-edge); }
+  .box-config { fill: var(--config); stroke: var(--config-edge); }
+  .box { stroke-width: 1.5; }
+  .arrow { stroke: var(--line); stroke-width: 1.6; fill: none; marker-end: url(#head); }
+  .dashed { stroke-dasharray: 6 4; }
+  .badge circle { fill: var(--badge); }
+  .badge text { fill: var(--badge-text); font-size: 11px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+  .badge.load circle { fill: var(--data-edge); }
+  .badge.cfg circle { fill: var(--config-edge); }
+  #head path { fill: var(--line); }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1.5px solid; }
+  .l-web::before { background: var(--web); border-color: var(--web-edge) !important; }
+  .l-ai::before { background: var(--ai); border-color: var(--ai-edge) !important; }
+  .l-data::before { background: var(--data); border-color: var(--data-edge) !important; }
+  .l-config::before { background: var(--config); border-color: var(--config-edge) !important; }
+  ol.steps { padding-left: 0; list-style: none; margin: 0; }
+  ol.steps li { display: flex; gap: 12px; margin-bottom: 10px; }
+  .num { flex: 0 0 26px; height: 26px; border-radius: 13px; background: var(--badge); color: var(--badge-text); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .num.load { background: var(--data-edge); }
+  .num.cfg { background: var(--config-edge); }
+  code { font: 13px ui-monospace, Consolas, monospace; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } main { padding-top: 20px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Trading Conformance Agent: system architecture</h1>
+  <p class="sub">An analyst types a question about the Vonnegut FIX message exports into a web page. A language model on OpenRouter writes SQL queries, <code>agent.js</code> runs them in the browser against the July–September 2026 data, which <code>data.js</code> downloads from Supabase, and the model writes the answer from the query results.</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 1110 730" role="img" aria-label="Architecture diagram of the Trading Conformance Agent">
+      <defs>
+        <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z"/>
+        </marker>
+      </defs>
+
+      <text class="group" x="20" y="40">ANSWERING A QUESTION (IN THE ANALYST'S BROWSER)</text>
+      <text class="group" x="20" y="532">REBUILDING THE SUPABASE DATA (WHEN THE EXCEL FILES CHANGE)</text>
+
+      <!-- Row 1 -->
+      <rect class="box box-web" x="20" y="60" width="200" height="140" rx="10"/>
+      <text class="title" x="36" y="88">Chat page</text>
+      <text class="file" x="36" y="108">index.html</text>
+      <text class="file" x="36" y="124">web/app.js</text>
+      <text class="desc" x="36" y="150">Takes the two keys and the</text>
+      <text class="desc" x="36" y="166">question. Shows each answer</text>
+      <text class="desc" x="36" y="182">and every query run for it.</text>
+
+      <rect class="box box-ai" x="310" y="60" width="200" height="140" rx="10"/>
+      <text class="title" x="326" y="88">Agent</text>
+      <text class="file" x="326" y="108">web/agent.js</text>
+      <text class="desc" x="326" y="134">Adds the system prompt and</text>
+      <text class="desc" x="326" y="150">3 tool definitions, runs each</text>
+      <text class="desc" x="326" y="166">tool call the model asks for,</text>
+      <text class="desc" x="326" y="182">up to 12 rounds per question.</text>
+
+      <rect class="box box-ai" x="600" y="60" width="200" height="140" rx="10"/>
+      <text class="title" x="616" y="88">Language model</text>
+      <text class="file" x="616" y="108">openrouter.ai (internet)</text>
+      <text class="file" x="616" y="124">nvidia/nemotron-3-ultra-</text>
+      <text class="file" x="616" y="140">550b-a55b:free</text>
+      <text class="desc" x="616" y="166">Returns either a tool call</text>
+      <text class="desc" x="616" y="182">or the final answer text.</text>
+
+      <!-- Row 1 arrows: forward on top, return below -->
+      <path class="arrow" d="M220,112 H306"/>
+      <path class="arrow" d="M306,160 H224"/>
+      <path class="arrow" d="M510,112 H596"/>
+      <path class="arrow" d="M596,160 H514"/>
+
+      <g class="badge"><circle cx="263" cy="96" r="11"/><text x="263" y="96">1</text></g>
+      <g class="badge"><circle cx="263" cy="176" r="11"/><text x="263" y="176">6</text></g>
+      <g class="badge"><circle cx="553" cy="96" r="11"/><text x="553" y="96">2</text></g>
+      <g class="badge"><circle cx="553" cy="176" r="11"/><text x="553" y="176">3</text></g>
+
+      <!-- Agent <-> database -->
+      <path class="arrow" d="M380,200 V286"/>
+      <path class="arrow" d="M440,286 V204"/>
+      <g class="badge"><circle cx="380" cy="240" r="11"/><text x="380" y="240">4</text></g>
+      <g class="badge"><circle cx="440" cy="250" r="11"/><text x="440" y="250">5</text></g>
+      <text class="note" x="290" y="330" text-anchor="end">Steps 2 to 5 repeat until the</text>
+      <text class="note" x="290" y="346" text-anchor="end">model returns answer text,</text>
+      <text class="note" x="290" y="362" text-anchor="end">at most 12 times.</text>
+
+      <!-- Row 2 -->
+      <rect class="box box-data" x="310" y="290" width="200" height="140" rx="10"/>
+      <text class="title" x="326" y="318">In-browser database</text>
+      <text class="file" x="326" y="338">web/data.js</text>
+      <text class="file" x="326" y="354">DuckDB-WASM, in memory</text>
+      <text class="desc" x="326" y="380">11 tables and the view</text>
+      <text class="desc" x="326" y="396">all_messages. File and</text>
+      <text class="desc" x="326" y="412">network access switched off.</text>
+
+      <rect class="box box-data" x="600" y="290" width="200" height="140" rx="10"/>
+      <text class="title" x="616" y="318">Supabase Storage</text>
+      <text class="file" x="616" y="338">bucket fix-data (private)</text>
+      <text class="desc" x="616" y="364">11 Parquet files and</text>
+      <text class="desc" x="616" y="380">manifest.json. Downloaded</text>
+      <text class="desc" x="616" y="396">with the publishable key.</text>
+
+      <path class="arrow dashed" d="M600,360 H514"/>
+      <g class="badge load"><circle cx="557" cy="344" r="11"/><text x="557" y="344">D</text></g>
+
+      <!-- Row 3 -->
+      <rect class="box box-data" x="20" y="560" width="200" height="140" rx="10"/>
+      <text class="title" x="36" y="588">Vonnegut exports</text>
+      <text class="file" x="36" y="608">Trading_FIX_Messages/</text>
+      <text class="desc" x="36" y="634">36 Excel files, one per FIX</text>
+      <text class="desc" x="36" y="650">message type per month,</text>
+      <text class="desc" x="36" y="666">July to September 2026.</text>
+
+      <rect class="box box-data" x="310" y="560" width="200" height="140" rx="10"/>
+      <text class="title" x="326" y="588">Converted copies</text>
+      <text class="file" x="326" y="608">code/.cache/*.parquet</text>
+      <text class="desc" x="326" y="634">One Parquet file per Excel</text>
+      <text class="desc" x="326" y="650">file. Rebuilt only when the</text>
+      <text class="desc" x="326" y="666">Excel file's size or date</text>
+      <text class="desc" x="326" y="682">changes.</text>
+
+      <rect class="box box-data" x="600" y="560" width="200" height="140" rx="10"/>
+      <text class="title" x="616" y="588">Site files</text>
+      <text class="file" x="616" y="608">data/ (not in git)</text>
+      <text class="file" x="616" y="624">code/build_site_data.py</text>
+      <text class="desc" x="616" y="650">One Parquet file per table,</text>
+      <text class="desc" x="616" y="666">plus manifest.json.</text>
+
+      <rect class="box box-config" x="890" y="560" width="200" height="140" rx="10"/>
+      <text class="title" x="906" y="588">Settings</text>
+      <text class="file" x="906" y="608">code/.env, code/config.py</text>
+      <text class="desc" x="906" y="634">Data folder, Supabase</text>
+      <text class="desc" x="906" y="650">address, secret key and</text>
+      <text class="desc" x="906" y="666">bucket name. .env is not</text>
+      <text class="desc" x="906" y="682">committed to git.</text>
+
+      <!-- Rebuild arrows -->
+      <path class="arrow dashed" d="M220,630 H306"/>
+      <path class="arrow dashed" d="M510,630 H596"/>
+      <path class="arrow dashed" d="M700,560 V434"/>
+      <g class="badge load"><circle cx="263" cy="614" r="11"/><text x="263" y="614">A</text></g>
+      <g class="badge load"><circle cx="553" cy="614" r="11"/><text x="553" y="614">B</text></g>
+      <g class="badge load"><circle cx="700" cy="497" r="11"/><text x="700" y="497">C</text></g>
+
+      <!-- Settings -> upload -->
+      <path class="arrow dashed" d="M960,560 L712,500"/>
+      <g class="badge cfg"><circle cx="836" cy="530" r="11"/><text x="836" y="530">E</text></g>
+    </svg>
+    <div class="legend">
+      <span class="l-web">Web page</span>
+      <span class="l-ai">Agent and language model</span>
+      <span class="l-data">Message data</span>
+      <span class="l-config">Settings</span>
+    </div>
+  </div>
+
+  <div class="cols">
+    <section>
+      <h2>Answering one question</h2>
+      <ol class="steps">
+        <li><span class="num">1</span><span><code>app.js</code> passes the whole conversation so far to <code>chat()</code> in <code>agent.js</code>. The project has no server: everything runs in the analyst's browser.</span></li>
+        <li><span class="num">2</span><span><code>agent.js</code> sends OpenRouter the analyst's OpenRouter key, the system prompt (conformance background, table names) followed by <code>web/knowledge/core.md</code>, the conversation, and the definitions of five tools: <code>list_tables</code>, <code>describe_table</code>, <code>run_sql</code>, <code>read_reference</code> (one topic file from <code>web/knowledge/</code>, such as the test steps or session times) and <code>lookup_reject_codes</code> (reject code meanings from <code>web/knowledge/reject_codes.json</code>).</span></li>
+        <li><span class="num">3</span><span>The model returns either a tool call, for example <code>run_sql</code> with a SQL query it has written, or the final answer text.</span></li>
+        <li><span class="num">4</span><span><code>agent.js</code> runs the tool call against the DuckDB-WASM tables. <code>run_sql</code> places the model's SQL inside <code>SELECT * FROM ( … )</code> with a row limit.</span></li>
+        <li><span class="num">5</span><span>The result is returned to <code>agent.js</code>: at most 200 rows, cut to 30,000 characters. It is added to the conversation and step 2 runs again.</span></li>
+        <li><span class="num">6</span><span>When the model returns answer text, the page shows it, and under it each tool call with its SQL and result, so the analyst can check every number.</span></li>
+      </ol>
+    </section>
+    <section>
+      <h2>Loading the data and settings</h2>
+      <ol class="steps">
+        <li><span class="num load">A</span><span><code>data_store.py</code> reads each Excel file with python-calamine, renames columns to lower case with underscores, converts timestamps, prices and quantities, and saves a Parquet copy. This takes several minutes the first time and is skipped for files that have not changed.</span></li>
+        <li><span class="num load">B</span><span><code>build_site_data.py</code> combines the copies into one table per FIX message type, all three months together, and writes each table to <code>data/</code> as a Parquet file, with <code>manifest.json</code>. Each Excel file is assigned to a table by the value in its <code>Message Type</code> column, not by its file name.</span></li>
+        <li><span class="num load">C</span><span><code>upload_to_supabase.py</code> uploads the files in <code>data/</code> to the private bucket <code>fix-data</code>, using the Supabase secret key.</span></li>
+        <li><span class="num load">D</span><span>When the analyst enters the Supabase publishable key, <code>data.js</code> downloads <code>manifest.json</code> and the 11 Parquet files, creates the tables and the <code>all_messages</code> view, then switches off file, network and settings access for the database.</span></li>
+        <li><span class="num cfg">E</span><span><code>config.py</code> reads <code>code/.env</code>: <code>DATA_DIR</code>, the Excel folder used in steps A and B, and <code>SUPABASE_URL</code>, <code>SUPABASE_SERVICE_KEY</code> and <code>SUPABASE_BUCKET</code>, used in step C. The OpenRouter key and model are entered in the page's sidebar.</span></li>
+      </ol>
+    </section>
+  </div>
+
+  <h2>Tables in the in-browser database</h2>
+  <table>
+    <thead><tr><th>Table</th><th>FIX MsgType (tag 35)</th><th>Rows, July–September 2026</th></tr></thead>
+    <tbody>
+      <tr><td><code>reject</code></td><td>3, session-level reject</td><td>1,127,014</td></tr>
+      <tr><td><code>order_cancel_replace_request</code></td><td>G</td><td>929,951</td></tr>
+      <tr><td><code>execution_report</code></td><td>8</td><td>699,162</td></tr>
+      <tr><td><code>order_cancel_request</code></td><td>F</td><td>539,586</td></tr>
+      <tr><td><code>new_order_single</code></td><td>D</td><td>325,344</td></tr>
+      <tr><td><code>logon</code></td><td>A</td><td>74,580</td></tr>
+      <tr><td><code>logon_response</code></td><td>B</td><td>23,846</td></tr>
+      <tr><td><code>order_cancel_reject</code></td><td>9</td><td>21,909</td></tr>
+      <tr><td><code>logout</code></td><td>5</td><td>21,306</td></tr>
+      <tr><td><code>order_mass_cancel_report</code></td><td>r</td><td>464</td></tr>
+      <tr><td><code>order_mass_cancel_request</code></td><td>q</td><td>354</td></tr>
+      <tr><td><code>all_messages</code> (view)</td><td>All of the above</td><td>3,763,516: the columns every table shares, used to follow one CompID or order across message types</td></tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

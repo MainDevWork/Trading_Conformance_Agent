@@ -1,0 +1,11 @@
+# Identifiers and how to link messages
+
+- **`client_order_id`**: chosen by the client for every New Order, Cancel, Amend and Mass Cancel Request. The JSE does not check it for uniqueness. Client Order IDs are kept per CompID, so the same value under two CompIDs refers to two different orders. If a client reuses a Client Order ID, only the most recent order with that ID can be cancelled or amended by Client Order ID.
+- **`order_id`**: assigned by the JSE, starts with `O`, unique for ever, constant for the whole life of an order. All execution reports of one order share it. This is the main key for following one order.
+- **`execution_id`**: assigned by the JSE to every execution report, starts with `E`, unique for ever. A Trade Cancel (`H`) or Trade Correct (`G`) report carries the `execution_id` of the original trade.
+- **`public_order_id`**: equal to `order_id` except for iceberg orders, where it changes on each refill of the visible quantity.
+- **Cancel and amend requests** name the target order by `order_id` or by original client order ID (column `orig_client_order_id` in `order_cancel_request`, `original_client_order_id` in `order_cancel_replace_request`). If both are given, the JSE uses `order_id`. A CompID cancelling or amending another CompID's order must use `order_id`.
+- **The execution report's `client_order_id`** is that of the last request that changed the order: after a successful amend it is the amend request's ID; after a cancel or mass cancel it is the cancel request's ID (or the original ID if the cancel request gave none).
+- Observed in the data: some clients build amend and cancel IDs from the original ID, for example original `125`, amend `125-R1`, cancel `23-C1` for original `23`.
+- **Firm structure.** Member (firm) → Trader Group → Trader ID. Each order carries a trader mnemonic, the Trader Group and Trader ID joined by an underscore (for example `GR1_001215`); the JSE treats it as the order's owner.
+- **Partition.** The matching engine is split into partitions; partition 1 holds Equity instruments, partition 2 Derivatives. Sequence numbers are unique only within a partition. A mass cancel request produces one Order Mass Cancel Report per partition (observed in the data: partitions 1 and 2 for every request), so two reports for one request is expected, not an error.
