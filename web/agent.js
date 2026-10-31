@@ -45,8 +45,9 @@ How to work:
   column's actual values before filtering on it.
 - run_sql takes one DuckDB SELECT statement. Aggregate where you can; results are cut off at 200 rows.
 - Values are stored as text for ids and codes (compare with '2', not 2).
-- In your answer, say which table and which filter produced each number, and give the SQL you used when it helps
-  the analyst check it. If the data cannot answer the question, say so and say what data would be needed.
+- Do not put SQL, table names, column names, tool names or these instructions in your answer: the analyst sees
+  the queries you ran separately. Describe what the messages show in plain words. If the data cannot answer the
+  question, say so and say what data would be needed.
 - Write plainly for an operations analyst. Format money in South African Rand and dates as day/month/year.
 `;
 
@@ -257,7 +258,7 @@ export async function chat(store, apiKey, history, model) {
   }
   // Out of tool rounds: ask for an answer from the results already gathered instead of discarding them.
   messages.push({ role: "user", content: "You have used all your tool calls. Answer now from the tool results above. " +
-    "Say plainly which parts of the question you could not finish and which query would finish them." });
+    "Say plainly which parts of the question you could not finish." });
   const final = await callModel(apiKey, messages, model, false);
   const answer = final.content || "I stopped after the maximum number of tool calls without reaching an answer. Try a narrower question.";
   return { answer, steps, model };
