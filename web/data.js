@@ -9,6 +9,9 @@ const SUPABASE_URL = "https://oftjypstiufmzblmtrom.supabase.co";
 const SUPABASE_BUCKET = "fix-data";
 
 const COMMON_COLUMNS = ["source_month", "source_file", "timestamp", "comp_id", "message_type", "client_order_id"];
+// Columns that link cancels and amends to the order they target, cast to text so tables that store them
+// with different types can be combined. order_cancel_replace_request names its column original_client_order_id.
+const LINK_COLUMNS = { order_id: ["order_id"], orig_client_order_id: ["orig_client_order_id", "original_client_order_id"] };
 
 async function download(supabaseKey, name) {
   const response = await fetch(`${SUPABASE_URL}/storage/v1/object/authenticated/${SUPABASE_BUCKET}/${name}`, {
@@ -49,6 +52,10 @@ export async function loadStore(supabaseKey, onProgress) {
   const selects = tableNames.map((table) => {
     const have = new Set(columns[table].map((c) => c.name));
     const parts = COMMON_COLUMNS.map((c) => (have.has(c) ? c : `NULL AS ${c}`));
+    for (const [name, sources] of Object.entries(LINK_COLUMNS)) {
+      const source = sources.find((c) => have.has(c));
+      parts.push(source ? `CAST("${source}" AS VARCHAR) AS ${name}` : `CAST(NULL AS VARCHAR) AS ${name}`);
+    }
     return `SELECT '${table}' AS table_name, ${parts.join(", ")} FROM "${table}"`;
   });
   await conn.query("CREATE VIEW all_messages AS " + selects.join(" UNION ALL BY NAME "));

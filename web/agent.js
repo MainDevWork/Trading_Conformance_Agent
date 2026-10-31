@@ -21,8 +21,10 @@ questions about these messages accurately, so analysts can find out what a clien
 The data: Vonnegut Excel exports for July, August and September 2026, one file per message type per month,
 loaded into DuckDB tables (one table per FIX message type, all months combined). Every table has the columns
 source_month (e.g. 'July_2026') and source_file (the Excel file name), timestamp, comp_id and message_type.
-The view all_messages holds the common columns of every table, so you can follow one comp_id or client_order_id
-across message types in time order.
+The view all_messages holds the common columns of every table (table_name, source_month, source_file, timestamp,
+comp_id, message_type, client_order_id, order_id, orig_client_order_id), so you can follow one comp_id or order
+across message types in time order with a single query. To follow an order, match on its client_order_id, its
+order_id (taken from its execution reports) and orig_client_order_id together, rather than querying each table.
 
 Tables by FIX MsgType (tag 35):
 A logon | B logon_response | 5 logout | D new_order_single | F order_cancel_request |
@@ -178,7 +180,8 @@ async function runTool(store, name, args) {
   return { error: `Unknown tool ${name}` };
 }
 
-async function callModel(apiKey, messages, model) {
+// allowTools = false sends tool_choice "none", so the model must reply in text.
+async function callModel(apiKey, messages, model, allowTools = true) {
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
     headers: {
@@ -186,7 +189,7 @@ async function callModel(apiKey, messages, model) {
       "Content-Type": "application/json",
       "X-Title": "Trading Conformance Agent",
     },
-    body: JSON.stringify({ model, messages, tools: TOOLS, temperature: 0 }),
+    body: JSON.stringify({ model, messages, tools: TOOLS, tool_choice: allowTools ? "auto" : "none", temperature: 0 }),
   });
   const text = await response.text();
   if (!response.ok) throw new Error(`OpenRouter returned ${response.status}: ${text.slice(0, 500)}`);
@@ -252,6 +255,10 @@ export async function chat(store, apiKey, history, model) {
       messages.push({ role: "tool", tool_call_id: call.id, content: text });
     }
   }
-  return { answer: "I stopped after the maximum number of tool calls without reaching an answer. Try a narrower question.",
-           steps, model };
+  // Out of tool rounds: ask for an answer from the results already gathered instead of discarding them.
+  messages.push({ role: "user", content: "You have used all your tool calls. Answer now from the tool results above. " +
+    "Say plainly which parts of the question you could not finish and which query would finish them." });
+  const final = await callModel(apiKey, messages, model, false);
+  const answer = final.content || "I stopped after the maximum number of tool calls without reaching an answer. Try a narrower question.";
+  return { answer, steps, model };
 }
