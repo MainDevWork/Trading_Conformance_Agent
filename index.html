@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trading Conformance Agent</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+</head>
+<body>
+  <aside id="sidebar">
+    <h1>Trading Conformance Agent</h1>
+    <section>
+      <h2>Data</h2>
+      <p id="status-text">Enter the Supabase key below to load the data.</p>
+      <div id="progress"><div id="progress-bar"></div></div>
+      <table id="tables"></table>
+    </section>
+    <section>
+      <h2>Supabase key</h2>
+      <input id="supabase-key" type="password" spellcheck="false" autocomplete="off" placeholder="sb_publishable_…">
+      <p class="hint">Needed to download the message data. Not saved: paste it again after reloading the page.</p>
+    </section>
+    <section>
+      <h2>OpenRouter key</h2>
+      <input id="api-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-or-v1-…">
+      <p class="hint">Not saved: paste it again after reloading the page. Sent only to openrouter.ai. Get a key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>.</p>
+    </section>
+    <section>
+      <h2>Model</h2>
+      <input id="model" type="text" spellcheck="false">
+    </section>
+    <section>
+      <h2>Example questions</h2>
+      <ul id="examples">
+        <li>Which tables are loaded, and how many messages does each month have?</li>
+        <li>Which CompIDs sent new orders in September 2026, and how many each?</li>
+        <li>List the session-level rejects in August 2026 by reject code and reason, with counts.</li>
+        <li>For CompID GJEN09 in July 2026, show the sequence of message types for its first 5 orders in time order.</li>
+        <li>Which order cancel requests were rejected, and what reject codes were given?</li>
+      </ul>
+    </section>
+    <button id="clear" type="button">New conversation</button>
+  </aside>
+
+  <main>
+    <div id="messages"></div>
+    <form id="composer">
+      <textarea id="input" rows="2" placeholder="Ask about the FIX messages… (Enter to send, Shift+Enter for a new line)"></textarea>
+      <button id="send" type="submit">Send</button>
+    </form>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+CompID_Key.xlsx
+Trading_FIX_Messages/
+CompID_Key_PRIVATE.xlsx
+# FIX message data is kept out of git: the web page downloads it from Supabase Storage.
+data/

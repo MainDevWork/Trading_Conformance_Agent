@@ -1,0 +1,91 @@
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --text: #1c2430;
+  --muted: #5f6b7a;
+  --border: #dde2e8;
+  --accent: #0b5cad;
+  --accent-text: #ffffff;
+  --user-bg: #e6f0fa;
+  --code-bg: #f0f2f5;
+  --error: #b42318;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12161c;
+    --panel: #1a2029;
+    --text: #e4e8ee;
+    --muted: #98a3b1;
+    --border: #2c3542;
+    --accent: #4c9be8;
+    --accent-text: #0b1420;
+    --user-bg: #1f3149;
+    --code-bg: #232b36;
+    --error: #f97066;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+#sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 20px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+}
+#sidebar h1 { font-size: 18px; margin: 0 0 16px; }
+#sidebar h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 20px 0 8px; }
+#status-text { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+#progress { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+#progress-bar { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+#tables { width: 100%; margin-top: 10px; font-size: 13px; border-collapse: collapse; }
+#tables td { padding: 3px 0; border-bottom: 1px solid var(--border); }
+#tables td:last-child { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+#model, #api-key, #supabase-key { width: 100%; padding: 6px 8px; font: 13px ui-monospace, monospace; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+.hint { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.hint a { color: var(--accent); }
+#examples { list-style: none; padding: 0; margin: 0; }
+#examples li { padding: 8px 10px; margin-bottom: 6px; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+#examples li:hover { border-color: var(--accent); }
+#clear { margin-top: 20px; width: 100%; padding: 8px; background: none; color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+
+main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+#messages { flex: 1; overflow-y: auto; padding: 24px; }
+.msg { max-width: 860px; margin: 0 auto 18px; }
+.msg .who { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.msg .body { padding: 12px 16px; border-radius: 10px; background: var(--panel); border: 1px solid var(--border); overflow-x: auto; }
+.msg.user .body { background: var(--user-bg); white-space: pre-wrap; }
+.msg.error .body { color: var(--error); }
+.msg .body > :first-child { margin-top: 0; }
+.msg .body > :last-child { margin-bottom: 0; }
+.msg table { border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+.msg th, .msg td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; }
+.msg code { font: 13px ui-monospace, monospace; background: var(--code-bg); padding: 1px 4px; border-radius: 4px; }
+.msg pre { background: var(--code-bg); padding: 10px; border-radius: 6px; overflow-x: auto; }
+.msg pre code { padding: 0; }
+.steps { margin-top: 8px; font-size: 13px; color: var(--muted); }
+.steps details { margin-top: 4px; }
+.steps summary { cursor: pointer; }
+.steps pre { white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; font-size: 12px; }
+.thinking { color: var(--muted); font-style: italic; }
+
+#composer { display: flex; gap: 10px; max-width: 908px; width: 100%; margin: 0 auto; padding: 16px 24px 24px; }
+#input { flex: 1; resize: vertical; padding: 10px 12px; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+#send { padding: 0 20px; font: inherit; font-weight: 600; color: var(--accent-text); background: var(--accent); border: none; border-radius: 8px; cursor: pointer; }
+#send:disabled { opacity: .5; cursor: default; }
+
+@media (max-width: 800px) {
+  body { flex-direction: column; }
+  #sidebar { width: 100%; max-height: 40vh; border-right: none; border-bottom: 1px solid var(--border); padding: 16px; }
+  #messages { padding: 16px; }
+  #composer { padding: 12px 16px 16px; }
+}
