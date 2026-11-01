@@ -7,8 +7,8 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="web/style.css">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="modulepreload" href="web/agent.js">
-  <link rel="modulepreload" href="web/data.js">
+  <link rel="modulepreload" href="web/agent.js?v=3">
+  <link rel="modulepreload" href="web/data.js?v=3">
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 </head>
@@ -42,12 +42,21 @@
 
   <main>
     <div id="messages"></div>
-    <form id="composer">
+    <form id="composer" onsubmit="return false">
       <textarea id="input" rows="2" placeholder="Ask about the FIX messages… (Enter to send, Shift+Enter for a new line)"></textarea>
       <button id="send" type="submit">Send</button>
     </form>
   </main>
 
-  <script type="module" src="web/app.js"></script>
+  <!-- ?v=3 is changed whenever a script changes, so the browser downloads all the new scripts together
+       instead of mixing a saved old copy of one with a new copy of another. -->
+  <script type="module" src="web/app.js?v=3"></script>
+  <script>
+    // web/app.js sets window.appStarted. If it did not run, the page says so instead of doing nothing.
+    window.addEventListener("load", () => {
+      if (!window.appStarted) document.getElementById("status-text").textContent =
+        "The page's script did not start. Reload the page with Ctrl+Shift+R.";
+    });
+  </script>
 </body>
 </html>

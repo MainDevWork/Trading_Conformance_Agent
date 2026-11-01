@@ -8,6 +8,8 @@ const MAX_ROWS = 200;
 
 // The language model every question is sent to. Fixed here; the page has no setting to change it.
 export const MODEL = "nvidia/nemotron-3.5-lightning:free";
+// Kept for copies of web/app.js saved in browsers before 01/11/2026, which import this name.
+export const DEFAULT_MODEL = MODEL;
 
 const SYSTEM_PROMPT = `You are the Trading Conformance Agent for JSE Trading Operations.
 

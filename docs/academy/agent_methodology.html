@@ -34,7 +34,6 @@
   p, ol, ul { max-width: 860px; }
   li { margin-bottom: 7px; }
   code { font: 13px ui-monospace, Consolas, monospace; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
-  .lead { font-size: 16px; margin: 0 0 22px; }
   .figure { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
   svg { display: block; width: 100%; max-width: 900px; margin: 0 auto; height: auto; }
   svg text { fill: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -80,10 +79,8 @@
     .figure { border: none; padding: 0; }
     .legend { margin-top: 2mm; font-size: 9pt; }
     svg { width: auto; max-width: none; height: 180mm; }
-    .lead { margin-bottom: 4mm; }
     h2 { break-after: avoid; }
     table, li { break-inside: avoid; }
-    .newpage { break-before: page; }
   }
 </style>
 </head>
@@ -91,8 +88,6 @@
 <main>
   <nav><a href="../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold star schema</a><a href="silver_data_diagram.html">Silver layer</a></nav>
 
-  <h1>How the chat agent answers a question</h1>
-  <p class="lead">The chat agent answers a question about the conformance test messages by repeating one cycle. It sends the question to a language model, runs the database queries the model writes, and returns the results to the model. It stops when the model replies with an answer instead of another query. The queries run on a copy of the gold tables held in the analyst's browser, so no data is fetched while a question is being answered.</p>
   <p class="pdf"><a href="agent_methodology.pdf">PDF version</a></p>
 
   <div class="figure">
@@ -214,46 +209,6 @@
       <span class="l-dec">Decision</span>
     </div>
   </div>
-
-  <h2 class="newpage">Before the first question: loading the data</h2>
-  <ol type="A">
-    <li>The analyst pastes the storage key into the sidebar of the chat page. The key gives read access to the gold tables in cloud storage.</li>
-    <li><code>web/data.js</code> downloads <code>manifest.json</code>, the list of the 9 gold tables with a description of every column. It then gets the 9 tables, which are Parquet files (a compressed file format for tables). If the browser already holds a saved copy that matches the current <code>manifest.json</code>, it reads that copy. Otherwise it downloads the files from cloud storage and saves a copy for the next visit.</li>
-    <li>It creates the 9 tables in DuckDB-WASM, a database that runs inside the browser tab and holds the tables in the tab's memory. It then switches off the database's access to files, to the network and to its own settings. From this point a query can read those 9 tables and nothing else. The sidebar shows "Data loaded. The agent can answer questions."</li>
-  </ol>
-
-  <h2>Answering a question</h2>
-  <ol>
-    <li>The analyst types a question. The chat page adds it to the conversation, which is the list of every question and answer so far in this session.</li>
-    <li><code>web/agent.js</code> builds one request with five parts: its instructions; the core of the JSE conformance reference (<code>web/knowledge/core.md</code>); every table's columns and their meanings; the whole conversation; and the definitions of the 5 tools. A tool is an action the agent can carry out on the model's behalf, such as running a query.</li>
-    <li>The agent sends the request to the language model <code>nvidia/nemotron-3.5-lightning:free</code>. The model is set to temperature 0, which removes most of the randomness from its replies.</li>
-    <li>The model's reply contains either answer text, or one or more tool calls. A tool call names a tool and gives its input, for example <code>run_sql</code> with a query the model has written. If the reply contains no tool call, the reply is the answer and the agent goes to step 8.</li>
-    <li>The agent runs each tool call. <code>run_sql</code> runs the model's query on the in-browser tables. The query is placed inside <code>SELECT * FROM ( … ) LIMIT 201</code>, so it can only read data and cannot return more than 201 rows. <code>read_reference</code> and <code>lookup_reject_codes</code> read the JSE reference files in <code>web/knowledge/</code>.</li>
-    <li>Each result is cut to at most 200 rows and 30,000 characters and added to the conversation, after the model's tool call.</li>
-    <li>If fewer than 12 requests have been sent to the model for this question, the agent goes back to step 3 with the longer conversation. After 12 requests it sends one last request with tools switched off. That request tells the model to answer from the results it already has and to say which parts of the question it could not finish.</li>
-    <li>The page shows the answer text. The tool calls and queries are not shown. The instructions tell the model to write in plain words, without SQL, table names or column names.</li>
-  </ol>
-
-  <h2>Example</h2>
-  <p>This is an illustration of the steps, not a recorded run. An analyst asks: "Which reject codes did CompID GJEN09 receive in August 2026, and what do they mean?" (GJEN09 is one of the fictitious CompIDs.)</p>
-  <ol>
-    <li>Round 1: the model replies with one <code>run_sql</code> call. Its query counts the rows of <code>fact_message</code> for CompID GJEN09 dated in August 2026 that have a reject code, and joins <code>dim_reject_code</code> to add each code's meaning.</li>
-    <li>The agent runs the query on the in-browser tables, which takes a fraction of a second, and adds the rows to the conversation.</li>
-    <li>Round 2: the model replies with text that lists each reject code, how many times it was received and what it means. The page shows that text.</li>
-  </ol>
-  <p>A question that needs the JSE test rules, such as whether a test was passed, usually takes more rounds. The model first calls <code>read_reference</code> for the <code>tests</code> topic, then queries the messages.</p>
-
-  <h2>Where the time is spent</h2>
-  <table>
-    <thead><tr><th>Step</th><th class="r">Time measured</th><th>Measured how</th></tr></thead>
-    <tbody>
-      <tr><td>Loading the data, first visit (download from cloud storage)</td><td class="r">33.6 s</td><td>Headless Edge on the project computer, 01/11/2026</td></tr>
-      <tr><td>Loading the data, later visits (saved copy)</td><td class="r">10.8 s</td><td>Same test, second load</td></tr>
-      <tr><td>One query on the in-browser tables</td><td class="r">23 to 86 ms</td><td>Four typical queries, same test</td></tr>
-      <tr><td>One request to the language model</td><td class="r">Not measured</td><td>Needs an OpenRouter key on the test computer</td></tr>
-    </tbody>
-  </table>
-  <p>A query takes less than a tenth of a second, so the time an analyst waits for an answer is mostly the time spent waiting for the language model's replies. Each round adds one model reply. Fewer rounds per question give faster answers. For that reason every table's columns are sent with the first request, so the model does not spend a round asking for them.</p>
 </main>
 </body>
 </html>

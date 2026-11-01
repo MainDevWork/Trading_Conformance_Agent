@@ -1,5 +1,7 @@
-import { chat } from "./agent.js";
-import { loadStore } from "./data.js";
+import { chat } from "./agent.js?v=3";
+import { loadStore } from "./data.js?v=3";
+
+window.appStarted = true;
 
 const messagesEl = document.getElementById("messages");
 const form = document.getElementById("composer");
