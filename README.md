@@ -9,7 +9,7 @@ A web chat page where a JSE Trading Operations analyst asks questions about the 
 | `index.html` | The page. Stays in the root so GitHub Pages serves it as the site's home page. |
 | `web/` | The page's code: `app.js` (chat screen), `agent.js` (language model and its tools), `data.js` (loads the data into the browser), `style.css` |
 | `web/knowledge/` | The JSE conformance reference the agent reads (see below) |
-| `code/` | Python scripts that convert the Excel exports and upload them to Supabase |
+| `code/` | Python scripts that build the bronze, silver and gold layers in Supabase |
 | `docs/jse/` | The JSE specification documents the reference was taken from: Volumes 00E, 01E, 10, 201, 202 |
 | `docs/academy/` | Academy project brief, Group 6 problem statement, system architecture diagram |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are; must stay in the root |
@@ -29,10 +29,10 @@ The sidebar's Model box sets the OpenRouter model. The default is `nvidia/nemotr
 
 ## How a question is answered
 
-1. When the Supabase key is entered, `web/data.js` downloads `manifest.json` and one Parquet file per table from Supabase (Parquet is a compressed file format for tables), and loads them into DuckDB-WASM, the version of the DuckDB SQL database that runs in the browser.
+1. When the Supabase key is entered, `web/data.js` downloads `gold/manifest.json` and the gold Parquet tables from Supabase (Parquet is a compressed file format for tables), and loads them into DuckDB-WASM, the version of the DuckDB SQL database that runs in the browser.
 2. `web/agent.js` sends the conversation to OpenRouter with a system prompt describing conformance testing and the tables, followed by `web/knowledge/core.md`, plus five tools the model may call:
-   - `list_tables`: every table, its row count, columns and source Excel files.
-   - `describe_table`: for one table, each column's distinct-value count, empty-value count and most common values, plus 5 sample rows.
+   - `list_tables`: every table, its description, row count and columns with their meanings.
+   - `describe_table`: for one table, each column's meaning, distinct-value count, empty-value count and most common values, plus 5 sample rows.
    - `run_sql`: one SELECT statement, returning at most 200 rows.
    - `read_reference`: one topic file from `web/knowledge/`.
    - `lookup_reject_codes`: the Volume 10 meaning of the given reject codes, from `web/knowledge/reject_codes.json`.
@@ -60,12 +60,22 @@ To add a topic, add the file and an entry in `REFERENCE_TOPICS` in `web/agent.js
 
 ## Rebuild the Supabase data
 
-Run these when the Excel files change. They need Python and the packages in `code/requirements.txt` (`pip install -r code/requirements.txt`).
+The bucket `fix-data` holds the data in three layers, each made by a script from the layer before it, plus a copy of the scripts:
 
-1. `python code/build_site_data.py` reads the 36 Excel files in `DATA_DIR` and writes one Parquet file per table, plus `manifest.json`, to `data/`. The first run converts each Excel file to a Parquet copy in `code/.cache/`, which takes a few minutes. Later runs re-read an Excel file only if its size or modified time has changed.
-2. `python code/upload_to_supabase.py` uploads everything in `data/` to the Supabase bucket, creating the bucket as private if it does not exist and replacing files of the same name.
+| Folder | Made by | Contents |
+|---|---|---|
+| `bronze/` | `code/bronze.py` | The 36 Vonnegut Excel exports in their month folders, unchanged except that every real CompID is replaced with its fictitious CompID from `CompID_Key.xlsx`. Supabase does not accept `[` or `]` in a file name, so they are stored as `(` and `)`; `bronze/files.json` lists the original names. |
+| `silver/` | `code/silver.py` | One Parquet table per message type, all months combined, with cleaned column names and types. |
+| `gold/` | `code/gold.py` | The star schema the page loads (see below). |
+| `scripts/` | each script | The current copy of the scripts in `code/`. |
 
-`data/`, `code/.cache/` and the Excel files are excluded from git.
+Run them in order when the Excel files change. They need Python and the packages in `code/requirements.txt` (`pip install -r code/requirements.txt`).
+
+1. `python code/bronze.py` reads the Excel files in `DATA_DIR` and uploads them to `bronze/`. It stops without uploading a file if any real CompID is left in it.
+2. `python code/silver.py` downloads `bronze/` and uploads `silver/`. It takes about 10 minutes, most of it reading the Excel files.
+3. `python code/gold.py` downloads `silver/` and uploads `gold/`.
+
+Each script replaces the files in its folder and deletes files that it no longer writes. The Excel files and `CompID_Key.xlsx` are excluded from git.
 
 ## Settings: `code/.env`
 
@@ -75,33 +85,28 @@ Run these when the Excel files change. They need Python and the packages in `cod
 |---|---|
 | `DATA_DIR` | Folder of month folders of Excel files, relative to the repository root. Default `Trading_FIX_Messages`. |
 | `SUPABASE_URL` | Address of the Supabase project, `https://oftjypstiufmzblmtrom.supabase.co`. |
-| `SUPABASE_SERVICE_KEY` | Supabase secret key. It can create buckets and upload files, so it is used only by `upload_to_supabase.py` and never entered in the page. |
+| `SUPABASE_SERVICE_KEY` | Supabase secret key. It can create buckets and upload files, so it is used only by the scripts in `code/` and never entered in the page. |
 | `SUPABASE_BUCKET` | Storage bucket name. Default `fix-data`. |
+| `COMPID_KEY` | Excel file with columns `Real CompID` and `Fictitious CompID`, relative to the repository root. Default `CompID_Key.xlsx`. |
 
-## Tables
+## Gold tables
 
-The exports are messages of the JSE Basic Native Trading Gateway. `code/data_store.py` combines the three months into one table per message type. A file is assigned to a table by the most frequent value in its `Message Type` column, not by its file name, because some file names do not match their contents: `July_2026/Logout [B].xlsx` holds Logon Response messages.
+A star schema is a table of events (a fact table) whose code and ID columns are described in small lookup tables (dimension tables). `code/gold.py` describes each table and column in `gold/manifest.json`, which the agent's `list_tables` and `describe_table` tools return.
 
-| Table | Native message type |
+| Table | One row per |
 |---|---|
-| `logon` | A |
-| `logon_response` | B |
-| `logout` | 5 |
-| `new_order_single` | D |
-| `order_cancel_request` | F |
-| `order_cancel_replace_request` | G |
-| `execution_report` | 8 |
-| `order_cancel_reject` | 9 |
-| `reject` | 3 |
-| `order_mass_cancel_request` | q |
-| `order_mass_cancel_report` | r |
+| `fact_message` | Distinct message of every type (2,169,820 messages from 3,763,516 export rows) |
+| `fact_order` | Order (JSE `order_id`), with how it was entered, its outcome and counts of its reports and requests |
+| `fact_compid_day` | CompID per day, with counts of each kind of message |
+| `dim_compid`, `dim_date`, `dim_security` | CompID, calendar day, instrument |
+| `dim_message_type`, `dim_code`, `dim_reject_code` | Meaning of each message type, code value and reject code |
 
-Changes made while loading:
+Changes made in `fact_message`:
 
-- Column headers are converted to lower case with underscores (`Comp ID` becomes `comp_id`).
-- Every table gets `source_month` (for example `July_2026`) and `source_file`.
-- The second `Message Type` column in Reject files is named `ref_message_type`: it holds the type of the message that was rejected.
-- `Timestamp` and `Transact Time` are stored as date-times. Vonnegut writes a 24-hour time followed by "am" or "pm", which is removed.
-- Quantities and prices are stored as numbers, with thousands commas removed. Identifiers and code columns stay as text.
+- Repeated rows are merged; `copies` counts the export rows in each message. An execution report is one row per `execution_id`; other messages one row per set of identical values.
+- An empty `comp_id` on a JSE reply is filled from other messages of the same order (`comp_id_filled` is true).
+- A New Order, cancel or amend with no `order_id` gets the `order_id` of the JSE reply with the same CompID and `client_order_id` captured within 1 second (`order_id_linked` is true).
+- `-1`, the exports' "not set" value, becomes empty in `reject_code`, `minimum_quantity`, `stop_price` and `password_expiry`.
+- The network capture columns (`source`, `destination`, `bytes`, `sequence_no`, `packet_id`) are left out; they are in `silver/`.
 
-In the browser, `web/data.js` also creates the view `all_messages`, which holds `table_name`, `source_month`, `source_file`, `timestamp`, `comp_id`, `message_type` and `client_order_id` for every row of every table, so one order or CompID can be followed across message types. After loading, `web/data.js` switches off file, network and settings access for the SQL connection.
+After loading, `web/data.js` switches off file, network and settings access for the SQL connection.

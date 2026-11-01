@@ -24,7 +24,7 @@
 | `order_status` | 0 New, 1 Partially Filled, 2 Filled, 4 Cancelled, 6 Expired, 8 Rejected, 9 Suspended. If several apply, the highest precedence is reported: 2, 9, 4, 6, 1, 0, 8 |
 | `working_indicator` | only when `order_status` is 0: 0 Unset, 1 Order is being worked (elected on entry), 2 Not currently working (unelected stop or stop limit) |
 | `liquidity_indicator` | only on trades: 0 Unset, 1 Added liquidity (passive), 2 Removed liquidity (aggressive), 4 Auction |
-| `typeoftrade` | only on trades: 0 Visible passive, 1 Hidden passive, 2 Not specified (the executed portion was aggressive), 3 Pegged passive |
+| `type_of_trade` | only on trades: 0 Visible passive, 1 Hidden passive, 2 Not specified (the executed portion was aggressive), 3 Pegged passive |
 | `indicator_flags` | only on trades: 1 = this order was the aggressor, 0 = passive; both sides 0 in auctions |
 | `executed_quantity`, `executed_price` | only when `execution_type` is F or G |
 | `leaves_quantity` | quantity still open |
@@ -39,7 +39,7 @@ Typical sequences: accepted order `0`; trade `F`; amend `5`; cancel `4`; IOC/FOK
 | Column | Values |
 |---|---|
 | `mass_cancel_request_type` | 3 All firm orders for an instrument, 4 All firm orders for a segment, 7 All orders for this CompID, 8 All orders for the firm, 9 This CompID's orders for an instrument, 15 This CompID's orders for a segment (types 14 and 22 are rejected by the Basic gateway) |
-| `status` (report) | 7 Accepted, 0 Rejected (reason in `reject_code`) |
+| `mass_cancel_status` (report) | 7 Accepted, 0 Rejected (reason in `reject_code`) |
 
 After an accepted mass cancel the JSE sends an Execution Report `4` for each cancelled order and an Order Cancel Reject `9` for each order it could not cancel, all carrying the mass cancel request's `client_order_id`. A mass cancel during the Start of Trading session is rejected.
 
@@ -47,7 +47,7 @@ After an accepted mass cancel the JSE sends an Execution Report `4` for each can
 
 - `protocol_version` (Logon): 1, 2 or 3; empty or 0 means the system default. Version 2 is required for iceberg orders; version 3 for self-match prevention.
 - `reject_code` (Logon Response): see the `reject_codes` reference. 0 means logged in; 3 means logged in but the new password does not meet the password policy; any other value means the logon was rejected and the JSE disconnected.
-- `password_expiry`: days until the password expires; negative means not applicable.
+- `password_expiry`: days until the password expires; empty means not applicable.
 - `reason` (Logout): free text. Observed in the data: "User logout received" (normal client logout), "Force Logout on End" (JSE end of day), "HB expired" (heartbeats missed), "Requested disconnect", "Recovery is done." and "recovery complete" (recovery channel), "session stop time", "Message limit exceed", "conformance test com…" and "conformance session …" (texts cut to 20 characters), and empty.
 
 **FIX values that differ from Native (Volume 00E Appendix G)** — use only to translate if an analyst quotes FIX values: order type Pegged FIX `P` = Native 50, Pegged Limit `R` = 51; TIF OPG FIX `2` = Native 5, ATC `7` = 10, GFX `8` = 51, GTT `6` = 8, CPX `a` = 12; order status Expired FIX `C` = Native 6; capacity Principal FIX `P` = Native 2, Agency `A` = 3.

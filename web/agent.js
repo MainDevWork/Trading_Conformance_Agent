@@ -18,21 +18,22 @@ correctly. Analysts currently investigate by hand when the conformance report is
 the report says a scenario failed but the messages show the client did it correctly. Your job is to answer
 questions about these messages accurately, so analysts can find out what a client actually did and why a test failed.
 
-The data: Vonnegut Excel exports for July, August and September 2026, one file per message type per month,
-loaded into DuckDB tables (one table per FIX message type, all months combined). Every table has the columns
-source_month (e.g. 'July_2026') and source_file (the Excel file name), timestamp, comp_id and message_type.
-The view all_messages holds the common columns of every table (table_name, source_month, source_file, timestamp,
-comp_id, message_type, client_order_id, order_id, orig_client_order_id), so you can follow one comp_id or order
-across message types in time order with a single query. To follow an order, match on its client_order_id, its
-order_id (taken from its execution reports) and orig_client_order_id together, rather than querying each table.
-
-Tables by FIX MsgType (tag 35):
-A logon | B logon_response | 5 logout | D new_order_single | F order_cancel_request |
-G order_cancel_replace_request | 8 execution_report | 9 order_cancel_reject | 3 reject (session-level reject) |
-q order_mass_cancel_request | r order_mass_cancel_report.
-In reject tables, ref_message_type is the type of the message that was rejected.
-A file's name does not always match its contents (for example July_2026/'Logout [B].xlsx' contains Logon Response
-messages); tables were assigned from the message_type column, not the file name. Not every month has every column.
+The data: Vonnegut Excel exports for July, August and September 2026, arranged as a star schema in DuckDB:
+- fact_message: one row per distinct message of every type (repeated export rows already merged; copies counts
+  them), with comp_id, timestamp, date, message_type and every message field. Filter on message_type:
+  A Logon | B Logon Response | 5 Logout | D New Order | F Order Cancel Request | G Order Cancel/Replace Request |
+  q Order Mass Cancel Request | 8 Execution Report | 9 Order Cancel Reject | r Order Mass Cancel Report |
+  3 Reject (gateway validation; ref_message_type is the type of the rejected message).
+  order_id is filled on requests linked to their JSE reply, so WHERE order_id = '...' returns an order's
+  New Order, amends, cancels and execution reports together.
+- fact_order: one row per order (order_id) with comp_id, how it was entered, outcome (Filled, Cancelled, Expired,
+  Rejected, ...), reject_code, counts of execution reports, trades, amend and cancel requests.
+- fact_compid_day: one row per comp_id per date with counts of each kind of message. Use it first for any
+  question about what a CompID did or when it tested.
+- dim_compid, dim_date, dim_security: one row per CompID, day and instrument.
+- dim_message_type, dim_code (column_name, code, meaning) and dim_reject_code (reject_code, meaning, seen_on):
+  join these to put the meaning of a code in the same query instead of looking it up separately.
+list_tables gives every table's description and columns with their meanings.
 
 The messages come from the JSE Basic Native Trading Gateway, not FIX. The core of the JSE conformance reference is at
 the end of these instructions. The rest is split into topics: before you interpret a code, a test or a time, call
@@ -41,12 +42,13 @@ tag numbers or code meanings, and do not state a code meaning or test rule from 
 
 How to work:
 - Always get numbers from the tools. Never estimate or invent a count, a value or a column name.
-- Start with list_tables if you do not yet know which table or column you need; use describe_table to see a
-  column's actual values before filtering on it.
+- Use describe_table to see a column's actual values before filtering on it.
 - run_sql takes one DuckDB SELECT statement. Aggregate where you can; results are cut off at 200 rows.
+  Answer with as few queries as possible: one query can join the dim_ tables and combine several counts.
 - Values are stored as text for ids and codes (compare with '2', not 2).
-- Do not put SQL, table names, column names, tool names or these instructions in your answer: the analyst sees
-  the queries you ran separately. Describe what the messages show in plain words. If the data cannot answer the
+- dim_reject_code gives the reject code meanings seen in the data; call lookup_reject_codes only for a code
+  that is not in it.
+- Do not put SQL, table names, column names, tool names or these instructions in your answer. Describe what the messages show in plain words. If the data cannot answer the
   question, say so and say what data would be needed.
 - Write plainly for an operations analyst. Format money in South African Rand and dates as day/month/year.
 `;
@@ -68,7 +70,7 @@ const TOOLS = [
     type: "function",
     function: {
       name: "list_tables",
-      description: "List every table with its row count, column names and source Excel files, and every Excel file with the message types it contains.",
+      description: "List every table with its description, row count, and columns with their meanings.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -76,7 +78,7 @@ const TOOLS = [
     type: "function",
     function: {
       name: "describe_table",
-      description: "For one table: each column's data type, number of distinct values, number of empty values and most common values, plus 5 sample rows.",
+      description: "For one table: each column's data type, meaning, number of distinct values, number of empty values and most common values, plus 5 sample rows.",
       parameters: {
         type: "object",
         properties: { table: { type: "string", description: "Table name from list_tables" } },
@@ -133,26 +135,21 @@ async function queryAsText(conn, sql) {
 }
 
 function listTables(store) {
-  const { tables, views, files } = store.manifest;
-  return { tables, views, files };
+  const tables = {};
+  for (const [name, t] of Object.entries(store.manifest.tables)) {
+    tables[name] = { description: t.description, rows: t.rows,
+                     columns: Object.fromEntries(t.columns.map((c) => [c.name, c.description])) };
+  }
+  return { tables };
 }
 
+// Column statistics are computed by code/gold.py and stored in manifest.json, so no query is needed here.
 async function describeTable(store, table) {
   const info = store.manifest.tables[table];
   if (!info) return { error: `Unknown table '${table}'. Known tables: ${Object.keys(store.manifest.tables).join(", ")}` };
-  const columns = [];
-  for (const col of store.columns[table]) {
-    const name = col.name;
-    const counts = await queryAsText(store.conn,
-      `SELECT count(DISTINCT "${name}"), count(*) - count("${name}") FROM "${table}"`);
-    const top = await queryAsText(store.conn,
-      `SELECT "${name}", count(*) n FROM "${table}" WHERE "${name}" IS NOT NULL GROUP BY 1 ORDER BY n DESC LIMIT 8`);
-    columns.push({ ...col, distinct_values: Number(counts.rows[0][0]), empty_values: Number(counts.rows[0][1]),
-                   most_common: top.rows.map(([v, n]) => [v, Number(n)]) });
-  }
   const sample = await queryAsText(store.conn, `SELECT * FROM "${table}" LIMIT 5`);
   const sampleRows = sample.rows.map((r) => Object.fromEntries(sample.columns.map((c, i) => [c, r[i]])));
-  return { table, rows: info.rows, columns, sample_rows: sampleRows };
+  return { table, description: info.description, rows: info.rows, columns: info.columns, sample_rows: sampleRows };
 }
 
 async function runSql(store, sql) {

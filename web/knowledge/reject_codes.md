@@ -1,10 +1,10 @@
 # Reject codes
 
-The Native gateway sends a reject code in four places: Reject `3` (gateway validation, `reject` table, with `reject_reason` naming the field), Execution Report `8` with `execution_type` 8 (matching engine), Order Cancel Reject `9`, and Logon Response `B`.
+The Native gateway sends a reject code in four places: Reject `3` (gateway validation, with `reject_reason` naming the field), Execution Report `8` with `execution_type` 8 (matching engine), Order Cancel Reject `9`, and Logon Response `B`.
 
 **Codes observed in the data, with their Volume 10 meaning**
 
-Reject (`reject` table). Observed in the data: about 1.09 million rows, almost all `134200` on New Orders; check whether one CompID sending to an unknown user dominates before drawing conclusions about rejects.
+Reject `3`. Observed in the data: about 1.09 million export rows (about 0.7 million distinct messages), almost all `134200` on New Orders; check whether one CompID sending to an unknown user dominates before drawing conclusions about rejects.
 
 | Code | Meaning | `reject_reason` seen |
 |---|---|---|
@@ -67,6 +67,6 @@ Logon Response:
 | 9903 | Concurrent login limit reached |
 | 9905 | System unavailable (to sponsored users) |
 
-Order Mass Cancel Report: observed in the data, every report has `status` 7 (accepted) and `reject_code` -1.
+Order Mass Cancel Report: observed in the data, every report has `mass_cancel_status` 7 (accepted) and no `reject_code`.
 
 For any other code, call `lookup_reject_codes`; it returns every Volume 10 entry for a code (reason, message types and the system that sends it). If a code is not in Volume 10, report the code and any `reject_reason` text and say its meaning is not in the documents provided.

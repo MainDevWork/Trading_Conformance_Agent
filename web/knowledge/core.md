@@ -19,21 +19,21 @@ Rules from the Academy brief that apply to answers: use real data and say when a
 
 The exports are messages of the JSE **Basic Native Trading Gateway** (the JSE's own binary order-entry protocol for equities), not FIX. The message type letters show it: in the Native gateway `B` is Logon Response; in FIX `B` is News. Use the Native codes in these references. Do not use FIX tag numbers or FIX code meanings; several differ (the `field_codes` reference lists the differences).
 
-| Code | Message | Table | Sent by |
+| Code | Message | In `fact_message` | Sent by |
 |---|---|---|---|
-| A | Logon | `logon` | client |
-| B | Logon Response | `logon_response` | JSE |
-| 5 | Logout | `logout` | either |
+| A | Logon | yes | client |
+| B | Logon Response | yes | JSE |
+| 5 | Logout | yes | either |
 | 0 | Heartbeat | not exported | either |
-| 3 | Reject (message failed gateway validation) | `reject` | JSE |
-| D | New Order | `new_order_single` | client |
-| F | Order Cancel Request | `order_cancel_request` | client |
-| G | Order Cancel/Replace Request (amend) | `order_cancel_replace_request` | client |
-| q | Order Mass Cancel Request | `order_mass_cancel_request` | client |
+| 3 | Reject (message failed gateway validation) | yes | JSE |
+| D | New Order | yes | client |
+| F | Order Cancel Request | yes | client |
+| G | Order Cancel/Replace Request (amend) | yes | client |
+| q | Order Mass Cancel Request | yes | client |
 | C | New Order Cross | not exported | client |
-| 8 | Execution Report | `execution_report` | JSE |
-| 9 | Order Cancel Reject | `order_cancel_reject` | JSE |
-| r | Order Mass Cancel Report | `order_mass_cancel_report` | JSE |
+| 8 | Execution Report | yes | JSE |
+| 9 | Order Cancel Reject | yes | JSE |
+| r | Order Mass Cancel Report | yes | JSE |
 | j | Business Reject | not exported | JSE |
 | M, N, P | Missed Message Request, Missed Message Request Ack, Transmission Complete (recovery channel) | not exported (M appears only as `ref_message_type` of rejects) | client, JSE, JSE |
 | n | System Status | not exported | JSE |
@@ -41,21 +41,22 @@ The exports are messages of the JSE **Basic Native Trading Gateway** (the JSE's 
 
 ## Rules for reading the data
 
-- **Repeated rows.** Observed in the data: between 10% and 50% of rows in a file are exact copies of another row, usually with the same `timestamp` or one a few milliseconds later. To count messages, count distinct rows or distinct identifiers (for example `count(DISTINCT execution_id)` for execution reports, `count(DISTINCT client_order_id)` for new orders per `comp_id`) and say which you used. Never report a raw `count(*)` as a number of messages without saying it includes repeated rows.
+- **Repeated rows.** Observed in the data: between 10% and 50% of rows in a Vonnegut export are copies of another row. `fact_message` already holds one row per message: an execution report is one row per `execution_id`, and other message types one row per set of identical values. `copies` is the number of export rows merged into the row. So `count(*)` on `fact_message` counts messages; say so when reporting a count.
 - **Times.** `timestamp` is the Vonnegut capture time in South African time (SAST, UTC+2). `transact_time` is the JSE event time in UTC. Observed in the data: `transact_time` is 2 hours behind `timestamp`. Compare times with the session schedule (see the `trading_sessions` reference) in SAST, and say which column you used.
-- **Missing columns.** Not every month has every column. Observed in the data: July execution reports have `order_status` but no `execution_type`; August execution reports have `execution_type` but no `order_status`; September has both. Check with `describe_table` before filtering on a column for a given month.
-- **Placeholder values.** Observed in the data: `-1` in `reject_code`, `minimum_quantity` and `stop_price` means "not set". `NONE` in `order_id` of an Order Cancel Reject means the JSE could not find the order.
+- **Missing columns.** Not every month has every column. Observed in the data: July execution reports have `order_status` but no `execution_type`; August execution reports have `execution_type` but no `order_status`; September has both. Check with `describe_table` before filtering on a column. `fact_order` handles this: its `outcome` uses whichever of the two columns is filled.
+- **Placeholder values.** The exports write `-1` for "not set" in `reject_code`, `minimum_quantity`, `stop_price` and `password_expiry`; in `fact_message` these are empty (NULL). `NONE` in `order_id` of an Order Cancel Reject means the JSE could not find the order.
+- **Filled and linked values.** Some JSE replies had no `comp_id`; `fact_message` fills it from other messages of the same order and marks those rows `comp_id_filled`. New Orders, cancels and amends that carried no `order_id` were given the `order_id` of the JSE reply with the same `comp_id` and `client_order_id` captured within 1 second, marked `order_id_linked`. Say so when an answer depends on a filled or linked value.
 - **Reject codes** are stored without leading zeros (Volume 10 writes `001202`, the data `1202`).
 - **Prices.** `executed_price`, `limit_price` and `stop_price` are in ZAC (South African cents) per share. Divide by 100 for Rand.
-- **Comp ID.** `comp_id` (CompID, the Interface User ID) is the login name of one client connection. One firm (member) can have several CompIDs. The `logon` table also has a `compid` column holding the CompID inside the Logon message.
-- **Two message type columns in rejects.** In the `reject` table, `message_type` is always `3`; `ref_message_type` is the type of the client message that was rejected.
+- **Comp ID.** `comp_id` (CompID, the Interface User ID) is the login name of one client connection. One firm (member) can have several CompIDs. Logon messages also have `logon_compid`, the CompID inside the Logon message.
+- **Two message type columns in rejects.** For Reject messages, `message_type` is `3` and `ref_message_type` is the type of the client message that was rejected.
 - **Security ID** is the JSE numeric Instrument ID. The exports do not contain instrument symbols or segments; the reference data that maps them (Volume 09, the daily reference data file) is not available here.
 
 ## How to investigate a failed or disputed test
 
-1. Identify the CompID, the test date and the test ID. If the analyst gives only a CompID, list that CompID's message types and distinct message counts per day to find the test day.
-2. List the client's messages for that day in time order from `all_messages`, removing exact repeated rows.
+1. Identify the CompID, the test date and the test ID. If the analyst gives only a CompID, read its rows in `fact_compid_day` to find the test days and what it sent on each.
+2. List the client's messages for that day in time order from `fact_message`, and its orders from `fact_order`.
 3. For each step of the test in the `tests` reference, find the client's request and the JSE's reply, linked by `order_id` or `client_order_id`, and check the session in force at that time (see the `trading_sessions` reference).
-4. Look for rejections and explain each with the `reject_codes` reference: `reject` rows (`ref_message_type`, `reject_code`, `reject_reason`), execution reports with `execution_type` 8, Order Cancel Rejects, Mass Cancel Reports with `status` 0, Logon Responses with a non-zero `reject_code`. Common causes in the data: price band (1202), wrong session (9008, 1524, 9015, 134007), unknown user or trader mnemonic (134200), order already gone (2000).
+4. Look for rejections and explain each with the `reject_codes` reference: Reject `3` messages (`ref_message_type`, `reject_code`, `reject_reason`), execution reports with `execution_type` 8, Order Cancel Rejects, Mass Cancel Reports with `mass_cancel_status` 0, Logon Responses with a non-zero `reject_code`. Common causes in the data: price band (1202), wrong session (9008, 1524, 9015, 134007), unknown user or trader mnemonic (134200), order already gone (2000).
 5. Check the process rules: a Logout or new Logon between steps that the test does not call for is a deviation; a missing step means the test was not completed; a step done in the wrong session (for example an IOC order during an auction) fails.
 6. State the conclusion as: what the test requires, what the messages show (with the query used), and whether the messages support a pass or a fail. If the report says a scenario failed but the messages show every expected reply, say that the messages show the client completed it, and that the conformance configuration may need checking.

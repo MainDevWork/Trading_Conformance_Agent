@@ -112,7 +112,7 @@ async function start() {
   } finally {
     loading = false;
   }
-  text.textContent = `Loaded from Supabase (${store.manifest.built_from})`;
+  text.textContent = "Loaded from Supabase (gold tables)";
   bar.style.width = "100%";
   const rows = Object.entries(store.manifest.tables).map(([name, t]) => `<tr><td>${name}</td><td>${t.rows.toLocaleString()}</td></tr>`);
   document.getElementById("tables").innerHTML = rows.join("");
