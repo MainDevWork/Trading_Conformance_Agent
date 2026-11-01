@@ -34,7 +34,8 @@ The data: Vonnegut Excel exports for July, August and September 2026, arranged a
 - dim_compid, dim_date, dim_security: one row per CompID, day and instrument.
 - dim_message_type, dim_code (column_name, code, meaning) and dim_reject_code (reject_code, meaning, seen_on):
   join these to put the meaning of a code in the same query instead of looking it up separately.
-list_tables gives every table's description and columns with their meanings.
+Every table's columns and their meanings are listed at the end of these instructions, so do not call
+list_tables before writing a query.
 
 The messages come from the JSE Basic Native Trading Gateway, not FIX. The core of the JSE conformance reference is at
 the end of these instructions. The rest is split into topics: before you interpret a code, a test or a time, call
@@ -43,7 +44,7 @@ tag numbers or code meanings, and do not state a code meaning or test rule from 
 
 How to work:
 - Always get numbers from the tools. Never estimate or invent a count, a value or a column name.
-- Use describe_table to see a column's actual values before filtering on it.
+- Call describe_table only when you need a column's most common values before filtering on it.
 - run_sql takes one DuckDB SELECT statement. Aggregate where you can; results are cut off at 200 rows.
   Answer with as few queries as possible: one query can join the dim_ tables and combine several counts.
 - Values are stored as text for ids and codes (compare with '2', not 2).
@@ -133,6 +134,16 @@ async function queryAsText(conn, sql) {
   const columns = table.schema.fields.map((f) => f.name);
   const rows = table.toArray().map((r) => columns.map((_, i) => r[columns[i]] ?? null));
   return { columns, rows };
+}
+
+// Every table with its columns and their meanings, as text for the system prompt.
+function schemaText(store) {
+  const lines = ["# Tables and columns"];
+  for (const [name, t] of Object.entries(store.manifest.tables)) {
+    lines.push(`\n## ${name} (${t.rows.toLocaleString("en-ZA")} rows): ${t.description}`);
+    for (const c of t.columns) lines.push(`- ${c.name} (${c.type})${c.description ? `: ${c.description}` : ""}`);
+  }
+  return lines.join("\n");
 }
 
 function listTables(store) {
@@ -233,7 +244,7 @@ async function lookupRejectCodes(codes) {
 export async function chat(store, apiKey, history) {
   const model = MODEL;
   const core = await loadKnowledge("core.md");
-  const messages = [{ role: "system", content: `${SYSTEM_PROMPT}\n\n${core}` },
+  const messages = [{ role: "system", content: `${SYSTEM_PROMPT}\n\n${core}\n\n${schemaText(store)}` },
     ...history.filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content }))];
   const steps = [];
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {

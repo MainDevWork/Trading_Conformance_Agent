@@ -12,7 +12,13 @@ const supabaseKeyInput = document.getElementById("supabase-key");
 // Keys saved by earlier versions of this page are deleted.
 localStorage.removeItem("supabaseKey");
 localStorage.removeItem("openrouterKey");
-supabaseKeyInput.addEventListener("change", () => { if (!store) start(); });
+// Loading starts 0.6 seconds after the key is pasted or typed, without waiting for Enter or a click elsewhere.
+let keyTimer = null;
+supabaseKeyInput.addEventListener("input", () => {
+  clearTimeout(keyTimer);
+  keyTimer = setTimeout(() => { if (!store) start(); }, 600);
+});
+supabaseKeyInput.addEventListener("change", () => { clearTimeout(keyTimer); if (!store) start(); });
 // A model name saved by earlier versions of this page is deleted: the model is fixed in agent.js.
 localStorage.removeItem("model");
 
@@ -96,21 +102,16 @@ async function start() {
   if (!supabaseKey || loading) return;
   loading = true;
   const text = document.getElementById("status-text");
-  const bar = document.getElementById("progress-bar");
   sendBtn.disabled = true;
   try {
-    store = await loadStore(supabaseKey, (message, fraction) => {
-      text.textContent = message;
-      bar.style.width = `${100 * fraction}%`;
-    });
+    store = await loadStore(supabaseKey, (message) => { text.textContent = message; });
   } catch (err) {
     text.textContent = `Loading failed: ${err.message || err}`;
     return;
   } finally {
     loading = false;
   }
-  text.textContent = "Loaded from Supabase (gold tables)";
-  bar.style.width = "100%";
+  text.textContent = "Data loaded. The agent can answer questions.";
   const rows = Object.entries(store.manifest.tables).map(([name, t]) => `<tr><td>${name}</td><td>${t.rows.toLocaleString()}</td></tr>`);
   document.getElementById("tables").innerHTML = rows.join("");
   sendBtn.disabled = false;

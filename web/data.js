@@ -16,11 +16,20 @@ async function download(supabaseKey, name) {
   return response;
 }
 
-// onProgress(text, fractionDone) is called before each step.
+// Copies of the gold files are kept in this browser's cache storage (Cache API). manifest.json is always downloaded,
+// which also checks the key; when it matches the saved copy, the tables are read from the saved files instead of
+// being downloaded again. When gold.py uploads new files, manifest.json changes and every file is downloaded again.
+const CACHE_NAME = "gold-tables";
+
+async function openCache() {
+  try { return "caches" in self ? await caches.open(CACHE_NAME) : null; } catch { return null; }
+}
+
+// onProgress(text) is called before each step.
 // Returns { conn, manifest }. manifest.tables[table] has description, rows and columns
 // (each column with its description, distinct and empty value counts and most common values).
 export async function loadStore(supabaseKey, onProgress) {
-  onProgress("Starting DuckDB…", 0);
+  onProgress("Starting DuckDB…");
   const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
   // Browsers refuse to start a worker from another site's URL, so the worker script is wrapped in a local blob.
   const workerUrl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" }));
@@ -29,17 +38,32 @@ export async function loadStore(supabaseKey, onProgress) {
   URL.revokeObjectURL(workerUrl);
   const conn = await db.connect();
 
-  onProgress("Downloading the table list…", 0);
-  const manifest = await (await download(supabaseKey, "manifest.json")).json();
+  onProgress("Downloading the table list…");
+  const manifestText = await (await download(supabaseKey, "manifest.json")).text();
+  const manifest = JSON.parse(manifestText);
+  const cache = await openCache();
+  const saved = cache && await cache.match("manifest.json");
+  const useSaved = Boolean(saved) && (await saved.text()) === manifestText;
+  if (cache && !useSaved) for (const request of await cache.keys()) await cache.delete(request);
+
   const tableNames = Object.keys(manifest.tables);
   for (const [i, table] of tableNames.entries()) {
-    onProgress(`Loading table ${i + 1} of ${tableNames.length}: ${table}`, i / tableNames.length);
-    const response = await download(supabaseKey, `${table}.parquet`);
     const file = `${table}.parquet`;
-    await db.registerFileBuffer(file, new Uint8Array(await response.arrayBuffer()));
+    const hit = useSaved && await cache.match(file);
+    onProgress(`Loading table ${i + 1} of ${tableNames.length}: ${table}${hit ? " (saved copy)" : ""}`);
+    let bytes;
+    if (hit) {
+      bytes = await hit.arrayBuffer();
+    } else {
+      bytes = await (await download(supabaseKey, file)).arrayBuffer();
+      if (cache) await cache.put(file, new Response(bytes)).catch(() => {});
+    }
+    await db.registerFileBuffer(file, new Uint8Array(bytes));
     await conn.query(`CREATE TABLE "${table}" AS SELECT * FROM read_parquet('${file}')`);
     await db.dropFile(file);
   }
+  // Saved last, so an interrupted download is never treated as a complete saved copy.
+  if (cache && !useSaved) await cache.put("manifest.json", new Response(manifestText)).catch(() => {});
 
   // The agent's SQL may only read the tables above: no file, network or settings access.
   await conn.query("SET enable_external_access = false");
