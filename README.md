@@ -25,7 +25,7 @@ Enter two keys in the sidebar. Neither is saved: paste them again after reloadin
 | Supabase key | The Supabase publishable key (starts `sb_publishable_`). `web/data.js` uses it to download the message data from the private Supabase Storage bucket `fix-data`. Never enter the service key here. |
 | OpenRouter key | `web/agent.js` sends it only to openrouter.ai, with each question. |
 
-The sidebar's Model box sets the OpenRouter model. The default is `nvidia/nemotron-3.5-lightning:free`, set in `web/agent.js`.
+Every question is sent to the model `nvidia/nemotron-3.5-lightning:free`, set as `MODEL` in `web/agent.js`. The page has no setting to change it.
 
 ## How a question is answered
 

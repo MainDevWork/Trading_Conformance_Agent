@@ -6,7 +6,8 @@ const MAX_TOOL_ROUNDS = 12;
 const MAX_TOOL_RESULT_CHARS = 30_000;
 const MAX_ROWS = 200;
 
-export const DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning:free";
+// The language model every question is sent to. Fixed here; the page has no setting to change it.
+export const MODEL = "nvidia/nemotron-3.5-lightning:free";
 
 const SYSTEM_PROMPT = `You are the Trading Conformance Agent for JSE Trading Operations.
 
@@ -229,8 +230,8 @@ async function lookupRejectCodes(codes) {
 
 // history is the visible conversation: [{role: "user"|"assistant", content}, ...].
 // Returns the agent's answer and the tool calls it made to reach it.
-export async function chat(store, apiKey, history, model) {
-  model = model || DEFAULT_MODEL;
+export async function chat(store, apiKey, history) {
+  const model = MODEL;
   const core = await loadKnowledge("core.md");
   const messages = [{ role: "system", content: `${SYSTEM_PROMPT}\n\n${core}` },
     ...history.filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content }))];

@@ -53,7 +53,7 @@ body {
 #tables { width: 100%; margin-top: 10px; font-size: 13px; border-collapse: collapse; }
 #tables td { padding: 3px 0; border-bottom: 1px solid var(--border); }
 #tables td:last-child { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
-#model, #api-key, #supabase-key { width: 100%; padding: 6px 8px; font: 13px ui-monospace, monospace; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+#api-key, #supabase-key { width: 100%; padding: 6px 8px; font: 13px ui-monospace, monospace; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
 .hint { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
 .hint a { color: var(--accent); }
 #clear { margin-top: 20px; width: 100%; padding: 8px; background: none; color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }

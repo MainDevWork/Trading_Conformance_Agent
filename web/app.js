@@ -1,11 +1,10 @@
-import { chat, DEFAULT_MODEL } from "./agent.js";
+import { chat } from "./agent.js";
 import { loadStore } from "./data.js";
 
 const messagesEl = document.getElementById("messages");
 const form = document.getElementById("composer");
 const input = document.getElementById("input");
 const sendBtn = document.getElementById("send");
-const modelInput = document.getElementById("model");
 const keyInput = document.getElementById("api-key");
 const supabaseKeyInput = document.getElementById("supabase-key");
 
@@ -14,9 +13,8 @@ const supabaseKeyInput = document.getElementById("supabase-key");
 localStorage.removeItem("supabaseKey");
 localStorage.removeItem("openrouterKey");
 supabaseKeyInput.addEventListener("change", () => { if (!store) start(); });
-// The model name is saved in this browser's localStorage so it survives a page reload.
-modelInput.value = localStorage.getItem("model") || DEFAULT_MODEL;
-modelInput.addEventListener("change", () => localStorage.setItem("model", modelInput.value.trim()));
+// A model name saved by earlier versions of this page is deleted: the model is fixed in agent.js.
+localStorage.removeItem("model");
 
 // The visible conversation, sent in full to the model with every question.
 let history = [];
@@ -72,7 +70,7 @@ async function send(text) {
   pending.querySelector(".body").classList.add("thinking");
 
   try {
-    const data = await chat(store, apiKey, history, modelInput.value.trim() || null);
+    const data = await chat(store, apiKey, history);
     pending.remove();
     history.push({ role: "assistant", content: data.answer });
     addMessage("assistant", data.answer);
