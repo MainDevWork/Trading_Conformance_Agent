@@ -1,5 +1,5 @@
-import { chat } from "./agent.js?v=5";
-import { loadStore } from "./data.js?v=5";
+import { chat } from "./agent.js?v=6";
+import { loadStore } from "./data.js?v=6";
 
 window.appStarted = true;
 

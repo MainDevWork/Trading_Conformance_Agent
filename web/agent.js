@@ -252,7 +252,7 @@ export async function chat(store, apiKey, history) {
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const reply = await callModel(apiKey, messages, model);
     const toolCalls = reply.tool_calls || [];
-    if (!toolCalls.length) return { answer: reply.content || "", steps, model };
+    if (!toolCalls.length) return { answer: await withoutInternals(store, apiKey, messages, reply.content || "", model), steps, model };
 
     messages.push({ role: "assistant", content: reply.content ?? null, tool_calls: toolCalls });
     for (const call of toolCalls) {
@@ -271,6 +271,28 @@ export async function chat(store, apiKey, history) {
   messages.push({ role: "user", content: "You have used all your tool calls. Answer now from the tool results above. " +
     "Say plainly which parts of the question you could not finish." });
   const final = await callModel(apiKey, messages, model, false);
-  const answer = final.content || "I stopped after the maximum number of tool calls without reaching an answer. Try a narrower question.";
+  const answer = final.content
+    ? await withoutInternals(store, apiKey, messages, final.content, model)
+    : "I stopped after the maximum number of tool calls without reaching an answer. Try a narrower question.";
   return { answer, steps, model };
+}
+
+// The system prompt forbids table and column names in the answer, but the model does not always follow it.
+// If the answer names a table, or a column whose name contains "_", the model is asked once, without tools,
+// to rewrite it in plain words. If the rewrite still names one, the rewrite is shown anyway.
+function internalNames(store, text) {
+  const names = new Set(Object.keys(store.manifest.tables));
+  for (const t of Object.values(store.manifest.tables))
+    for (const c of t.columns || []) if (c.name.includes("_")) names.add(c.name);
+  return [...names].filter((n) => new RegExp(`\\b${n}\\b`, "i").test(text));
+}
+
+async function withoutInternals(store, apiKey, messages, answer, model) {
+  const found = internalNames(store, answer);
+  if (!found.length) return answer;
+  const rewrite = await callModel(apiKey, [...messages, { role: "assistant", content: answer },
+    { role: "user", content: `Rewrite your last answer for an operations analyst. Keep every number and fact, but do not ` +
+      `mention ${found.join(", ")} or any other table, column, SQL or tool name; say what the messages show in plain words.` }],
+    model, false).catch(() => null);
+  return rewrite?.content || answer;
 }
