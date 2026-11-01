@@ -75,7 +75,7 @@ async function send(text) {
     const data = await chat(store, apiKey, history, modelInput.value.trim() || null);
     pending.remove();
     history.push({ role: "assistant", content: data.answer });
-    addMessage("assistant", data.answer, data.steps);
+    addMessage("assistant", data.answer);
   } catch (err) {
     pending.remove();
     history.pop(); // drop the unanswered question so it can be asked again

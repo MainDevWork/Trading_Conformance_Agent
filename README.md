@@ -37,7 +37,7 @@ The sidebar's Model box sets the OpenRouter model. The default is `nvidia/nemotr
    - `read_reference`: one topic file from `web/knowledge/`.
    - `lookup_reject_codes`: the Volume 10 meaning of the given reject codes, from `web/knowledge/reject_codes.json`.
 3. `web/agent.js` runs each tool call the model makes and returns the result to the model, up to 12 rounds, until the model replies with text.
-4. The page shows the answer and, under it, each tool call with its SQL and result, so the analyst can check where every number came from.
+4. The page shows the answer text only; the tool calls and their SQL are not shown.
 
 ## Reference files: `web/knowledge/`
 

@@ -219,7 +219,7 @@
         <li><span class="num">3</span><span>The model returns either a tool call, for example <code>run_sql</code> with a SQL query it has written, or the final answer text.</span></li>
         <li><span class="num">4</span><span><code>agent.js</code> runs the tool call against the DuckDB-WASM tables. <code>run_sql</code> places the model's SQL inside <code>SELECT * FROM ( … )</code> with a row limit.</span></li>
         <li><span class="num">5</span><span>The result is returned to <code>agent.js</code>: at most 200 rows, cut to 30,000 characters. It is added to the conversation and step 2 runs again.</span></li>
-        <li><span class="num">6</span><span>When the model returns answer text, the page shows it, and under it each tool call with its SQL and result, so the analyst can check every number.</span></li>
+        <li><span class="num">6</span><span>When the model returns answer text, the page shows that text only. The tool calls and their SQL are not shown.</span></li>
       </ol>
     </section>
     <section>
