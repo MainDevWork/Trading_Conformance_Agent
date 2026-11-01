@@ -62,10 +62,9 @@
 </head>
 <body>
 <main>
-  <nav><a href="system_architecture.html">System architecture</a><a href="data_architecture.html">Data architecture</a><a href="silver_layer.html">Silver layer</a><a href="gold_star_schema.html">Gold star schema</a></nav>
+  <nav><a href="system_architecture.html">System architecture</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold star schema</a></nav>
 
   <h1>Gold layer: star schema of 3 fact tables and 6 dimension tables</h1>
-  <p class="sub"><code>code/gold.py</code> rebuilds the 11 silver tables as a star schema and uploads it to <code>gold/</code> in the Supabase bucket <code>fix-data</code>. These 9 tables are the only tables the chat page loads. A fact table has one row per event or per thing counted; a dimension table has one row per value of a code or ID used in the fact tables, with the description of that value. Each line in the diagram is a join: the two tables are matched on the column named on the line.</p>
 
   <div class="figure">
     <svg viewBox="0 0 1400 1080" role="img" aria-label="Star schema diagram: fact_message, fact_order and fact_compid_day in the middle row, joined to dim_date, dim_message_type, dim_security, dim_code, dim_compid and dim_reject_code">
@@ -251,7 +250,6 @@
   </ol>
 
   <h2>How fact_order decides each order's outcome</h2>
-  <p>The first test that is true gives the outcome.</p>
   <table>
     <thead><tr><th>Outcome</th><th>Test on the order's execution reports</th><th class="r">Orders</th></tr></thead>
     <tbody>
@@ -265,7 +263,6 @@
   </table>
 
   <h2>Example: a query that uses two joins</h2>
-  <p>Rejected orders per CompID, with the meaning of each reject code and the time in force the client sent:</p>
 <pre>SELECT o.comp_id,
        o.reject_code,
        r.meaning              AS reject_meaning,
@@ -277,7 +274,6 @@ LEFT JOIN dim_code c   ON c.column_name = 'time_in_force' AND c.code = o.time_in
 WHERE o.outcome = 'Rejected'
 GROUP BY ALL
 ORDER BY orders DESC;</pre>
-  <p>To list every message of one of those orders in capture order, a second query filters <code>fact_message</code> on the same <code>order_id</code> and sorts by <code>timestamp</code>.</p>
 </main>
 </body>
 </html>

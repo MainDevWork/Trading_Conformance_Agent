@@ -79,31 +79,26 @@
 </head>
 <body>
 <main>
-  <nav><a href="system_architecture.html">System architecture</a><a href="data_architecture.html">Data architecture</a><a href="silver_layer.html">Silver layer</a><a href="gold_star_schema.html">Gold star schema</a></nav>
+  <nav><a href="system_architecture.html">System architecture</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold star schema</a></nav>
 
   <h1>Trading Conformance Agent: system architecture</h1>
-  <p class="sub">A JSE Trading Operations analyst types a question about the July to September 2026 conformance test messages into a chat page. A language model on OpenRouter (a service that gives access to many language models) writes database queries; <code>web/agent.js</code> runs them on the gold tables inside the analyst's browser tab and returns the results to the model, and the model writes the answer. The project has no server of its own: every program runs in the browser tab or on an outside service.</p>
 
   <h2>Components</h2>
   <div class="figure">
-    <svg viewBox="0 0 1200 650" role="img" aria-label="Component diagram: chat page, agent, reference files, data loader and in-browser database in the browser tab, connected to OpenRouter, GitHub Pages, jsDelivr and Supabase Storage">
+    <svg viewBox="0 0 1200 550" role="img" aria-label="Component diagram: chat page, agent, reference files, data loader and in-browser database in the browser tab, connected to cloud storage">
       <defs>
         <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z"/></marker>
       </defs>
 
       <rect class="zone" x="20" y="40" width="720" height="490" rx="12"/>
       <text class="zl" x="34" y="64">ANALYST'S BROWSER TAB</text>
-      <rect class="zone" x="780" y="40" width="400" height="490" rx="12"/>
-      <text class="zl" x="794" y="64">OUTSIDE SERVICES (INTERNET)</text>
-      <rect class="zone" x="780" y="548" width="400" height="92" rx="12"/>
-      <text class="zl" x="794" y="568">ANALYST'S COMPUTER</text>
 
       <!-- browser row 1 -->
       <rect class="b web" x="40" y="80" width="200" height="150" rx="10"/>
       <text class="t" x="54" y="106">Chat page</text>
       <text class="p" x="54" y="125">index.html, web/app.js</text>
-      <text class="d" x="54" y="152">Sidebar: Supabase key,</text>
-      <text class="d" x="54" y="170">OpenRouter key, model.</text>
+      <text class="d" x="54" y="152">Sidebar: storage key,</text>
+      <text class="d" x="54" y="170">language model key, model.</text>
       <text class="d" x="54" y="194">Shows each answer's text.</text>
       <text class="d" x="54" y="212">Keys are not saved.</text>
 
@@ -120,7 +115,7 @@
       <text class="t" x="54" y="356">Data loader</text>
       <text class="p" x="54" y="375">web/data.js</text>
       <text class="d" x="54" y="402">Downloads gold/ from</text>
-      <text class="d" x="54" y="420">Supabase and creates</text>
+      <text class="d" x="54" y="420">cloud storage and creates</text>
       <text class="d" x="54" y="438">the 9 tables.</text>
 
       <rect class="b data" x="290" y="330" width="220" height="130" rx="10"/>
@@ -137,43 +132,16 @@
       <text class="d" x="554" y="420">question; 8 topic files and</text>
       <text class="d" x="554" y="438">reject_codes.json on request</text>
 
-      <!-- outside services -->
-      <rect class="b ai" x="800" y="80" width="360" height="110" rx="10"/>
-      <text class="t" x="814" y="106">OpenRouter</text>
-      <text class="p" x="814" y="125">openrouter.ai</text>
-      <text class="d" x="814" y="152">Runs the language model. Default:</text>
-      <text class="p" x="814" y="172">nvidia/nemotron-3.5-lightning:free</text>
-
-      <rect class="b ext" x="800" y="210" width="360" height="80" rx="10"/>
-      <text class="t" x="814" y="236">GitHub Pages</text>
-      <text class="d" x="814" y="262">Serves index.html, web/ and web/knowledge/</text>
-
-      <rect class="b ext" x="800" y="310" width="360" height="80" rx="10"/>
-      <text class="t" x="814" y="336">jsDelivr</text>
-      <text class="d" x="814" y="362">Serves the DuckDB-WASM library, version</text>
-      <text class="p" x="814" y="380">1.33.1-dev57.0</text>
-
       <rect class="b data" x="800" y="410" width="360" height="100" rx="10"/>
-      <text class="t" x="814" y="436">Supabase Storage</text>
-      <text class="p" x="814" y="455">private bucket fix-data, folder gold/</text>
-      <text class="d" x="814" y="480">9 Parquet files and manifest.json,</text>
-      <text class="d" x="814" y="498">built by the scripts below</text>
-
-      <rect class="b cfg" x="800" y="578" width="360" height="52" rx="10"/>
-      <text class="p" x="814" y="600">code/bronze.py → silver.py → gold.py</text>
-      <text class="d" x="814" y="620">Upload the layers with the Supabase secret key</text>
+      <text class="t" x="814" y="436">Cloud storage</text>
+      <text class="p" x="814" y="455">private folder gold/</text>
+      <text class="d" x="814" y="480">9 Parquet files and manifest.json</text>
 
       <!-- arrows: chat and agent -->
       <path class="arrow" d="M240,130 H286"/>
       <path class="arrow ret" d="M286,180 H244"/>
       <text class="al" x="244" y="122">question</text>
       <text class="al" x="248" y="198">answer</text>
-
-      <!-- agent and OpenRouter -->
-      <path class="arrow" d="M510,120 H796"/>
-      <text class="al" x="520" y="112">conversation, tool definitions, OpenRouter key</text>
-      <path class="arrow ret" d="M796,170 H514"/>
-      <text class="al" x="520" y="162">a tool call, or the answer text</text>
 
       <!-- agent and database -->
       <path class="arrow" d="M380,230 V326"/>
@@ -188,85 +156,17 @@
       <!-- loader -->
       <path class="arrow" d="M240,395 H286"/>
       <path class="arrow" d="M800,490 H140 V464"/>
-      <text class="al" x="160" y="482">gold/ files, downloaded with the Supabase publishable key</text>
-
-      <!-- page code from GitHub Pages and jsDelivr -->
-      <path class="arrow" d="M800,250 H744"/>
-      <path class="arrow" d="M800,350 H744"/>
-
-      <!-- build -->
-      <path class="arrow" d="M980,578 V514"/>
+      <text class="al" x="160" y="482">gold/ files, downloaded with the cloud storage publishable key</text>
     </svg>
     <div class="legend">
       <span class="l-web">Chat page</span>
-      <span class="l-ai">Agent, language model and reference</span>
+      <span class="l-ai">Agent and reference</span>
       <span class="l-data">Message data</span>
-      <span class="l-ext">Code hosting</span>
-      <span class="l-cfg">Data build</span>
       <span>Dashed arrow: a reply</span>
     </div>
   </div>
 
-  <h2>One question, step by step</h2>
-  <div class="figure">
-    <svg viewBox="0 0 1200 780" role="img" aria-label="Sequence diagram of one question: analyst, app.js, agent.js, web/knowledge, OpenRouter and DuckDB-WASM">
-      <defs>
-        <marker id="head2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z"/></marker>
-      </defs>
-      <style>.sq { stroke: var(--line); stroke-width: 1.6; fill: none; marker-end: url(#head2); }</style>
-
-      <!-- heads -->
-      <rect class="b ext" x="20" y="20" width="140" height="56" rx="8"/><text class="hd" x="90" y="44">Analyst</text><text class="hp" x="90" y="62">keyboard</text>
-      <rect class="b web" x="210" y="20" width="140" height="56" rx="8"/><text class="hd" x="280" y="44">Chat page</text><text class="hp" x="280" y="62">web/app.js</text>
-      <rect class="b ai" x="410" y="20" width="140" height="56" rx="8"/><text class="hd" x="480" y="44">Agent</text><text class="hp" x="480" y="62">web/agent.js</text>
-      <rect class="b ai" x="590" y="20" width="140" height="56" rx="8"/><text class="hd" x="660" y="44">Reference</text><text class="hp" x="660" y="62">web/knowledge/</text>
-      <rect class="b ai" x="780" y="20" width="140" height="56" rx="8"/><text class="hd" x="850" y="44">Language model</text><text class="hp" x="850" y="62">OpenRouter</text>
-      <rect class="b data" x="990" y="20" width="140" height="56" rx="8"/><text class="hd" x="1060" y="44">Database</text><text class="hp" x="1060" y="62">DuckDB-WASM</text>
-
-      <line class="life" x1="90" y1="76" x2="90" y2="740"/>
-      <line class="life" x1="280" y1="76" x2="280" y2="740"/>
-      <line class="life" x1="480" y1="76" x2="480" y2="740"/>
-      <line class="life" x1="660" y1="76" x2="660" y2="740"/>
-      <line class="life" x1="850" y1="76" x2="850" y2="740"/>
-      <line class="life" x1="1060" y1="76" x2="1060" y2="740"/>
-
-      <!-- loop frame -->
-      <rect class="loop" x="400" y="290" width="760" height="330" rx="8"/>
-      <text class="note" x="412" y="308">Repeated until the model returns answer text; at most 12 rounds</text>
-
-      <path class="sq" d="M90,125 H276"/>          <text class="ml" x="185" y="118">types a question</text>
-      <path class="sq" d="M280,170 H476"/>         <text class="mlm" x="380" y="163">chat(conversation)</text>
-      <path class="sq" d="M480,215 H656"/>         <text class="ml" x="570" y="208">fetch core.md</text>
-      <path class="sq ret" d="M660,255 H484"/>     <text class="ml" x="570" y="248">core.md text</text>
-
-      <path class="sq" d="M480,345 H846"/>         <text class="ml" x="665" y="338">system prompt, core.md, conversation, 5 tools</text>
-      <path class="sq ret" d="M850,390 H484"/>     <text class="ml" x="665" y="383">tool call, for example run_sql with a SELECT</text>
-      <path class="sq" d="M480,435 H1056"/>        <text class="mlm" x="770" y="428">SELECT * FROM ( model's SELECT ) LIMIT 201</text>
-      <path class="sq ret" d="M1060,480 H484"/>    <text class="ml" x="770" y="473">rows</text>
-      <text class="note" x="492" y="510">agent.js keeps at most 200 rows and 30,000 characters,</text>
-      <text class="note" x="492" y="526">and adds the result to the conversation</text>
-      <path class="sq" d="M480,560 H846"/>         <text class="ml" x="665" y="553">conversation with the tool results</text>
-      <path class="sq ret" d="M850,600 H484"/>     <text class="ml" x="665" y="593">answer text, with no tool call</text>
-
-      <path class="sq ret" d="M480,660 H284"/>     <text class="ml" x="380" y="653">answer</text>
-      <path class="sq ret" d="M280,705 H94"/>      <text class="ml" x="185" y="698">answer text on screen</text>
-    </svg>
-  </div>
-  <p>If 12 rounds pass without answer text, <code>agent.js</code> sends one more request that tells the model to answer from the tool results it already has and to say which parts of the question it could not finish. That request does not allow tool calls. One reply from the model can contain several tool calls; <code>agent.js</code> runs each one and adds its result to the conversation before the next request.</p>
-
-  <div class="cols">
-    <section>
-      <h2>Starting the page</h2>
-      <ol>
-        <li>The browser downloads <code>index.html</code> and <code>web/</code> from GitHub Pages.</li>
-        <li>The analyst pastes the Supabase publishable key (starts <code>sb_publishable_</code>) into the sidebar.</li>
-        <li><code>web/data.js</code> downloads the DuckDB-WASM library from jsDelivr and starts it in a separate browser thread.</li>
-        <li>It downloads <code>gold/manifest.json</code>, then each of the 9 Parquet files, from the bucket <code>fix-data</code>, and creates one table from each.</li>
-        <li>It runs <code>SET enable_external_access = false</code> and <code>SET lock_configuration = true</code>, so the model's SQL can read only those 9 tables and cannot change the database's settings.</li>
-        <li>The analyst pastes the OpenRouter key. The page can now take questions.</li>
-      </ol>
-    </section>
-    <section>
+  <section>
       <h2>Limits set in web/agent.js</h2>
       <table>
         <thead><tr><th>Setting</th><th>Value</th><th>Effect</th></tr></thead>
@@ -278,47 +178,7 @@
           <tr><td><code>DEFAULT_MODEL</code></td><td><code>nvidia/nemotron-3.5-lightning:free</code></td><td>Used when the sidebar's Model box is empty</td></tr>
         </tbody>
       </table>
-    </section>
-  </div>
-
-  <h2>The 5 tools the model can call</h2>
-  <table>
-    <thead><tr><th>Tool</th><th>What agent.js does</th><th>Returns</th></tr></thead>
-    <tbody>
-      <tr><td><code>list_tables</code></td><td>Reads <code>gold/manifest.json</code></td><td>Every table with its description, row count and column meanings</td></tr>
-      <tr><td><code>describe_table</code></td><td>Reads the manifest and runs <code>SELECT * … LIMIT 5</code> on the table</td><td>Each column's meaning, number of distinct values, number of empty values and most common values, and 5 sample rows</td></tr>
-      <tr><td><code>run_sql</code></td><td>Places the model's SELECT inside <code>SELECT * FROM ( … ) LIMIT 201</code> and runs it on DuckDB-WASM</td><td>At most 200 rows, with a note when more rows exist</td></tr>
-      <tr><td><code>read_reference</code></td><td>Downloads one topic file from <code>web/knowledge/</code>: <code>tests</code>, <code>field_codes</code>, <code>reject_codes</code>, <code>trading_sessions</code>, <code>orders</code>, <code>identifiers</code>, <code>gateway_rules</code> or <code>conformance_process</code></td><td>The text of the file, taken from JSE Volumes 00E, 01E, 10, 201 and 202</td></tr>
-      <tr><td><code>lookup_reject_codes</code></td><td>Looks up the given codes in <code>web/knowledge/reject_codes.json</code></td><td>The JSE Volume 10 meaning of each code, for codes not in <code>dim_reject_code</code></td></tr>
-    </tbody>
-  </table>
-
-  <h2>Where each piece of data and each key goes</h2>
-  <table>
-    <thead><tr><th>Item</th><th>Sent to</th><th>Not sent to</th></tr></thead>
-    <tbody>
-      <tr><td>The question and the conversation</td><td>OpenRouter, and the model provider OpenRouter selects</td><td>Supabase, GitHub</td></tr>
-      <tr><td>Query results (rows from the gold tables)</td><td>OpenRouter, as tool results</td><td>Supabase, GitHub</td></tr>
-      <tr><td>OpenRouter key</td><td>openrouter.ai only</td><td>Saved nowhere; pasted again after a reload</td></tr>
-      <tr><td>Supabase publishable key</td><td>Supabase Storage only</td><td>Saved nowhere; it can download files but not change them</td></tr>
-      <tr><td>Supabase secret key</td><td>Supabase Storage, from the scripts in <code>code/</code></td><td>Never typed into the page; kept in <code>code/.env</code>, which git ignores</td></tr>
-      <tr><td>Real CompIDs</td><td>Nowhere: they stay in the Excel files on the analyst's computer</td><td>Every copy outside that computer has the fictitious CompIDs</td></tr>
-    </tbody>
-  </table>
-  <p>The system prompt tells the model not to put SQL, table names, column names or tool names in its answer, and to describe what the messages show in plain words. The page shows only the answer text, not the tool calls.</p>
-
-  <h2>Files</h2>
-  <table>
-    <thead><tr><th>File</th><th>Role</th></tr></thead>
-    <tbody>
-      <tr><td><code>index.html</code></td><td>The page. In the repository root so GitHub Pages serves it as the site's home page.</td></tr>
-      <tr><td><code>web/app.js</code>, <code>web/style.css</code></td><td>Chat screen: sidebar, message list, input box</td></tr>
-      <tr><td><code>web/agent.js</code></td><td>System prompt, tool definitions, request to OpenRouter, tool rounds</td></tr>
-      <tr><td><code>web/data.js</code></td><td>Downloads <code>gold/</code> and creates the tables in DuckDB-WASM</td></tr>
-      <tr><td><code>web/knowledge/</code></td><td><code>core.md</code>, 8 topic files and <code>reject_codes.json</code> (714 reject codes)</td></tr>
-      <tr><td><code>code/</code></td><td>The scripts that build bronze, silver and gold in Supabase: see <a href="data_architecture.html">Data architecture</a></td></tr>
-    </tbody>
-  </table>
+  </section>
 </main>
 </body>
 </html>
