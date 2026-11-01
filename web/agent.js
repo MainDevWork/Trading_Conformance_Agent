@@ -6,7 +6,7 @@ const MAX_TOOL_ROUNDS = 12;
 const MAX_TOOL_RESULT_CHARS = 30_000;
 const MAX_ROWS = 200;
 
-export const DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
+export const DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning:free";
 
 const SYSTEM_PROMPT = `You are the Trading Conformance Agent for JSE Trading Operations.
 
