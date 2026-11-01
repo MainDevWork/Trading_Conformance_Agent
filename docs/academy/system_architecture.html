@@ -30,6 +30,8 @@
   main { max-width: 1240px; margin: 0 auto; padding: 32px 16px 48px; }
   nav { font-size: 13px; margin-bottom: 18px; color: var(--muted); }
   nav a { color: inherit; margin-right: 14px; }
+  svg a:hover rect { stroke-width: 3; }
+  svg a { cursor: pointer; }
   a { color: var(--muted); }
   h1 { font-size: 24px; margin: 0 0 4px; }
   .sub { color: var(--muted); margin: 0 0 22px; max-width: 920px; }
@@ -79,7 +81,7 @@
 </head>
 <body>
 <main>
-  <nav><a href="system_architecture.html">System architecture</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold star schema</a></nav>
+  <nav><a href="../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="data_architecture.html">Data architecture</a><a href="silver_data_diagram.html">Silver layer</a><a href="gold_star_schema.html">Gold star schema</a></nav>
 
   <h1>Trading Conformance Agent: system architecture</h1>
 
@@ -94,13 +96,13 @@
       <text class="zl" x="34" y="64">ANALYST'S BROWSER TAB</text>
 
       <!-- browser row 1 -->
-      <rect class="b web" x="40" y="80" width="200" height="150" rx="10"/>
+      <a href="../../index.html" aria-label="Open the chat"><rect class="b web" x="40" y="80" width="200" height="150" rx="10"/>
       <text class="t" x="54" y="106">Chat page</text>
       <text class="p" x="54" y="125">index.html, web/app.js</text>
       <text class="d" x="54" y="152">Sidebar: storage key,</text>
       <text class="d" x="54" y="170">language model key, model.</text>
       <text class="d" x="54" y="194">Shows each answer's text.</text>
-      <text class="d" x="54" y="212">Keys are not saved.</text>
+      <text class="d" x="54" y="212">Keys are not saved.</text></a>
 
       <rect class="b ai" x="290" y="80" width="220" height="150" rx="10"/>
       <text class="t" x="304" y="106">Agent</text>
@@ -143,6 +145,18 @@
       <text class="al" x="244" y="122">question</text>
       <text class="al" x="248" y="198">answer</text>
 
+      <!-- language model -->
+      <rect class="b ai" x="800" y="80" width="360" height="110" rx="10"/>
+      <text class="t" x="814" y="106">Language model</text>
+      <text class="d" x="814" y="134">Model used:</text>
+      <text class="p" x="814" y="156">nvidia/nemotron-3.5-lightning:free</text>
+
+      <!-- agent and language model -->
+      <path class="arrow" d="M510,120 H796"/>
+      <text class="al" x="520" y="112">conversation, tool definitions, language model key</text>
+      <path class="arrow ret" d="M796,170 H514"/>
+      <text class="al" x="520" y="162">a tool call, or the answer text</text>
+
       <!-- agent and database -->
       <path class="arrow" d="M380,230 V326"/>
       <path class="arrow ret" d="M430,326 V234"/>
@@ -160,25 +174,11 @@
     </svg>
     <div class="legend">
       <span class="l-web">Chat page</span>
-      <span class="l-ai">Agent and reference</span>
+      <span class="l-ai">Agent, language model and reference</span>
       <span class="l-data">Message data</span>
       <span>Dashed arrow: a reply</span>
     </div>
   </div>
-
-  <section>
-      <h2>Limits set in web/agent.js</h2>
-      <table>
-        <thead><tr><th>Setting</th><th>Value</th><th>Effect</th></tr></thead>
-        <tbody>
-          <tr><td><code>MAX_TOOL_ROUNDS</code></td><td>12</td><td>Requests to the model per question before it must answer</td></tr>
-          <tr><td><code>MAX_ROWS</code></td><td>200</td><td>Rows of one query result returned to the model</td></tr>
-          <tr><td><code>MAX_TOOL_RESULT_CHARS</code></td><td>30,000</td><td>Characters of one tool result returned to the model</td></tr>
-          <tr><td><code>temperature</code></td><td>0</td><td>Removes most of the randomness from the model's replies, so the same question gives the same answer more often</td></tr>
-          <tr><td><code>DEFAULT_MODEL</code></td><td><code>nvidia/nemotron-3.5-lightning:free</code></td><td>Used when the sidebar's Model box is empty</td></tr>
-        </tbody>
-      </table>
-  </section>
 </main>
 </body>
 </html>

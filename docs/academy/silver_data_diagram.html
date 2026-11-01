@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silver layer: consolidated data</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5f6b7a; --border: #cfd6de;
+    --client: #e6f0fa; --client-edge: #0b5cad; --jse: #e5f4ec; --jse-edge: #1d7a4b; --both: #efe9fb; --both-edge: #6a3fc1;
+    --k-comp: #0b5cad; --k-cl: #c2410c; --k-ord: #1d7a4b; --k-sec: #0f766e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c; --panel: #1a2029; --text: #e4e8ee; --muted: #98a3b1; --border: #2c3542;
+      --client: #16283d; --client-edge: #4c9be8; --jse: #13291f; --jse-edge: #4fbf86; --both: #251b3d; --both-edge: #a785ea;
+      --k-comp: #6cb0f0; --k-cl: #f08a4b; --k-ord: #4fbf86; --k-sec: #3fbfb0;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1300px; margin: 0 auto; padding: 32px 16px 48px; }
+  nav { font-size: 13px; margin-bottom: 18px; color: var(--muted); }
+  nav a { color: inherit; margin-right: 14px; }
+  h1 { font-size: 24px; margin: 0 0 18px; }
+  .figure { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; overflow-x: auto; }
+  svg { display: block; width: 100%; min-width: 1100px; height: auto; }
+  svg text { fill: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .tb { fill: var(--panel); stroke: var(--border); stroke-width: 1.4; }
+  .hd { stroke-width: 1.4; }
+  .hd.client { fill: var(--client); stroke: var(--client-edge); }
+  .hd.jse { fill: var(--jse); stroke: var(--jse-edge); }
+  .hd.both { fill: var(--both); stroke: var(--both-edge); }
+  svg .tn { font: 700 13px ui-monospace, Consolas, monospace; }
+  svg .ts { font-size: 11.5px; fill: var(--muted); }
+  svg .cn { font: 12px ui-monospace, Consolas, monospace; }
+  svg .cn.added { fill: var(--muted); font-style: italic; }
+  svg .cn.k-comp { fill: var(--k-comp); font-weight: 700; } .dot.k-comp { fill: var(--k-comp); }
+  svg .cn.k-cl { fill: var(--k-cl); font-weight: 700; }     .dot.k-cl { fill: var(--k-cl); }
+  svg .cn.k-ord { fill: var(--k-ord); font-weight: 700; }   .dot.k-ord { fill: var(--k-ord); }
+  svg .cn.k-sec { fill: var(--k-sec); font-weight: 700; }   .dot.k-sec { fill: var(--k-sec); }
+  .legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+  .legend b { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1.5px solid; }
+</style>
+</head>
+<body>
+<main>
+  <nav><a href="../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="data_architecture.html">Data architecture</a><a href="silver_data_diagram.html">Silver layer</a><a href="gold_star_schema.html">Gold star schema</a></nav>
+
+  <h1>Silver layer: consolidated data</h1>
+
+  <div class="figure">
+    <svg viewBox="0 0 1252 833" role="img" aria-label="Data diagram of the 11 silver tables and their columns">
+      <rect class="tb" x="10" y="10" width="232" height="175" rx="8"/>
+      <path class="hd client" d="M18,10 H234 Q242,10 242,18 V54 H10 V18 Q10,10 18,10 Z"/>
+      <text class="tn" x="20" y="29">logon</text>
+      <text class="ts" x="20" y="45">A · 74,580 rows · 7 columns</text>
+      <text class="cn added" x="34" y="72">source_month</text>
+      <text class="cn added" x="34" y="89">source_file</text>
+      <text class="cn " x="34" y="106">timestamp</text>
+      <circle class="dot k-comp" cx="24" cy="119" r="4"/>
+      <text class="cn k-comp" x="34" y="123">comp_id</text>
+      <text class="cn " x="34" y="140">message_type</text>
+      <text class="cn " x="34" y="157">compid</text>
+      <text class="cn " x="34" y="174">protocol_version</text>
+      <rect class="tb" x="10" y="203" width="232" height="175" rx="8"/>
+      <path class="hd jse" d="M18,203 H234 Q242,203 242,211 V247 H10 V211 Q10,203 18,203 Z"/>
+      <text class="tn" x="20" y="222">logon_response</text>
+      <text class="ts" x="20" y="238">B · 23,846 rows · 7 columns</text>
+      <text class="cn added" x="34" y="265">source_month</text>
+      <text class="cn added" x="34" y="282">source_file</text>
+      <text class="cn " x="34" y="299">timestamp</text>
+      <circle class="dot k-comp" cx="24" cy="312" r="4"/>
+      <text class="cn k-comp" x="34" y="316">comp_id</text>
+      <text class="cn " x="34" y="333">message_type</text>
+      <text class="cn " x="34" y="350">password_expiry</text>
+      <text class="cn " x="34" y="367">reject_code</text>
+      <rect class="tb" x="10" y="396" width="232" height="158" rx="8"/>
+      <path class="hd both" d="M18,396 H234 Q242,396 242,404 V440 H10 V404 Q10,396 18,396 Z"/>
+      <text class="tn" x="20" y="415">logout</text>
+      <text class="ts" x="20" y="431">5 · 21,306 rows · 6 columns</text>
+      <text class="cn added" x="34" y="458">source_month</text>
+      <text class="cn added" x="34" y="475">source_file</text>
+      <text class="cn " x="34" y="492">timestamp</text>
+      <circle class="dot k-comp" cx="24" cy="505" r="4"/>
+      <text class="cn k-comp" x="34" y="509">comp_id</text>
+      <text class="cn " x="34" y="526">message_type</text>
+      <text class="cn " x="34" y="543">reason</text>
+      <rect class="tb" x="10" y="572" width="232" height="243" rx="8"/>
+      <path class="hd jse" d="M18,572 H234 Q242,572 242,580 V616 H10 V580 Q10,572 18,572 Z"/>
+      <text class="tn" x="20" y="591">order_mass_cancel_report</text>
+      <text class="ts" x="20" y="607">r · 464 rows · 11 columns</text>
+      <text class="cn added" x="34" y="634">source_month</text>
+      <text class="cn added" x="34" y="651">source_file</text>
+      <text class="cn " x="34" y="668">timestamp</text>
+      <circle class="dot k-comp" cx="24" cy="681" r="4"/>
+      <text class="cn k-comp" x="34" y="685">comp_id</text>
+      <text class="cn " x="34" y="702">message_type</text>
+      <circle class="dot k-cl" cx="24" cy="715" r="4"/>
+      <text class="cn k-cl" x="34" y="719">client_order_id</text>
+      <text class="cn " x="34" y="736">order_book</text>
+      <text class="cn " x="34" y="753">partition_id</text>
+      <text class="cn " x="34" y="770">reject_code</text>
+      <text class="cn " x="34" y="787">status</text>
+      <text class="cn " x="34" y="804">transact_time</text>
+      <rect class="tb" x="260" y="10" width="232" height="430" rx="8"/>
+      <path class="hd client" d="M268,10 H484 Q492,10 492,18 V54 H260 V18 Q260,10 268,10 Z"/>
+      <text class="tn" x="270" y="29">new_order_single</text>
+      <text class="ts" x="270" y="45">D · 325,344 rows · 22 columns</text>
+      <text class="cn added" x="284" y="72">source_month</text>
+      <text class="cn added" x="284" y="89">source_file</text>
+      <text class="cn " x="284" y="106">timestamp</text>
+      <circle class="dot k-comp" cx="274" cy="119" r="4"/>
+      <text class="cn k-comp" x="284" y="123">comp_id</text>
+      <text class="cn " x="284" y="140">message_type</text>
+      <text class="cn " x="284" y="157">account</text>
+      <text class="cn " x="284" y="174">cancel_on_disconnect</text>
+      <circle class="dot k-cl" cx="274" cy="187" r="4"/>
+      <text class="cn k-cl" x="284" y="191">client_order_id</text>
+      <text class="cn " x="284" y="208">display_quantity</text>
+      <text class="cn " x="284" y="225">execution_instruction</text>
+      <text class="cn " x="284" y="242">limit_price</text>
+      <text class="cn " x="284" y="259">minimum_quantity</text>
+      <text class="cn " x="284" y="276">order_quantity</text>
+      <text class="cn " x="284" y="293">order_sub_type</text>
+      <text class="cn " x="284" y="310">order_type</text>
+      <circle class="dot k-sec" cx="274" cy="323" r="4"/>
+      <text class="cn k-sec" x="284" y="327">security_id</text>
+      <text class="cn " x="284" y="344">self_trade_prevention_key</text>
+      <text class="cn " x="284" y="361">side</text>
+      <text class="cn " x="284" y="378">stop_price</text>
+      <text class="cn " x="284" y="395">time_in_force</text>
+      <text class="cn " x="284" y="412">capacity</text>
+      <text class="cn " x="284" y="429">order_book</text>
+      <rect class="tb" x="260" y="458" width="232" height="243" rx="8"/>
+      <path class="hd client" d="M268,458 H484 Q492,458 492,466 V502 H260 V466 Q260,458 268,458 Z"/>
+      <text class="tn" x="270" y="477">order_mass_cancel_request</text>
+      <text class="ts" x="270" y="493">q · 354 rows · 11 columns</text>
+      <text class="cn added" x="284" y="520">source_month</text>
+      <text class="cn added" x="284" y="537">source_file</text>
+      <text class="cn " x="284" y="554">timestamp</text>
+      <circle class="dot k-comp" cx="274" cy="567" r="4"/>
+      <text class="cn k-comp" x="284" y="571">comp_id</text>
+      <text class="cn " x="284" y="588">message_type</text>
+      <circle class="dot k-cl" cx="274" cy="601" r="4"/>
+      <text class="cn k-cl" x="284" y="605">client_order_id</text>
+      <text class="cn " x="284" y="622">mass_cancel_request_type</text>
+      <circle class="dot k-sec" cx="274" cy="635" r="4"/>
+      <text class="cn k-sec" x="284" y="639">security_id</text>
+      <text class="cn " x="284" y="656">ordersubtype</text>
+      <text class="cn " x="284" y="673">segment</text>
+      <text class="cn " x="284" y="690">orderbook</text>
+      <rect class="tb" x="510" y="10" width="232" height="243" rx="8"/>
+      <path class="hd client" d="M518,10 H734 Q742,10 742,18 V54 H510 V18 Q510,10 518,10 Z"/>
+      <text class="tn" x="520" y="29">order_cancel_request</text>
+      <text class="ts" x="520" y="45">F · 539,586 rows · 11 columns</text>
+      <text class="cn added" x="534" y="72">source_month</text>
+      <text class="cn added" x="534" y="89">source_file</text>
+      <text class="cn " x="534" y="106">timestamp</text>
+      <circle class="dot k-comp" cx="524" cy="119" r="4"/>
+      <text class="cn k-comp" x="534" y="123">comp_id</text>
+      <text class="cn " x="534" y="140">message_type</text>
+      <circle class="dot k-cl" cx="524" cy="153" r="4"/>
+      <text class="cn k-cl" x="534" y="157">client_order_id</text>
+      <text class="cn " x="534" y="174">order_book</text>
+      <circle class="dot k-ord" cx="524" cy="187" r="4"/>
+      <text class="cn k-ord" x="534" y="191">order_id</text>
+      <circle class="dot k-cl" cx="524" cy="204" r="4"/>
+      <text class="cn k-cl" x="534" y="208">orig_client_order_id</text>
+      <circle class="dot k-sec" cx="524" cy="221" r="4"/>
+      <text class="cn k-sec" x="534" y="225">security_id</text>
+      <text class="cn " x="534" y="242">side</text>
+      <rect class="tb" x="510" y="271" width="232" height="362" rx="8"/>
+      <path class="hd client" d="M518,271 H734 Q742,271 742,279 V315 H510 V279 Q510,271 518,271 Z"/>
+      <text class="tn" x="520" y="290">order_cancel_replace_request</text>
+      <text class="ts" x="520" y="306">G · 929,951 rows · 18 columns</text>
+      <text class="cn added" x="534" y="333">source_month</text>
+      <text class="cn added" x="534" y="350">source_file</text>
+      <text class="cn " x="534" y="367">timestamp</text>
+      <circle class="dot k-comp" cx="524" cy="380" r="4"/>
+      <text class="cn k-comp" x="534" y="384">comp_id</text>
+      <text class="cn " x="534" y="401">message_type</text>
+      <circle class="dot k-cl" cx="524" cy="414" r="4"/>
+      <text class="cn k-cl" x="534" y="418">client_order_id</text>
+      <text class="cn " x="534" y="435">display_quantity</text>
+      <text class="cn " x="534" y="452">limit_price</text>
+      <text class="cn " x="534" y="469">minimum_quantity</text>
+      <circle class="dot k-ord" cx="524" cy="482" r="4"/>
+      <text class="cn k-ord" x="534" y="486">order_id</text>
+      <circle class="dot k-cl" cx="524" cy="499" r="4"/>
+      <text class="cn k-cl" x="534" y="503">original_client_order_id</text>
+      <text class="cn " x="534" y="520">order_type</text>
+      <circle class="dot k-sec" cx="524" cy="533" r="4"/>
+      <text class="cn k-sec" x="534" y="537">security_id</text>
+      <text class="cn " x="534" y="554">side</text>
+      <text class="cn " x="534" y="571">stop_price</text>
+      <text class="cn " x="534" y="588">time_in_force</text>
+      <text class="cn " x="534" y="605">order_quantity</text>
+      <text class="cn " x="534" y="622">expire_time</text>
+      <rect class="tb" x="760" y="10" width="232" height="498" rx="8"/>
+      <path class="hd jse" d="M768,10 H984 Q992,10 992,18 V54 H760 V18 Q760,10 768,10 Z"/>
+      <text class="tn" x="770" y="29">execution_report</text>
+      <text class="ts" x="770" y="45">8 · 699,162 rows · 26 columns</text>
+      <text class="cn added" x="784" y="72">source_month</text>
+      <text class="cn added" x="784" y="89">source_file</text>
+      <text class="cn " x="784" y="106">timestamp</text>
+      <circle class="dot k-comp" cx="774" cy="119" r="4"/>
+      <text class="cn k-comp" x="784" y="123">comp_id</text>
+      <text class="cn " x="784" y="140">message_type</text>
+      <circle class="dot k-cl" cx="774" cy="153" r="4"/>
+      <text class="cn k-cl" x="784" y="157">client_order_id</text>
+      <text class="cn " x="784" y="174">display_quantity</text>
+      <text class="cn " x="784" y="191">execution_id</text>
+      <text class="cn " x="784" y="208">working_indicator</text>
+      <text class="cn " x="784" y="225">type_of_trade</text>
+      <text class="cn " x="784" y="242">transact_time</text>
+      <text class="cn " x="784" y="259">side</text>
+      <text class="cn " x="784" y="276">public_order_id</text>
+      <text class="cn " x="784" y="293">reject_code</text>
+      <circle class="dot k-ord" cx="774" cy="306" r="4"/>
+      <text class="cn k-ord" x="784" y="310">order_id</text>
+      <text class="cn " x="784" y="327">leaves_quantity</text>
+      <text class="cn " x="784" y="344">liquidity_indicator</text>
+      <text class="cn " x="784" y="361">execution_type</text>
+      <text class="cn " x="784" y="378">execution_instruction</text>
+      <text class="cn " x="784" y="395">executed_quantity</text>
+      <text class="cn " x="784" y="412">executed_price</text>
+      <text class="cn " x="784" y="429">indicator_flags</text>
+      <text class="cn " x="784" y="446">order_book</text>
+      <text class="cn " x="784" y="463">order_status</text>
+      <circle class="dot k-sec" cx="774" cy="476" r="4"/>
+      <text class="cn k-sec" x="784" y="480">security_id</text>
+      <text class="cn " x="784" y="497">self_trade_prevention_key</text>
+      <rect class="tb" x="1010" y="10" width="232" height="328" rx="8"/>
+      <path class="hd jse" d="M1018,10 H1234 Q1242,10 1242,18 V54 H1010 V18 Q1010,10 1018,10 Z"/>
+      <text class="tn" x="1020" y="29">order_cancel_reject</text>
+      <text class="ts" x="1020" y="45">9 · 21,909 rows · 16 columns</text>
+      <text class="cn added" x="1034" y="72">source_month</text>
+      <text class="cn added" x="1034" y="89">source_file</text>
+      <text class="cn " x="1034" y="106">timestamp</text>
+      <circle class="dot k-comp" cx="1024" cy="119" r="4"/>
+      <text class="cn k-comp" x="1034" y="123">comp_id</text>
+      <text class="cn " x="1034" y="140">message_type</text>
+      <circle class="dot k-cl" cx="1024" cy="153" r="4"/>
+      <text class="cn k-cl" x="1034" y="157">client_order_id</text>
+      <text class="cn " x="1034" y="174">order_book</text>
+      <circle class="dot k-ord" cx="1024" cy="187" r="4"/>
+      <text class="cn k-ord" x="1034" y="191">order_id</text>
+      <text class="cn " x="1034" y="208">reject_code</text>
+      <text class="cn " x="1034" y="225">transact_time</text>
+      <text class="cn " x="1034" y="242">partition_id</text>
+      <text class="cn " x="1034" y="259">source</text>
+      <text class="cn " x="1034" y="276">destination</text>
+      <text class="cn " x="1034" y="293">bytes</text>
+      <text class="cn " x="1034" y="310">sequence_no</text>
+      <text class="cn " x="1034" y="327">packet_id</text>
+      <rect class="tb" x="1010" y="356" width="232" height="294" rx="8"/>
+      <path class="hd jse" d="M1018,356 H1234 Q1242,356 1242,364 V400 H1010 V364 Q1010,356 1018,356 Z"/>
+      <text class="tn" x="1020" y="375">reject</text>
+      <text class="ts" x="1020" y="391">3 · 1,127,014 rows · 14 columns</text>
+      <text class="cn added" x="1034" y="418">source_month</text>
+      <text class="cn added" x="1034" y="435">source_file</text>
+      <text class="cn " x="1034" y="452">timestamp</text>
+      <circle class="dot k-comp" cx="1024" cy="465" r="4"/>
+      <text class="cn k-comp" x="1034" y="469">comp_id</text>
+      <text class="cn " x="1034" y="486">message_type</text>
+      <circle class="dot k-cl" cx="1024" cy="499" r="4"/>
+      <text class="cn k-cl" x="1034" y="503">client_order_id</text>
+      <text class="cn " x="1034" y="520">ref_message_type</text>
+      <text class="cn " x="1034" y="537">reject_code</text>
+      <text class="cn " x="1034" y="554">reject_reason</text>
+      <text class="cn " x="1034" y="571">source</text>
+      <text class="cn " x="1034" y="588">destination</text>
+      <text class="cn " x="1034" y="605">bytes</text>
+      <text class="cn " x="1034" y="622">sequence_no</text>
+      <text class="cn " x="1034" y="639">packet_id</text>
+    </svg>
+    <div class="legend">
+      <span><b style="background:var(--client);border-color:var(--client-edge)"></b>Sent by a client</span>
+      <span><b style="background:var(--jse);border-color:var(--jse-edge)"></b>Sent by the JSE</span>
+      <span><b style="background:var(--both);border-color:var(--both-edge)"></b>Sent by either side</span>
+      <span><i style="background:var(--k-comp)"></i><code>comp_id</code></span>
+      <span><i style="background:var(--k-cl)"></i><code>client_order_id</code>, <code>orig_client_order_id</code>, <code>original_client_order_id</code></span>
+      <span><i style="background:var(--k-ord)"></i><code>order_id</code></span>
+      <span><i style="background:var(--k-sec)"></i><code>security_id</code></span>
+      <span><em>source_month</em>, <em>source_file</em>: the export each row came from</span>
+    </div>
+  </div>
+</main>
+</body>
+</html>

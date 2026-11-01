@@ -15,6 +15,12 @@
 <body>
   <aside id="sidebar">
     <h1>Trading Conformance Agent</h1>
+    <nav id="docs-nav">
+      <a href="docs/academy/system_architecture.html" target="_blank" rel="noopener">System architecture</a>
+      <a href="docs/academy/data_architecture.html" target="_blank" rel="noopener">Data architecture</a>
+      <a href="docs/academy/silver_data_diagram.html" target="_blank" rel="noopener">Silver layer</a>
+      <a href="docs/academy/gold_star_schema.html" target="_blank" rel="noopener">Gold star schema</a>
+    </nav>
     <section>
       <h2>Data</h2>
       <p id="status-text">Enter the Supabase key below to load the data.</p>
@@ -34,16 +40,6 @@
     <section>
       <h2>Model</h2>
       <input id="model" type="text" spellcheck="false">
-    </section>
-    <section>
-      <h2>Example questions</h2>
-      <ul id="examples">
-        <li>Which tables are loaded, and how many messages does each month have?</li>
-        <li>Which CompIDs sent new orders in September 2026, and how many each?</li>
-        <li>List the session-level rejects in August 2026 by reject code and reason, with counts.</li>
-        <li>For CompID GJEN09 in July 2026, show the sequence of message types for its first 5 orders in time order.</li>
-        <li>Which order cancel requests were rejected, and what reject codes were given?</li>
-      </ul>
     </section>
     <button id="clear" type="button">New conversation</button>
   </aside>

@@ -89,7 +89,6 @@ form.addEventListener("submit", (e) => { e.preventDefault(); send(input.value); 
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input.value); }
 });
-document.querySelectorAll("#examples li").forEach((li) => li.addEventListener("click", () => send(li.textContent)));
 document.getElementById("clear").addEventListener("click", () => { history = []; messagesEl.innerHTML = ""; });
 
 let loading = false;

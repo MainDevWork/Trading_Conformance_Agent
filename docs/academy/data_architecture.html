@@ -12,6 +12,7 @@
     --silver: #eef1f5; --silver-edge: #6b7785;
     --gold: #fbf3d5;   --gold-edge: #a07c0a;
     --web: #e6f0fa;    --web-edge: #0b5cad;
+    --ai: #efe9fb;     --ai-edge: #6a3fc1;
     --zone: #fafbfc;
   }
   @media (prefers-color-scheme: dark) {
@@ -22,6 +23,7 @@
       --silver: #222831; --silver-edge: #a3afbd;
       --gold: #2c2611;   --gold-edge: #d9b23a;
       --web: #16283d;    --web-edge: #4c9be8;
+      --ai: #251b3d;     --ai-edge: #a785ea;
       --zone: #161b22;
     }
   }
@@ -30,6 +32,8 @@
   main { max-width: 1240px; margin: 0 auto; padding: 32px 16px 48px; }
   nav { font-size: 13px; margin-bottom: 18px; color: var(--muted); }
   nav a { color: inherit; margin-right: 14px; }
+  svg a:hover rect { stroke-width: 3; }
+  svg a { cursor: pointer; }
   h1 { font-size: 24px; margin: 0 0 18px; }
   h2 { font-size: 17px; margin: 34px 0 10px; }
   .figure { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; overflow-x: auto; }
@@ -48,6 +52,11 @@
   .silver { fill: var(--silver); stroke: var(--silver-edge); }
   .gold { fill: var(--gold); stroke: var(--gold-edge); }
   .web { fill: var(--web); stroke: var(--web-edge); }
+  .ai { fill: var(--ai); stroke: var(--ai-edge); }
+  .fan { stroke-width: 1.2; }
+  svg .sn { font-size: 12.5px; font-weight: 600; }
+  svg .sf { font-size: 11px; fill: var(--muted); text-anchor: end; }
+  svg .role { font-size: 13px; font-weight: 700; font-style: italic; }
   .arrow { stroke: var(--line); stroke-width: 1.8; fill: none; marker-end: url(#head); }
   #head path { fill: var(--line); }
   code { font: 13px ui-monospace, Consolas, monospace; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
@@ -60,96 +69,116 @@
 </head>
 <body>
 <main>
-  <nav><a href="system_architecture.html">System architecture</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold star schema</a></nav>
+  <nav><a href="../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="data_architecture.html">Data architecture</a><a href="silver_data_diagram.html">Silver layer</a><a href="gold_star_schema.html">Gold star schema</a></nav>
 
   <h1>Data architecture</h1>
 
   <div class="figure">
-    <svg viewBox="0 0 1400 330" role="img" aria-label="Data architecture diagram: Vonnegut exports, bronze, silver and gold layers in cloud storage, and the in-browser database">
+    <svg viewBox="0 0 1400 660" role="img" aria-label="Data architecture diagram: 11 Vonnegut export data sets point to the bronze layer; bronze, silver and gold layers in cloud storage; the in-browser database and the chat agent">
       <defs>
-        <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z"/></marker>
       </defs>
-
-      <rect class="zone" x="10" y="20" width="240" height="295" rx="12"/>
-      <text class="zl" x="24" y="44">SOURCE</text>
-      <rect class="zone" x="310" y="20" width="800" height="295" rx="12"/>
+      <rect class="zone" x="8" y="20" width="282" height="620" rx="12"/>
+      <text class="zl" x="24" y="44">SOURCE: VONNEGUT EXPORTS</text>
+      <rect class="zone" x="310" y="20" width="800" height="620" rx="12"/>
       <text class="zl" x="324" y="44">CLOUD STORAGE</text>
-      <rect class="zone" x="1150" y="20" width="240" height="295" rx="12"/>
+      <rect class="zone" x="1150" y="20" width="240" height="620" rx="12"/>
       <text class="zl" x="1164" y="44">BROWSER</text>
-
-      <rect class="b src" x="25" y="65" width="210" height="230" rx="10"/>
-      <text class="t" x="39" y="93">Vonnegut exports</text>
-      <text class="p" x="39" y="113">Trading_FIX_Messages/</text>
-      <text class="d" x="39" y="141">36 Excel files</text>
-      <text class="d" x="39" y="165">3 month folders, July to</text>
-      <text class="d" x="39" y="183">September 2026</text>
-      <text class="n" x="39" y="275">3,763,516 rows</text>
-
-      <rect class="b bronze" x="330" y="65" width="200" height="230" rx="10"/>
-      <text class="t" x="344" y="93">Bronze</text>
-      <text class="p" x="344" y="113">bronze/</text>
-      <text class="d" x="344" y="141">36 Excel files</text>
-      <text class="d" x="344" y="165">Same folders and</text>
-      <text class="d" x="344" y="183">file names</text>
-      <text class="d" x="344" y="207">files.json</text>
-      <text class="n" x="344" y="275">3,763,516 rows</text>
-
-      <rect class="b silver" x="610" y="65" width="200" height="230" rx="10"/>
-      <text class="t" x="624" y="93">Silver</text>
-      <text class="p" x="624" y="113">silver/</text>
-      <text class="d" x="624" y="141">11 Parquet tables,</text>
-      <text class="d" x="624" y="159">one per message type</text>
-      <text class="d" x="624" y="183">3 months combined</text>
-      <text class="d" x="624" y="207">Every export row kept</text>
-      <text class="d" x="624" y="231">manifest.json</text>
-      <text class="n" x="624" y="275">3,763,516 rows</text>
-
-      <rect class="b gold" x="890" y="65" width="200" height="230" rx="10"/>
-      <text class="t" x="904" y="93">Gold</text>
-      <text class="p" x="904" y="113">gold/</text>
-      <text class="d" x="904" y="141">9 Parquet tables:</text>
-      <text class="d" x="904" y="159">3 fact, 6 dimension</text>
-      <text class="d" x="904" y="183">Repeated rows merged</text>
-      <text class="d" x="904" y="207">manifest.json</text>
-      <text class="n" x="904" y="257">fact_message:</text>
-      <text class="n" x="904" y="275">2,169,820 messages</text>
-
-      <rect class="b web" x="1170" y="65" width="200" height="230" rx="10"/>
-      <text class="t" x="1184" y="93">In-browser database</text>
-      
-      <text class="d" x="1184" y="121">The 9 gold tables,</text>
-      <text class="d" x="1184" y="139">held in memory</text>
-      <text class="d" x="1184" y="163">Read only</text>
-
-      <path class="arrow" d="M235,180 H326"/>
-      <text class="al" x="282" y="170">upload</text>
-      <path class="arrow" d="M530,180 H606"/>
-      <text class="al" x="569" y="156">combine by</text>
-      <text class="al" x="569" y="170">message type</text>
-      <path class="arrow" d="M810,180 H886"/>
-      <text class="al" x="849" y="156">merge into</text>
-      <text class="al" x="849" y="170">star schema</text>
-      <path class="arrow" d="M1090,180 H1166"/>
-      <text class="al" x="1129" y="170">download</text>
+      <path class="arrow fan" d="M276,81 L326,215"/>
+      <path class="arrow fan" d="M276,133 L326,240"/>
+      <path class="arrow fan" d="M276,185 L326,265"/>
+      <path class="arrow fan" d="M276,237 L326,290"/>
+      <path class="arrow fan" d="M276,289 L326,315"/>
+      <path class="arrow fan" d="M276,341 L326,340"/>
+      <path class="arrow fan" d="M276,393 L326,365"/>
+      <path class="arrow fan" d="M276,445 L326,390"/>
+      <path class="arrow fan" d="M276,497 L326,415"/>
+      <path class="arrow fan" d="M276,549 L326,440"/>
+      <path class="arrow fan" d="M276,601 L326,465"/>
+      <rect class="b src" x="16" y="60" width="260" height="42" rx="7"/>
+      <text class="sn" x="28" y="86">Logon</text>
+      <text class="sf" x="266" y="86">3 files</text>
+      <rect class="b src" x="16" y="112" width="260" height="42" rx="7"/>
+      <text class="sn" x="28" y="138">Logon Response</text>
+      <text class="sf" x="266" y="138">3 files</text>
+      <rect class="b src" x="16" y="164" width="260" height="42" rx="7"/>
+      <text class="sn" x="28" y="190">Logout</text>
+      <text class="sf" x="266" y="190">3 files</text>
+      <rect class="b src" x="16" y="216" width="260" height="42" rx="7"/>
+      <text class="sn" x="28" y="242">New Order</text>
+      <text class="sf" x="266" y="242">3 files</text>
+      <rect class="b src" x="16" y="268" width="260" height="42" rx="7"/>
+      <text class="sn" x="28" y="294">Order Cancel Request</text>
+      <text class="sf" x="266" y="294">3 files</text>
+      <rect class="b src" x="16" y="320" width="260" height="42" rx="7"/>
+      <text class="sn" x="28" y="346">Order Cancel Replace Request</text>
+      <text class="sf" x="266" y="346">3 files</text>
+      <rect class="b src" x="16" y="372" width="260" height="42" rx="7"/>
+      <text class="sn" x="28" y="398">Order Mass Cancel Request</text>
+      <text class="sf" x="266" y="398">3 files</text>
+      <rect class="b src" x="16" y="424" width="260" height="42" rx="7"/>
+      <text class="sn" x="28" y="450">Execution Report</text>
+      <text class="sf" x="266" y="450">4 files</text>
+      <rect class="b src" x="16" y="476" width="260" height="42" rx="7"/>
+      <text class="sn" x="28" y="502">Order Cancel Reject</text>
+      <text class="sf" x="266" y="502">3 files</text>
+      <rect class="b src" x="16" y="528" width="260" height="42" rx="7"/>
+      <text class="sn" x="28" y="554">Order Mass Cancel Report</text>
+      <text class="sf" x="266" y="554">3 files</text>
+      <rect class="b src" x="16" y="580" width="260" height="42" rx="7"/>
+      <text class="sn" x="28" y="606">Reject</text>
+      <text class="sf" x="266" y="606">5 files</text>
+      <rect class="b bronze" x="330" y="200" width="200" height="280" rx="10"/>
+      <text class="t" x="344" y="228">Bronze</text>
+      <text class="p" x="344" y="248">bronze/</text>
+      <text class="role" x="344" y="278">Raw data in its</text>
+      <text class="role" x="344" y="296">original state</text>
+      <text class="d" x="344" y="338">36 Excel files</text>
+      <text class="d" x="344" y="358">Same folders and file names</text>
+      <text class="n" x="344" y="462">3,763,516 rows</text>
+      <rect class="b silver" x="610" y="200" width="200" height="280" rx="10"/>
+      <text class="t" x="624" y="228">Silver</text>
+      <text class="p" x="624" y="248">silver/</text>
+      <text class="role" x="624" y="278">Consolidated and</text>
+      <text class="role" x="624" y="296">transformed data</text>
+      <text class="d" x="624" y="338">11 tables, one per</text>
+      <text class="d" x="624" y="358">message type</text>
+      <text class="d" x="624" y="378">3 months combined</text>
+      <text class="d" x="624" y="398">Every export row kept</text>
+      <text class="n" x="624" y="462">3,763,516 rows</text>
+      <rect class="b gold" x="890" y="200" width="200" height="280" rx="10"/>
+      <text class="t" x="904" y="228">Gold</text>
+      <text class="p" x="904" y="248">gold/</text>
+      <text class="role" x="904" y="278">Star schema: the</text>
+      <text class="role" x="904" y="296">analytical model</text>
+      <text class="d" x="904" y="338">3 fact tables</text>
+      <text class="d" x="904" y="358">6 dimension tables</text>
+      <text class="d" x="904" y="378">Repeated rows merged</text>
+      <text class="n" x="904" y="462">2,169,820 messages</text>
+      <path class="arrow" d="M530,340 H606"/>
+      <text class="al" x="569" y="316">combine by</text>
+      <text class="al" x="569" y="330">message type</text>
+      <path class="arrow" d="M810,340 H886"/>
+      <text class="al" x="849" y="316">merge into</text>
+      <text class="al" x="849" y="330">star schema</text>
+      <rect class="b web" x="1170" y="200" width="200" height="120" rx="10"/>
+      <text class="t" x="1184" y="228">In-browser database</text>
+      <text class="d" x="1184" y="256">The 9 gold tables,</text>
+      <text class="d" x="1184" y="274">held in memory</text>
+      <text class="d" x="1184" y="298">Read only</text>
+      <path class="arrow" d="M1090,260 H1166"/>
+      <text class="al" x="1129" y="250">download</text>
+      <a href="../../index.html" aria-label="Open the chat"><rect class="b ai" x="1170" y="380" width="200" height="140" rx="10"/>
+      <text class="t" x="1184" y="408">Chat agent</text>
+      <text class="d" x="1184" y="436">Answers analysts' questions</text>
+      <text class="d" x="1184" y="454">by querying the</text>
+      <text class="d" x="1184" y="472">gold tables</text></a>
+      <path class="arrow" d="M1240,380 V324"/>
+      <path class="arrow" d="M1300,320 V376"/>
+      <text class="al" x="1232" y="356" text-anchor="end">queries</text>
+      <text class="al" x="1308" y="356" style="text-anchor:start">results</text>
     </svg>
   </div>
-
-  <h2>Rows at each layer</h2>
-  <table>
-    <thead><tr><th>Message type</th><th>Silver table</th><th class="r">Silver rows</th><th class="r">Gold messages</th><th class="r">Export rows per message</th></tr></thead>
-    <tbody>
-      <tr><td>3 Reject</td><td><code>reject</code></td><td class="r">1,127,014</td><td class="r">736,608</td><td class="r">1.53</td></tr>
-      <tr><td>G Order Cancel/Replace Request (amend)</td><td><code>order_cancel_replace_request</code></td><td class="r">929,951</td><td class="r">558,305</td><td class="r">1.67</td></tr>
-      <tr><td>8 Execution Report</td><td><code>execution_report</code></td><td class="r">699,162</td><td class="r">245,298</td><td class="r">2.85</td></tr>
-      <tr><td>F Order Cancel Request</td><td><code>order_cancel_request</code></td><td class="r">539,586</td><td class="r">318,157</td><td class="r">1.70</td></tr>
-      <tr><td>D New Order</td><td><code>new_order_single</code></td><td class="r">325,344</td><td class="r">205,175</td><td class="r">1.59</td></tr>
-      <tr><td>A Logon</td><td><code>logon</code></td><td class="r">74,580</td><td class="r">55,557</td><td class="r">1.34</td></tr>
-      <tr><td>B Logon Response</td><td><code>logon_response</code></td><td class="r">23,846</td><td class="r">19,947</td><td class="r">1.20</td></tr>
-      <tr><td>5 Logout</td><td><code>logout</code></td><td class="r">21,306</td><td class="r">15,617</td><td class="r">1.36</td></tr>
-      <tr><td>9 Order Cancel Reject, r Order Mass Cancel Report, q Order Mass Cancel Request</td><td><code>order_cancel_reject</code>, <code>order_mass_cancel_report</code>, <code>order_mass_cancel_request</code></td><td class="r">22,727</td><td class="r">15,156</td><td class="r">1.50</td></tr>
-    </tbody>
-    <tfoot><tr><td>All 11 types</td><td></td><td class="r">3,763,516</td><td class="r">2,169,820</td><td class="r">1.73</td></tr></tfoot>
-  </table>
 </main>
 </body>
 </html>
