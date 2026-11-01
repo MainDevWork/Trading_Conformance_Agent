@@ -2,7 +2,9 @@
 // The Parquet files and manifest.json are written to gold/ in a private Supabase Storage bucket by code/gold.py,
 // and the page downloads them with the Supabase key the user enters in the sidebar.
 
-import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.33.1-dev57.0/+esm";
+// DuckDB is downloaded inside startDuckDB, not with an import line at the top of this file: if the download failed
+// at the top, the browser would stop every script on the page without saying why.
+const DUCKDB_URL = "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.33.1-dev57.0/+esm";
 
 const SUPABASE_URL = "https://oftjypstiufmzblmtrom.supabase.co";
 const SUPABASE_BUCKET = "fix-data";
@@ -25,18 +27,32 @@ async function openCache() {
   try { return "caches" in self ? await caches.open(CACHE_NAME) : null; } catch { return null; }
 }
 
-// onProgress(text, fractionDone) is called before each step.
-// Returns { conn, manifest }. manifest.tables[table] has description, rows and columns
-// (each column with its description, distinct and empty value counts and most common values).
-export async function loadStore(supabaseKey, onProgress) {
-  onProgress("Starting DuckDB…", 0);
+// DuckDB is started as soon as the page opens, before the key is entered, so loading the tables does not wait for it.
+async function startDuckDB() {
+  let duckdb;
+  try {
+    duckdb = await import(DUCKDB_URL);
+  } catch (err) {
+    throw new Error(`Could not download DuckDB from cdn.jsdelivr.net (${err.message || err}). ` +
+      "Check that the browser or a blocker such as Brave Shields is not blocking cdn.jsdelivr.net.");
+  }
   const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
   // Browsers refuse to start a worker from another site's URL, so the worker script is wrapped in a local blob.
   const workerUrl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" }));
   const db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING), new Worker(workerUrl));
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
   URL.revokeObjectURL(workerUrl);
-  const conn = await db.connect();
+  return { db, conn: await db.connect() };
+}
+const duckdbReady = startDuckDB();
+duckdbReady.catch(() => {}); // a failure is reported when loadStore awaits it
+
+// onProgress(text, fractionDone) is called before each step.
+// Returns { conn, manifest }. manifest.tables[table] has description, rows and columns
+// (each column with its description, distinct and empty value counts and most common values).
+export async function loadStore(supabaseKey, onProgress) {
+  onProgress("Starting DuckDB…", 0);
+  const { db, conn } = await duckdbReady;
 
   onProgress("Downloading the table list…", 0);
   const manifestText = await (await download(supabaseKey, "manifest.json")).text();
@@ -59,7 +75,8 @@ export async function loadStore(supabaseKey, onProgress) {
       if (cache) await cache.put(file, new Response(bytes)).catch(() => {});
     }
     await db.registerFileBuffer(file, new Uint8Array(bytes));
-    await conn.query(`CREATE TABLE "${table}" AS SELECT * FROM read_parquet('${file}')`);
+    // OR REPLACE: a retry after a failed load reuses the same database, which may already hold some tables.
+    await conn.query(`CREATE OR REPLACE TABLE "${table}" AS SELECT * FROM read_parquet('${file}')`);
     await db.dropFile(file);
   }
   // Saved last, so an interrupted download is never treated as a complete saved copy.
