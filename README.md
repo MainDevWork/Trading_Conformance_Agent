@@ -11,7 +11,7 @@ A web chat page where a JSE Trading Operations analyst asks questions about the 
 | `web/knowledge/` | The JSE conformance reference the agent reads (see below) |
 | `code/` | Python scripts that build the bronze, silver and gold layers in Supabase |
 | `docs/jse/` | The JSE specification documents the reference was taken from: Volumes 00E, 01E, 10, 201, 202 |
-| `docs/academy/` | Academy project brief, Group 6 problem statement, and three diagram pages: `system_architecture.html`, `data_architecture.html`, `gold_star_schema.html` |
+| `docs/academy/` | Academy project brief, Group 6 problem statement, and the diagram pages: `system_architecture.html`, `agent_methodology.html` (also as `agent_methodology.pdf`), `data_architecture.html`, `gold_star_schema.html`, `silver_data_diagram.html` |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are; must stay in the root |
 
 ## Use the page
