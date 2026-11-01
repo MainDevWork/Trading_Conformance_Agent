@@ -25,11 +25,11 @@ async function openCache() {
   try { return "caches" in self ? await caches.open(CACHE_NAME) : null; } catch { return null; }
 }
 
-// onProgress(text) is called before each step.
+// onProgress(text, fractionDone) is called before each step.
 // Returns { conn, manifest }. manifest.tables[table] has description, rows and columns
 // (each column with its description, distinct and empty value counts and most common values).
 export async function loadStore(supabaseKey, onProgress) {
-  onProgress("Starting DuckDB…");
+  onProgress("Starting DuckDB…", 0);
   const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
   // Browsers refuse to start a worker from another site's URL, so the worker script is wrapped in a local blob.
   const workerUrl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" }));
@@ -38,7 +38,7 @@ export async function loadStore(supabaseKey, onProgress) {
   URL.revokeObjectURL(workerUrl);
   const conn = await db.connect();
 
-  onProgress("Downloading the table list…");
+  onProgress("Downloading the table list…", 0);
   const manifestText = await (await download(supabaseKey, "manifest.json")).text();
   const manifest = JSON.parse(manifestText);
   const cache = await openCache();
@@ -50,7 +50,7 @@ export async function loadStore(supabaseKey, onProgress) {
   for (const [i, table] of tableNames.entries()) {
     const file = `${table}.parquet`;
     const hit = useSaved && await cache.match(file);
-    onProgress(`Loading table ${i + 1} of ${tableNames.length}: ${table}${hit ? " (saved copy)" : ""}`);
+    onProgress(`Loading table ${i + 1} of ${tableNames.length}: ${table}${hit ? " (saved copy)" : ""}`, i / tableNames.length);
     let bytes;
     if (hit) {
       bytes = await hit.arrayBuffer();

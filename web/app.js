@@ -1,5 +1,5 @@
-import { chat } from "./agent.js?v=4";
-import { loadStore } from "./data.js?v=4";
+import { chat } from "./agent.js?v=5";
+import { loadStore } from "./data.js?v=5";
 
 window.appStarted = true;
 
@@ -121,13 +121,18 @@ function start() {
 
 async function load(supabaseKey) {
   const text = document.getElementById("status-text");
+  const bar = document.getElementById("progress-bar");
   try {
-    store = await loadStore(supabaseKey, (message) => { text.textContent = message; });
+    store = await loadStore(supabaseKey, (message, fraction) => {
+      text.textContent = message;
+      bar.style.width = `${100 * fraction}%`;
+    });
   } catch (err) {
     text.textContent = `Loading failed: ${err.message || err}`;
     return;
   }
   text.textContent = "Data loaded. The agent can answer questions.";
+  bar.style.width = "100%";
   const rows = Object.entries(store.manifest.tables).map(([name, t]) => `<tr><td>${name}</td><td>${t.rows.toLocaleString()}</td></tr>`);
   document.getElementById("tables").innerHTML = rows.join("");
 }
