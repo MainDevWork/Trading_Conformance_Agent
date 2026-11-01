@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silver layer: the 36 exports combined into 11 tables</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5f6b7a; --border: #cfd6de; --line: #44505e;
+    --client: #e6f0fa; --client-edge: #0b5cad;
+    --jse: #e5f4ec;    --jse-edge: #1d7a4b;
+    --both: #efe9fb;   --both-edge: #6a3fc1;
+    --file: #f3f4f6;   --file-edge: #9aa5b1;
+    --warn: #a8650a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c; --panel: #1a2029; --text: #e4e8ee; --muted: #98a3b1; --border: #2c3542; --line: #aab4c0;
+      --client: #16283d; --client-edge: #4c9be8;
+      --jse: #13291f;    --jse-edge: #4fbf86;
+      --both: #251b3d;   --both-edge: #a785ea;
+      --file: #20262f;   --file-edge: #4a5563;
+      --warn: #e0a14a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1240px; margin: 0 auto; padding: 32px 16px 48px; }
+  nav { font-size: 13px; margin-bottom: 18px; color: var(--muted); }
+  nav a { color: inherit; margin-right: 14px; }
+  a { color: var(--muted); }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 22px; max-width: 900px; }
+  h2 { font-size: 17px; margin: 34px 0 10px; }
+  p { max-width: 900px; }
+  .figure { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; overflow-x: auto; }
+  svg { display: block; width: 100%; min-width: 1000px; height: auto; }
+  svg text { fill: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  svg .head { font-size: 13px; font-weight: 700; letter-spacing: .04em; fill: var(--muted); }
+  svg .fname { font: 11px ui-monospace, Consolas, monospace; }
+  svg .rows { font-size: 12px; fill: var(--muted); }
+  svg .tname { font: 600 13.5px ui-monospace, Consolas, monospace; }
+  svg .tdesc { font-size: 12px; fill: var(--muted); }
+  svg .plus { font-size: 16px; font-weight: 700; fill: var(--muted); text-anchor: middle; }
+  svg .total { font-size: 12.5px; font-weight: 600; }
+  svg .flag { fill: var(--warn); font-weight: 700; }
+  .cell { fill: var(--file); stroke: var(--file-edge); stroke-width: 1; }
+  .t-client { fill: var(--client); stroke: var(--client-edge); stroke-width: 1.5; }
+  .t-jse { fill: var(--jse); stroke: var(--jse-edge); stroke-width: 1.5; }
+  .t-both { fill: var(--both); stroke: var(--both-edge); stroke-width: 1.5; }
+  .arrow { stroke: var(--line); stroke-width: 1.6; fill: none; marker-end: url(#head); }
+  .rule { stroke: var(--border); stroke-width: 1; }
+  #head path { fill: var(--line); }
+  .legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1.5px solid; }
+  .l-client::before { background: var(--client); border-color: var(--client-edge) !important; }
+  .l-jse::before { background: var(--jse); border-color: var(--jse-edge) !important; }
+  .l-both::before { background: var(--both); border-color: var(--both-edge) !important; }
+  .l-file::before { background: var(--file); border-color: var(--file-edge) !important; }
+  code { font: 13px ui-monospace, Consolas, monospace; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+  ol.steps { max-width: 900px; padding-left: 22px; }
+  ol.steps li { margin-bottom: 8px; }
+  table { border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); font-size: 13.5px; }
+  th, td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  thead th { font-size: 12px; color: var(--muted); }
+  .wrap { overflow-x: auto; }
+  .matrix th, .matrix td { padding: 5px 8px; }
+  .matrix thead th.v { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; font: 12px ui-monospace, Consolas, monospace; color: var(--text); padding: 8px 4px; }
+  .matrix td.y { text-align: center; color: var(--client-edge); }
+  .matrix td.n { text-align: right; color: var(--muted); }
+  .matrix tbody tr:hover { background: var(--bg); }
+  .matrix code { border: none; padding: 0; background: none; }
+  .grid { width: 100%; }
+</style>
+</head>
+<body>
+<main>
+  <nav><a href="system_architecture.html">System architecture</a><a href="data_architecture.html">Data architecture</a><a href="silver_layer.html">Silver layer</a><a href="gold_star_schema.html">Gold star schema</a></nav>
+
+  <h1>Silver layer: 36 Excel exports combined into 11 tables</h1>
+  <p class="sub"><code>code/silver.py</code> downloads the 36 Vonnegut exports from <code>bronze/</code> in the Supabase bucket <code>fix-data</code>, puts every row of one FIX message type into one table, and uploads each table to <code>silver/</code> as a Parquet file (a compressed file format for tables). No row is removed and no row is merged: the 11 tables hold the same 3,763,516 rows as the 36 files.</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 1240 840" role="img" aria-label="Diagram: each row shows the July, August and September export files for one message type and the silver table they are combined into">
+      <defs>
+        <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+
+      <text class="head" x="20" y="34">bronze/July_2026/</text>
+      <text class="head" x="310" y="34">bronze/August_2026/</text>
+      <text class="head" x="600" y="34">bronze/September_2026/</text>
+      <text class="head" x="930" y="34">silver/&lt;table&gt;.parquet</text>
+
+      <!-- Row 1: logon (A) y0=50 -->
+      <rect class="cell" x="20" y="50" width="270" height="56" rx="6"/><text class="fname" x="30" y="72">Logon.xlsx</text><text class="rows" x="30" y="92">44,399 rows</text>
+      <text class="plus" x="300" y="84">+</text>
+      <rect class="cell" x="310" y="50" width="270" height="56" rx="6"/><text class="fname" x="320" y="72">Logon.xlsx</text><text class="rows" x="320" y="92">13,205 rows</text>
+      <text class="plus" x="590" y="84">+</text>
+      <rect class="cell" x="600" y="50" width="270" height="56" rx="6"/><text class="fname" x="610" y="72">Logon [A].xlsx</text><text class="rows" x="610" y="92">16,976 rows</text>
+      <path class="arrow" d="M872,78 H924"/>
+      <rect class="t-client" x="930" y="50" width="290" height="56" rx="6"/><text class="tname" x="942" y="72">logon</text><text class="tdesc" x="942" y="92">A · 74,580 rows · 7 columns</text>
+
+      <!-- Row 2: new_order_single (D) y0=116 -->
+      <rect class="cell" x="20" y="116" width="270" height="56" rx="6"/><text class="fname" x="30" y="138">New Order [D].xlsx</text><text class="rows" x="30" y="158">62,040 rows</text>
+      <text class="plus" x="300" y="150">+</text>
+      <rect class="cell" x="310" y="116" width="270" height="56" rx="6"/><text class="fname" x="320" y="138">New Order [D].xlsx</text><text class="rows" x="320" y="158">205,986 rows</text>
+      <text class="plus" x="590" y="150">+</text>
+      <rect class="cell" x="600" y="116" width="270" height="56" rx="6"/><text class="fname" x="610" y="138">New Order.xlsx</text><text class="rows" x="610" y="158">57,318 rows</text>
+      <path class="arrow" d="M872,144 H924"/>
+      <rect class="t-client" x="930" y="116" width="290" height="56" rx="6"/><text class="tname" x="942" y="138">new_order_single</text><text class="tdesc" x="942" y="158">D · 325,344 rows · 22 columns</text>
+
+      <!-- Row 3: order_cancel_request (F) y0=182 -->
+      <rect class="cell" x="20" y="182" width="270" height="56" rx="6"/><text class="fname" x="30" y="204">Order Cancel Request[F].xlsx</text><text class="rows" x="30" y="224">274,697 rows</text>
+      <text class="plus" x="300" y="216">+</text>
+      <rect class="cell" x="310" y="182" width="270" height="56" rx="6"/><text class="fname" x="320" y="204">Order Cancel Request[F].xlsx</text><text class="rows" x="320" y="224">124,881 rows</text>
+      <text class="plus" x="590" y="216">+</text>
+      <rect class="cell" x="600" y="182" width="270" height="56" rx="6"/><text class="fname" x="610" y="204">Order Cancel Request [F].xlsx</text><text class="rows" x="610" y="224">140,008 rows</text>
+      <path class="arrow" d="M872,210 H924"/>
+      <rect class="t-client" x="930" y="182" width="290" height="56" rx="6"/><text class="tname" x="942" y="204">order_cancel_request</text><text class="tdesc" x="942" y="224">F · 539,586 rows · 11 columns</text>
+
+      <!-- Row 4: order_cancel_replace_request (G) y0=248 -->
+      <rect class="cell" x="20" y="248" width="270" height="56" rx="6"/><text class="fname" x="30" y="270">Order Cancel Replace Request [G].xlsx</text><text class="rows" x="30" y="290">282,791 rows</text>
+      <text class="plus" x="300" y="282">+</text>
+      <rect class="cell" x="310" y="248" width="270" height="56" rx="6"/><text class="fname" x="320" y="270">Order Cancel Replace Request[G].xlsx</text><text class="rows" x="320" y="290">160,352 rows</text>
+      <text class="plus" x="590" y="282">+</text>
+      <rect class="cell" x="600" y="248" width="270" height="56" rx="6"/><text class="fname" x="610" y="270">Order Cancel Replace Request [G].xlsx</text><text class="rows" x="610" y="290">486,808 rows</text>
+      <path class="arrow" d="M872,276 H924"/>
+      <rect class="t-client" x="930" y="248" width="290" height="56" rx="6"/><text class="tname" x="942" y="270">order_cancel_replace_request</text><text class="tdesc" x="942" y="290">G · 929,951 rows · 18 columns</text>
+
+      <!-- Row 5: order_mass_cancel_request (q) y0=314 -->
+      <rect class="cell" x="20" y="314" width="270" height="56" rx="6"/><text class="fname" x="30" y="336">Order Mass Cancel Request.xlsx</text><text class="rows" x="30" y="356">42 rows</text>
+      <text class="plus" x="300" y="348">+</text>
+      <rect class="cell" x="310" y="314" width="270" height="56" rx="6"/><text class="fname" x="320" y="336">Order Mass Cancel Request.xlsx</text><text class="rows" x="320" y="356">134 rows</text>
+      <text class="plus" x="590" y="348">+</text>
+      <rect class="cell" x="600" y="314" width="270" height="56" rx="6"/><text class="fname" x="610" y="336">Order Mass Cancel Request [q].xlsx</text><text class="rows" x="610" y="356">178 rows</text>
+      <path class="arrow" d="M872,342 H924"/>
+      <rect class="t-client" x="930" y="314" width="290" height="56" rx="6"/><text class="tname" x="942" y="336">order_mass_cancel_request</text><text class="tdesc" x="942" y="356">q · 354 rows · 11 columns</text>
+
+      <!-- Row 6: logout (5) y0=380 -->
+      <rect class="cell" x="20" y="380" width="270" height="56" rx="6"/><text class="fname" x="30" y="402">Logout[5].xlsx</text><text class="rows" x="30" y="422">4,249 rows</text>
+      <text class="plus" x="300" y="414">+</text>
+      <rect class="cell" x="310" y="380" width="270" height="56" rx="6"/><text class="fname" x="320" y="402">Logout.xlsx</text><text class="rows" x="320" y="422">11,065 rows</text>
+      <text class="plus" x="590" y="414">+</text>
+      <rect class="cell" x="600" y="380" width="270" height="56" rx="6"/><text class="fname" x="610" y="402">Logout.xlsx</text><text class="rows" x="610" y="422">5,992 rows</text>
+      <path class="arrow" d="M872,408 H924"/>
+      <rect class="t-both" x="930" y="380" width="290" height="56" rx="6"/><text class="tname" x="942" y="402">logout</text><text class="tdesc" x="942" y="422">5 · 21,306 rows · 6 columns</text>
+
+      <!-- Row 7: logon_response (B) y0=446 -->
+      <rect class="cell" x="20" y="446" width="270" height="56" rx="6"/><text class="fname" x="30" y="468">Logout [B].xlsx <tspan class="flag">*</tspan></text><text class="rows" x="30" y="488">4,312 rows</text>
+      <text class="plus" x="300" y="480">+</text>
+      <rect class="cell" x="310" y="446" width="270" height="56" rx="6"/><text class="fname" x="320" y="468">Logon Response [B].xlsx</text><text class="rows" x="320" y="488">9,860 rows</text>
+      <text class="plus" x="590" y="480">+</text>
+      <rect class="cell" x="600" y="446" width="270" height="56" rx="6"/><text class="fname" x="610" y="468">Logon Response [B].xlsx</text><text class="rows" x="610" y="488">9,674 rows</text>
+      <path class="arrow" d="M872,474 H924"/>
+      <rect class="t-jse" x="930" y="446" width="290" height="56" rx="6"/><text class="tname" x="942" y="468">logon_response</text><text class="tdesc" x="942" y="488">B · 23,846 rows · 7 columns</text>
+
+      <!-- Row 8: execution_report (8) y0=512 -->
+      <rect class="cell" x="20" y="512" width="270" height="56" rx="6"/><text class="fname" x="30" y="534">Execution Report [8].xlsx</text><text class="rows" x="30" y="554">76,466 rows</text>
+      <text class="plus" x="300" y="546">+</text>
+      <rect class="cell" x="310" y="512" width="270" height="56" rx="6"/><text class="fname" x="320" y="532">Execution Report 1.xlsx <tspan class="rows">270,398</tspan></text><text class="fname" x="320" y="552">Execution Report 2.xlsx <tspan class="rows">168,418</tspan></text>
+      <text class="plus" x="590" y="546">+</text>
+      <rect class="cell" x="600" y="512" width="270" height="56" rx="6"/><text class="fname" x="610" y="534">Execution Report.xlsx</text><text class="rows" x="610" y="554">183,880 rows</text>
+      <path class="arrow" d="M872,540 H924"/>
+      <rect class="t-jse" x="930" y="512" width="290" height="56" rx="6"/><text class="tname" x="942" y="534">execution_report</text><text class="tdesc" x="942" y="554">8 · 699,162 rows · 26 columns</text>
+
+      <!-- Row 9: order_cancel_reject (9) y0=578 -->
+      <rect class="cell" x="20" y="578" width="270" height="56" rx="6"/><text class="fname" x="30" y="600">Order Cancel Reject.xlsx</text><text class="rows" x="30" y="620">8,737 rows</text>
+      <text class="plus" x="300" y="612">+</text>
+      <rect class="cell" x="310" y="578" width="270" height="56" rx="6"/><text class="fname" x="320" y="600">Order Cancel Reject[9].xlsx</text><text class="rows" x="320" y="620">11,476 rows</text>
+      <text class="plus" x="590" y="612">+</text>
+      <rect class="cell" x="600" y="578" width="270" height="56" rx="6"/><text class="fname" x="610" y="600">Order Cancel Reject.xlsx</text><text class="rows" x="610" y="620">1,696 rows</text>
+      <path class="arrow" d="M872,606 H924"/>
+      <rect class="t-jse" x="930" y="578" width="290" height="56" rx="6"/><text class="tname" x="942" y="600">order_cancel_reject</text><text class="tdesc" x="942" y="620">9 · 21,909 rows · 16 columns</text>
+
+      <!-- Row 10: order_mass_cancel_report (r) y0=644 -->
+      <rect class="cell" x="20" y="644" width="270" height="56" rx="6"/><text class="fname" x="30" y="666">Order Mass Cancel Report.xlsx</text><text class="rows" x="30" y="686">8 rows</text>
+      <text class="plus" x="300" y="678">+</text>
+      <rect class="cell" x="310" y="644" width="270" height="56" rx="6"/><text class="fname" x="320" y="666">Order Mass Cancel Report.xlsx</text><text class="rows" x="320" y="686">188 rows</text>
+      <text class="plus" x="590" y="678">+</text>
+      <rect class="cell" x="600" y="644" width="270" height="56" rx="6"/><text class="fname" x="610" y="666">Order Mass Cancel Report [r].xlsx</text><text class="rows" x="610" y="686">268 rows</text>
+      <path class="arrow" d="M872,672 H924"/>
+      <rect class="t-jse" x="930" y="644" width="290" height="56" rx="6"/><text class="tname" x="942" y="666">order_mass_cancel_report</text><text class="tdesc" x="942" y="686">r · 464 rows · 11 columns</text>
+
+      <!-- Row 11: reject (3) y0=710, taller for three August files -->
+      <rect class="cell" x="20" y="710" width="270" height="66" rx="6"/><text class="fname" x="30" y="737">Rejects.xlsx</text><text class="rows" x="30" y="757">126 rows</text>
+      <text class="plus" x="300" y="749">+</text>
+      <rect class="cell" x="310" y="710" width="270" height="66" rx="6"/><text class="fname" x="320" y="728">Reject 1.xlsx <tspan class="rows">48,628</tspan></text><text class="fname" x="320" y="746">Reject 2.xlsx <tspan class="rows">88</tspan></text><text class="fname" x="320" y="764">Reject 3.xlsx <tspan class="rows">983,608</tspan></text>
+      <text class="plus" x="590" y="749">+</text>
+      <rect class="cell" x="600" y="710" width="270" height="66" rx="6"/><text class="fname" x="610" y="737">Reject.xlsx</text><text class="rows" x="610" y="757">94,564 rows</text>
+      <path class="arrow" d="M872,743 H924"/>
+      <rect class="t-jse" x="930" y="710" width="290" height="66" rx="6"/><text class="tname" x="942" y="737">reject</text><text class="tdesc" x="942" y="757">3 · 1,127,014 rows · 14 columns</text>
+
+      <!-- Totals -->
+      <line class="rule" x1="20" y1="794" x2="1220" y2="794"/>
+      <text class="total" x="20" y="822">11 files · 757,867 rows</text>
+      <text class="total" x="310" y="822">14 files · 2,008,287 rows</text>
+      <text class="total" x="600" y="822">11 files · 997,362 rows</text>
+      <text class="total" x="930" y="822">11 tables · 3,763,516 rows</text>
+    </svg>
+    <div class="legend">
+      <span class="l-file">One bronze Excel file</span>
+      <span class="l-client">Silver table of messages a client sends</span>
+      <span class="l-jse">Silver table of messages the JSE sends</span>
+      <span class="l-both">Sent by either side</span>
+    </div>
+  </div>
+  <p>The letter or digit before each table's row count is the FIX message type code (FIX tag 35, <code>MsgType</code>) of every row in that table. The files in each row are joined by column name, so a column that one month's file does not have is empty for that month's rows.</p>
+  <p><span style="color:var(--warn);font-weight:700">*</span> The July file named <code>Logout [B].xlsx</code> holds Logon Responses. <code>silver.py</code> chooses each file's table from the most common value in the file's <code>Message Type</code> column, which is <code>B</code> in this file, so its 4,312 rows are in <code>logon_response</code>, not <code>logout</code>.</p>
+
+  <h2>What silver.py does to each file</h2>
+  <ol class="steps">
+    <li>Downloads the file from <code>bronze/</code>. Every CompID in it is already fictitious: <code>bronze.py</code> replaced the real CompIDs before the upload.</li>
+    <li>Changes each column header to lower case with underscores: <code>Client Order ID</code> becomes <code>client_order_id</code>. Reject files have two headers called <code>Message Type</code>; the second is the type of the client message that was rejected, and is named <code>ref_message_type</code>.</li>
+    <li>Makes empty cells NULL (empty), and reads the <code>timestamp</code> column and every column ending in <code>_time</code> as a date and time. Vonnegut writes 24-hour times followed by an <code>am</code> or <code>pm</code> that is ignored, for example <code>2026-07-01 20:15:01.7941 pm</code>.</li>
+    <li>Keeps identifier and code columns as text, so that leading zeros and letters are kept: <code>order_id</code>, <code>side</code>, <code>reject_code</code>, <code>time_in_force</code> and every column whose name contains <code>_id</code>, <code>code</code>, <code>type</code>, <code>status</code> or a similar word. Any other column whose values are all numbers becomes a number column.</li>
+    <li>Adds two columns: <code>source_month</code> (for example <code>August_2026</code>) and <code>source_file</code> (for example <code>August_2026/Reject 3.xlsx</code>).</li>
+    <li>Adds the rows to the table for the file's message type. When all 36 files are read, each table is written to <code>silver/&lt;table&gt;.parquet</code>, and <code>silver/manifest.json</code> records each table's row count, columns and source files.</li>
+  </ol>
+
+  <h2>Which columns each table has</h2>
+  <p>A dot means the table has the column. The 27 columns below appear in two or more tables; they are the columns used to follow one CompID or one order from one message type to another.</p>
+  <div class="wrap">
+  <table class="matrix">
+    <thead><tr><th>Column</th>
+      <th class="v">A logon</th><th class="v">B logon_response</th><th class="v">5 logout</th><th class="v">D new_order_single</th><th class="v">F order_cancel_request</th><th class="v">G order_cancel_replace_request</th><th class="v">q order_mass_cancel_request</th><th class="v">8 execution_report</th><th class="v">9 order_cancel_reject</th><th class="v">r order_mass_cancel_report</th><th class="v">3 reject</th><th>Tables</th></tr></thead>
+    <tbody>
+<tr><th scope="row"><code>comp_id</code></th><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="n">11</td></tr>
+<tr><th scope="row"><code>message_type</code></th><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="n">11</td></tr>
+<tr><th scope="row"><code>source_file</code></th><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="n">11</td></tr>
+<tr><th scope="row"><code>source_month</code></th><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="n">11</td></tr>
+<tr><th scope="row"><code>timestamp</code></th><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="n">11</td></tr>
+<tr><th scope="row"><code>client_order_id</code></th><td></td><td></td><td></td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="n">8</td></tr>
+<tr><th scope="row"><code>order_book</code></th><td></td><td></td><td></td><td class="y">&#9679;</td><td class="y">&#9679;</td><td></td><td></td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td></td><td class="n">5</td></tr>
+<tr><th scope="row"><code>reject_code</code></th><td></td><td class="y">&#9679;</td><td></td><td></td><td></td><td></td><td></td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="n">5</td></tr>
+<tr><th scope="row"><code>security_id</code></th><td></td><td></td><td></td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td></td><td></td><td></td><td class="n">5</td></tr>
+<tr><th scope="row"><code>order_id</code></th><td></td><td></td><td></td><td></td><td class="y">&#9679;</td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td class="y">&#9679;</td><td></td><td></td><td class="n">4</td></tr>
+<tr><th scope="row"><code>side</code></th><td></td><td></td><td></td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td></td><td></td><td></td><td class="n">4</td></tr>
+<tr><th scope="row"><code>display_quantity</code></th><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td></td><td></td><td></td><td class="n">3</td></tr>
+<tr><th scope="row"><code>transact_time</code></th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="y">&#9679;</td><td class="y">&#9679;</td><td class="y">&#9679;</td><td></td><td class="n">3</td></tr>
+<tr><th scope="row"><code>bytes</code></th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td class="n">2</td></tr>
+<tr><th scope="row"><code>destination</code></th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td class="n">2</td></tr>
+<tr><th scope="row"><code>execution_instruction</code></th><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td></td><td></td><td class="n">2</td></tr>
+<tr><th scope="row"><code>limit_price</code></th><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td></td><td></td><td></td><td></td><td></td><td class="n">2</td></tr>
+<tr><th scope="row"><code>minimum_quantity</code></th><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td></td><td></td><td></td><td></td><td></td><td class="n">2</td></tr>
+<tr><th scope="row"><code>order_quantity</code></th><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td></td><td></td><td></td><td></td><td></td><td class="n">2</td></tr>
+<tr><th scope="row"><code>order_type</code></th><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td></td><td></td><td></td><td></td><td></td><td class="n">2</td></tr>
+<tr><th scope="row"><code>packet_id</code></th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td class="n">2</td></tr>
+<tr><th scope="row"><code>partition_id</code></th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="y">&#9679;</td><td class="y">&#9679;</td><td></td><td class="n">2</td></tr>
+<tr><th scope="row"><code>self_trade_prevention_key</code></th><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td></td><td></td><td class="n">2</td></tr>
+<tr><th scope="row"><code>sequence_no</code></th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td class="n">2</td></tr>
+<tr><th scope="row"><code>source</code></th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td class="n">2</td></tr>
+<tr><th scope="row"><code>stop_price</code></th><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td></td><td></td><td></td><td></td><td></td><td class="n">2</td></tr>
+<tr><th scope="row"><code>time_in_force</code></th><td></td><td></td><td></td><td class="y">&#9679;</td><td></td><td class="y">&#9679;</td><td></td><td></td><td></td><td></td><td></td><td class="n">2</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Columns found in one table only</h2>
+  <table class="grid">
+    <thead><tr><th>Table</th><th>Columns</th></tr></thead>
+    <tbody>
+      <tr><td><code>logon</code></td><td><code>compid</code>, <code>protocol_version</code></td></tr>
+      <tr><td><code>logon_response</code></td><td><code>password_expiry</code></td></tr>
+      <tr><td><code>logout</code></td><td><code>reason</code></td></tr>
+      <tr><td><code>new_order_single</code></td><td><code>account</code>, <code>cancel_on_disconnect</code>, <code>order_sub_type</code>, <code>capacity</code></td></tr>
+      <tr><td><code>order_cancel_request</code></td><td><code>orig_client_order_id</code></td></tr>
+      <tr><td><code>order_cancel_replace_request</code></td><td><code>original_client_order_id</code>, <code>expire_time</code></td></tr>
+      <tr><td><code>order_mass_cancel_request</code></td><td><code>mass_cancel_request_type</code>, <code>ordersubtype</code>, <code>segment</code>, <code>orderbook</code></td></tr>
+      <tr><td><code>execution_report</code></td><td><code>execution_id</code>, <code>public_order_id</code>, <code>execution_type</code>, <code>order_status</code>, <code>working_indicator</code>, <code>liquidity_indicator</code>, <code>type_of_trade</code>, <code>indicator_flags</code>, <code>leaves_quantity</code>, <code>executed_quantity</code>, <code>executed_price</code></td></tr>
+      <tr><td><code>order_mass_cancel_report</code></td><td><code>status</code></td></tr>
+      <tr><td><code>reject</code></td><td><code>ref_message_type</code>, <code>reject_reason</code></td></tr>
+    </tbody>
+  </table>
+  <p>Silver keeps each export's own column names. Three pairs of columns hold the same field under two names: <code>original_client_order_id</code> and <code>orig_client_order_id</code>, <code>orderbook</code> and <code>order_book</code>, <code>ordersubtype</code> and <code>order_sub_type</code>. <code>gold.py</code> gives each pair one name when it builds <code>fact_message</code> (see <a href="gold_star_schema.html">Gold star schema</a>). The network capture columns <code>source</code>, <code>destination</code>, <code>bytes</code>, <code>sequence_no</code> and <code>packet_id</code> are in silver only.</p>
+
+  <h2>Why silver keeps every row</h2>
+  <p>Vonnegut records many messages more than once, so silver row counts are higher than message counts: <code>reject</code> has 1,127,014 rows for 736,608 distinct messages. Silver keeps the repeated rows so that any rule for merging them can be checked against the exports. <code>gold.py</code> applies the merging rule and records in the column <code>copies</code> how many silver rows each message was made from.</p>
+</main>
+</body>
+</html>

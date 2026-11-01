@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data architecture: from Vonnegut exports to the in-browser tables</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5f6b7a; --border: #cfd6de; --line: #44505e;
+    --src: #f3f4f6;    --src-edge: #6b7785;
+    --bronze: #f6ebdf; --bronze-edge: #9a5b1e;
+    --silver: #eef1f5; --silver-edge: #6b7785;
+    --gold: #fbf3d5;   --gold-edge: #a07c0a;
+    --web: #e6f0fa;    --web-edge: #0b5cad;
+    --cfg: #fbf1e2;    --cfg-edge: #a8650a;
+    --zone: #fafbfc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c; --panel: #1a2029; --text: #e4e8ee; --muted: #98a3b1; --border: #2c3542; --line: #aab4c0;
+      --src: #20262f;    --src-edge: #8a96a5;
+      --bronze: #2e2116; --bronze-edge: #d08c4c;
+      --silver: #222831; --silver-edge: #a3afbd;
+      --gold: #2c2611;   --gold-edge: #d9b23a;
+      --web: #16283d;    --web-edge: #4c9be8;
+      --cfg: #2e2312;    --cfg-edge: #e0a14a;
+      --zone: #161b22;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1240px; margin: 0 auto; padding: 32px 16px 48px; }
+  nav { font-size: 13px; margin-bottom: 18px; color: var(--muted); }
+  nav a { color: inherit; margin-right: 14px; }
+  a { color: var(--muted); }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 22px; max-width: 920px; }
+  h2 { font-size: 17px; margin: 34px 0 10px; }
+  p, ol, ul { max-width: 920px; }
+  li { margin-bottom: 7px; }
+  .figure { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; overflow-x: auto; }
+  svg { display: block; width: 100%; min-width: 1050px; height: auto; }
+  svg text { fill: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  svg .zl { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; fill: var(--muted); }
+  svg .t { font-size: 15px; font-weight: 700; }
+  svg .p { font: 11.5px ui-monospace, Consolas, monospace; fill: var(--muted); }
+  svg .d { font-size: 12.5px; }
+  svg .n { font-size: 12.5px; font-weight: 700; }
+  svg .al { font: 600 11px ui-monospace, Consolas, monospace; text-anchor: middle; }
+  svg .an { font-size: 11px; fill: var(--muted); }
+  .zone { fill: var(--zone); stroke: var(--border); stroke-width: 1.2; stroke-dasharray: 6 4; }
+  .b { stroke-width: 1.6; }
+  .src { fill: var(--src); stroke: var(--src-edge); }
+  .bronze { fill: var(--bronze); stroke: var(--bronze-edge); }
+  .silver { fill: var(--silver); stroke: var(--silver-edge); }
+  .gold { fill: var(--gold); stroke: var(--gold-edge); }
+  .web { fill: var(--web); stroke: var(--web-edge); }
+  .cfg { fill: var(--cfg); stroke: var(--cfg-edge); }
+  .arrow { stroke: var(--line); stroke-width: 1.8; fill: none; marker-end: url(#head); }
+  .dash { stroke-dasharray: 5 4; stroke-width: 1.4; }
+  #head path { fill: var(--line); }
+  code { font: 13px ui-monospace, Consolas, monospace; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+  table { border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); font-size: 14px; width: 100%; }
+  th, td { padding: 8px 11px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  thead th { font-size: 12px; color: var(--muted); }
+  td.r, th.r { text-align: right; white-space: nowrap; }
+  tfoot td { font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+  <nav><a href="system_architecture.html">System architecture</a><a href="data_architecture.html">Data architecture</a><a href="silver_layer.html">Silver layer</a><a href="gold_star_schema.html">Gold star schema</a></nav>
+
+  <h1>Data architecture: Vonnegut exports to bronze, silver, gold and the browser</h1>
+  <p class="sub">Three Python scripts, run one after another on the analyst's computer, build three layers of the data in the private Supabase Storage bucket <code>fix-data</code>. Each script downloads the layer before it and uploads its own. The chat page downloads only the last layer, <code>gold/</code>, into a database inside the browser tab.</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 1400 710" role="img" aria-label="Data architecture diagram: Vonnegut exports on the analyst's computer, bronze, silver and gold folders in Supabase Storage, and the in-browser database">
+      <defs>
+        <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+
+      <!-- zones -->
+      <rect class="zone" x="10" y="40" width="270" height="655" rx="12"/>
+      <text class="zl" x="24" y="64">ANALYST'S COMPUTER</text>
+      <rect class="zone" x="300" y="40" width="820" height="520" rx="12"/>
+      <text class="zl" x="314" y="64">SUPABASE STORAGE · PRIVATE BUCKET fix-data</text>
+      <rect class="zone" x="1140" y="40" width="250" height="520" rx="12"/>
+      <text class="zl" x="1154" y="64">ANALYST'S BROWSER TAB</text>
+      <rect class="zone" x="300" y="575" width="1090" height="120" rx="12"/>
+      <text class="zl" x="314" y="597">GIT REPOSITORY Trading_Conformance_Agent</text>
+
+      <!-- Vonnegut exports -->
+      <rect class="b src" x="25" y="90" width="230" height="270" rx="10"/>
+      <text class="t" x="39" y="118">Vonnegut exports</text>
+      <text class="p" x="39" y="138">Trading_FIX_Messages/</text>
+      <text class="d" x="39" y="166">36 Excel files in 3 month</text>
+      <text class="d" x="39" y="184">folders, July to September</text>
+      <text class="d" x="39" y="202">2026</text>
+      <text class="n" x="39" y="230">3,763,516 rows</text>
+      <text class="d" x="39" y="258">Real CompIDs</text>
+      <text class="d" x="39" y="276">Not in git, not uploaded</text>
+
+      <!-- CompID key -->
+      <rect class="b cfg" x="25" y="380" width="230" height="90" rx="10"/>
+      <text class="t" x="39" y="404">CompID key</text>
+      <text class="p" x="39" y="422">CompID_Key.xlsx</text>
+      <text class="d" x="39" y="442">Real CompID → fictitious CompID</text>
+      <text class="d" x="39" y="459">Used by bronze.py. Not in git.</text>
+
+      <!-- Scripts and settings -->
+      <rect class="b cfg" x="25" y="490" width="230" height="190" rx="10"/>
+      <text class="t" x="39" y="518">Scripts and settings</text>
+      <text class="p" x="39" y="538">code/</text>
+      <text class="d" x="39" y="566">bronze.py, silver.py, gold.py:</text>
+      <text class="d" x="39" y="584">run in that order</text>
+      <text class="d" x="39" y="602">storage.py: upload, download</text>
+      <text class="d" x="39" y="620">config.py: reads .env</text>
+      <text class="d" x="39" y="644">.env: Supabase secret key</text>
+      <text class="d" x="39" y="662">(not in git)</text>
+
+      <!-- Bronze -->
+      <rect class="b bronze" x="320" y="90" width="220" height="270" rx="10"/>
+      <text class="t" x="334" y="118">Bronze</text>
+      <text class="p" x="334" y="138">bronze/</text>
+      <text class="d" x="334" y="166">The 36 Excel files, same</text>
+      <text class="d" x="334" y="184">folders and file names</text>
+      <text class="d" x="334" y="208">Real CompIDs replaced</text>
+      <text class="d" x="334" y="226">with fictitious CompIDs</text>
+      <text class="d" x="334" y="250">[ and ] in names stored</text>
+      <text class="d" x="334" y="268">as ( and )</text>
+      <text class="d" x="334" y="292">files.json: original names</text>
+      <text class="n" x="334" y="320">3,763,516 rows</text>
+
+      <!-- Silver -->
+      <rect class="b silver" x="600" y="90" width="220" height="270" rx="10"/>
+      <text class="t" x="614" y="118">Silver</text>
+      <text class="p" x="614" y="138">silver/</text>
+      <text class="d" x="614" y="166">11 Parquet tables, one per</text>
+      <text class="d" x="614" y="184">message type</text>
+      <text class="d" x="614" y="208">3 months combined</text>
+      <text class="d" x="614" y="232">Column names and types</text>
+      <text class="d" x="614" y="250">cleaned</text>
+      <text class="d" x="614" y="274">Every export row kept</text>
+      <text class="d" x="614" y="292">manifest.json</text>
+      <text class="n" x="614" y="320">3,763,516 rows</text>
+
+      <!-- Gold -->
+      <rect class="b gold" x="880" y="90" width="220" height="270" rx="10"/>
+      <text class="t" x="894" y="118">Gold</text>
+      <text class="p" x="894" y="138">gold/</text>
+      <text class="d" x="894" y="166">9 Parquet tables: 3 fact</text>
+      <text class="d" x="894" y="184">tables, 6 dimension tables</text>
+      <text class="d" x="894" y="208">Repeated rows merged</text>
+      <text class="d" x="894" y="232">manifest.json: meaning and</text>
+      <text class="d" x="894" y="250">value counts of each column</text>
+      <text class="n" x="894" y="292">fact_message:</text>
+      <text class="n" x="894" y="310">2,169,820 messages</text>
+
+      <!-- Browser database -->
+      <rect class="b web" x="1160" y="90" width="215" height="270" rx="10"/>
+      <text class="t" x="1174" y="118">In-browser database</text>
+      <text class="p" x="1174" y="138">DuckDB-WASM</text>
+      <text class="d" x="1174" y="166">The 9 gold tables, held in</text>
+      <text class="d" x="1174" y="184">the tab's memory</text>
+      <text class="d" x="1174" y="208">Loaded when the Supabase</text>
+      <text class="d" x="1174" y="226">publishable key is entered</text>
+      <text class="d" x="1174" y="250">File and network access</text>
+      <text class="d" x="1174" y="268">switched off after loading</text>
+      <text class="d" x="1174" y="292">Deleted when the tab closes</text>
+
+      <!-- Script copies -->
+      <rect class="b silver" x="600" y="400" width="220" height="140" rx="10"/>
+      <text class="t" x="614" y="428">Script copies</text>
+      <text class="p" x="614" y="448">scripts/</text>
+      <text class="d" x="614" y="476">The 6 files from code/,</text>
+      <text class="d" x="614" y="494">uploaded by each run, so the</text>
+      <text class="d" x="614" y="512">bucket records how each</text>
+      <text class="d" x="614" y="530">layer was made</text>
+
+      <!-- Agent -->
+      <rect class="b web" x="1160" y="400" width="215" height="140" rx="10"/>
+      <text class="t" x="1174" y="428">Agent</text>
+      <text class="p" x="1174" y="448">web/agent.js</text>
+      <text class="d" x="1174" y="476">Runs the language model's</text>
+      <text class="d" x="1174" y="494">SQL on the 9 tables with</text>
+      <text class="d" x="1174" y="512">run_sql, list_tables and</text>
+      <text class="d" x="1174" y="530">describe_table</text>
+
+      <!-- Repository files -->
+      <rect class="b src" x="880" y="605" width="220" height="78" rx="10"/>
+      <text class="t" x="894" y="628">Reject code list</text>
+      <text class="p" x="894" y="646">web/knowledge/reject_codes.json</text>
+      <text class="d" x="894" y="668">714 codes from JSE Volume 10</text>
+      <rect class="b src" x="1160" y="605" width="215" height="78" rx="10"/>
+      <text class="t" x="1174" y="628">Page files</text>
+      <text class="p" x="1174" y="646">index.html, web/</text>
+      <text class="d" x="1174" y="668">Served by GitHub Pages</text>
+
+      <!-- main arrows -->
+      <path class="arrow" d="M255,225 H316"/>
+      <text class="al" x="287" y="214">bronze.py</text>
+      <path class="arrow" d="M540,225 H596"/>
+      <text class="al" x="569" y="214">silver.py</text>
+      <path class="arrow" d="M820,225 H876"/>
+      <text class="al" x="849" y="214">gold.py</text>
+      <path class="arrow" d="M1100,225 H1156"/>
+      <text class="al" x="1129" y="214">data.js</text>
+
+      <!-- supporting arrows -->
+      <path class="arrow dash" d="M255,425 H287 V233"/>
+      <path class="arrow dash" d="M255,520 H560 V470 H596"/>
+      <text class="an" x="318" y="512">each script uploads a copy of code/</text>
+      <path class="arrow dash" d="M990,605 V364"/>
+      <text class="an" x="998" y="590">read by gold.py for dim_reject_code</text>
+      <path class="arrow" d="M1267,400 V364"/>
+      <text class="an" x="1274" y="386">SQL queries</text>
+      <path class="arrow dash" d="M1267,605 V544"/>
+      <text class="an" x="1274" y="590">loaded into the tab</text>
+    </svg>
+  </div>
+
+  <h2>What each step does</h2>
+  <ol>
+    <li><code>bronze.py</code> reads each Excel file in <code>Trading_FIX_Messages/</code> and replaces every real CompID in it with its fictitious CompID from <code>CompID_Key.xlsx</code>. It then searches the whole file for any real CompID; if one is found, it stops and uploads nothing. Otherwise it uploads the file to <code>bronze/</code> with the same folder and file name. The real CompIDs never leave the analyst's computer.</li>
+    <li><code>silver.py</code> downloads the 36 files from <code>bronze/</code>, cleans the column names and types, and combines all rows of one FIX message type from all three months into one table. It uploads 11 Parquet files (a compressed file format for tables) to <code>silver/</code>. See <a href="silver_layer.html">Silver layer</a>.</li>
+    <li><code>gold.py</code> downloads the 11 silver tables, merges the repeated rows into one row per message, fills missing CompIDs, links requests to their orders, and builds the 9 star schema tables. It uploads them to <code>gold/</code>. See <a href="gold_star_schema.html">Gold star schema</a>.</li>
+    <li>When the analyst enters the Supabase publishable key in the chat page, <code>web/data.js</code> downloads <code>gold/manifest.json</code> and the 9 Parquet files, creates the 9 tables in DuckDB-WASM (the version of the DuckDB database that runs inside a web page), and switches off the database's access to files, the network and its own settings.</li>
+  </ol>
+  <p>Each script deletes from its own folder in the bucket any file it did not write in that run, so a folder holds only the output of the last run. <code>silver.py</code> and <code>gold.py</code> write their Parquet files to a temporary folder that is deleted when the script ends; no layer is kept in the repository folder, which is stored on Google Drive.</p>
+
+  <h2>Rows at each layer</h2>
+  <p>Silver has one row per export row. Gold has one row per distinct message, because Vonnegut records many messages more than once.</p>
+  <table>
+    <thead><tr><th>Message type</th><th>Silver table</th><th class="r">Silver rows</th><th class="r">Gold messages</th><th class="r">Export rows per message</th></tr></thead>
+    <tbody>
+      <tr><td>3 Reject</td><td><code>reject</code></td><td class="r">1,127,014</td><td class="r">736,608</td><td class="r">1.53</td></tr>
+      <tr><td>G Order Cancel/Replace Request (amend)</td><td><code>order_cancel_replace_request</code></td><td class="r">929,951</td><td class="r">558,305</td><td class="r">1.67</td></tr>
+      <tr><td>8 Execution Report</td><td><code>execution_report</code></td><td class="r">699,162</td><td class="r">245,298</td><td class="r">2.85</td></tr>
+      <tr><td>F Order Cancel Request</td><td><code>order_cancel_request</code></td><td class="r">539,586</td><td class="r">318,157</td><td class="r">1.70</td></tr>
+      <tr><td>D New Order</td><td><code>new_order_single</code></td><td class="r">325,344</td><td class="r">205,175</td><td class="r">1.59</td></tr>
+      <tr><td>A Logon</td><td><code>logon</code></td><td class="r">74,580</td><td class="r">55,557</td><td class="r">1.34</td></tr>
+      <tr><td>B Logon Response</td><td><code>logon_response</code></td><td class="r">23,846</td><td class="r">19,947</td><td class="r">1.20</td></tr>
+      <tr><td>5 Logout</td><td><code>logout</code></td><td class="r">21,306</td><td class="r">15,617</td><td class="r">1.36</td></tr>
+      <tr><td>9 Order Cancel Reject, r Order Mass Cancel Report, q Order Mass Cancel Request</td><td><code>order_cancel_reject</code>, <code>order_mass_cancel_report</code>, <code>order_mass_cancel_request</code></td><td class="r">22,727</td><td class="r">15,156</td><td class="r">1.50</td></tr>
+    </tbody>
+    <tfoot><tr><td>All 11 types</td><td></td><td class="r">3,763,516</td><td class="r">2,169,820</td><td class="r">1.73</td></tr></tfoot>
+  </table>
+
+  <h2>Keys and who uses them</h2>
+  <table>
+    <thead><tr><th>Key</th><th>Kept in</th><th>Used by</th><th>What it allows</th></tr></thead>
+    <tbody>
+      <tr><td>Supabase secret key (<code>SUPABASE_SERVICE_KEY</code>)</td><td><code>code/.env</code> on the analyst's computer; excluded from git</td><td><code>bronze.py</code>, <code>silver.py</code>, <code>gold.py</code> through <code>storage.py</code></td><td>Create the bucket, upload, replace and delete files</td></tr>
+      <tr><td>Supabase publishable key (starts <code>sb_publishable_</code>)</td><td>Typed into the chat page's sidebar; not saved</td><td><code>web/data.js</code></td><td>Download the files in <code>gold/</code></td></tr>
+      <tr><td>OpenRouter key</td><td>Typed into the chat page's sidebar; not saved</td><td><code>web/agent.js</code></td><td>Send questions to the language model on openrouter.ai</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Rules for changing the data</h2>
+  <ul>
+    <li>Every CompID outside the analyst's computer is fictitious. The mapping file <code>CompID_Key.xlsx</code> is excluded from git and is never uploaded.</li>
+    <li>A change to the data is made by changing a script in <code>code/</code> and running it and the scripts after it, so the change is written to Supabase. The repository holds no message data.</li>
+    <li>When new Excel exports arrive, they are added to <code>Trading_FIX_Messages/</code> in a month folder and the three scripts are run in order: <code>bronze.py</code>, <code>silver.py</code>, <code>gold.py</code>.</li>
+  </ul>
+</main>
+</body>
+</html>
