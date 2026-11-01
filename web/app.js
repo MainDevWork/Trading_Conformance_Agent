@@ -1,5 +1,5 @@
-import { chat } from "./agent.js?v=5";
-import { loadStore } from "./data.js?v=5";
+import { chat } from "./agent.js?v=6";
+import { loadStore } from "./data.js?v=6";
 
 window.appStarted = true;
 
@@ -80,15 +80,21 @@ async function send(text) {
   input.value = "";
   busy = true;
   sendBtn.disabled = true;
-  const pending = addMessage("assistant", store ? "_Querying the message data…_" : "_Waiting for the data to finish loading…_");
-  pending.querySelector(".body").classList.add("thinking");
+  // The waiting message shows the current step and the seconds since the question was sent.
+  const pending = addMessage("assistant", "");
+  const pendingBody = pending.querySelector(".body");
+  pendingBody.classList.add("thinking");
+  const sentAt = Date.now();
+  let step = store ? "Starting" : "Waiting for the data to finish loading";
+  const showStep = () => { pendingBody.textContent = `${step}… ${Math.round((Date.now() - sentAt) / 1000)} s`; };
+  showStep();
+  const ticker = setInterval(showStep, 1000);
 
   try {
     // A question sent while the data is still loading is answered once loading ends.
     await loadingDone;
     if (!store) throw new Error("The data did not load, so the question could not be answered. See the message in the sidebar.");
-    pending.querySelector(".body").innerHTML = renderMarkdown("_Querying the message data…_");
-    const data = await chat(store, apiKey, history);
+    const data = await chat(store, apiKey, history, (text) => { step = text; showStep(); });
     pending.remove();
     history.push({ role: "assistant", content: data.answer });
     addMessage("assistant", data.answer);
@@ -97,6 +103,7 @@ async function send(text) {
     history.pop(); // drop the unanswered question so it can be asked again
     addMessage("error", err.message);
   } finally {
+    clearInterval(ticker);
     busy = false;
     sendBtn.disabled = false;
   }

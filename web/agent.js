@@ -5,6 +5,8 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
 const MAX_TOOL_RESULT_CHARS = 30_000;
 const MAX_ROWS = 200;
+// A model request with no reply after this long is stopped, so the page never waits without a limit.
+const MODEL_TIMEOUT_MS = 120_000;
 
 // The language model every question is sent to. Fixed here; the page has no setting to change it.
 export const MODEL = "nvidia/nemotron-3.5-lightning:free";
@@ -192,18 +194,38 @@ async function runTool(store, name, args) {
   return { error: `Unknown tool ${name}` };
 }
 
+// What the page shows while each tool runs.
+const STEP_TEXT = {
+  list_tables: "Reading the list of tables",
+  describe_table: "Reading a table's columns",
+  run_sql: "Running a database query",
+  read_reference: "Reading the JSE conformance reference",
+  lookup_reject_codes: "Looking up reject codes",
+};
+
 // allowTools = false sends tool_choice "none", so the model must reply in text.
 async function callModel(apiKey, messages, model, allowTools = true) {
-  const response = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "X-Title": "Trading Conformance Agent",
-    },
-    body: JSON.stringify({ model, messages, tools: TOOLS, tool_choice: allowTools ? "auto" : "none", temperature: 0 }),
-  });
-  const text = await response.text();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
+  let response, text;
+  try {
+    response = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "X-Title": "Trading Conformance Agent",
+      },
+      body: JSON.stringify({ model, messages, tools: TOOLS, tool_choice: allowTools ? "auto" : "none", temperature: 0 }),
+    });
+    text = await response.text();
+  } catch (err) {
+    if (err.name === "AbortError") throw new Error(`The language model did not reply within ${MODEL_TIMEOUT_MS / 1000} seconds. Send the question again.`);
+    throw new Error(`Could not reach OpenRouter: ${err.message || err}`);
+  } finally {
+    clearTimeout(timer);
+  }
   if (!response.ok) throw new Error(`OpenRouter returned ${response.status}: ${text.slice(0, 500)}`);
   const body = JSON.parse(text);
   if (body.error) throw new Error(`OpenRouter error: ${JSON.stringify(body.error)}`);
@@ -242,14 +264,16 @@ async function lookupRejectCodes(codes) {
 }
 
 // history is the visible conversation: [{role: "user"|"assistant", content}, ...].
+// onStep(text) is called before each model request and each tool call, so the page can show what is happening.
 // Returns the agent's answer and the tool calls it made to reach it.
-export async function chat(store, apiKey, history) {
+export async function chat(store, apiKey, history, onStep = () => {}) {
   const model = MODEL;
   const core = await loadKnowledge("core.md");
   const messages = [{ role: "system", content: `${SYSTEM_PROMPT}\n\n${core}\n\n${schemaText(store)}` },
     ...history.filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content }))];
   const steps = [];
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    onStep(`Waiting for the language model's reply (request ${round + 1})`);
     const reply = await callModel(apiKey, messages, model);
     const toolCalls = reply.tool_calls || [];
     if (!toolCalls.length) return { answer: reply.content || "", steps, model };
@@ -259,6 +283,7 @@ export async function chat(store, apiKey, history) {
       const name = call.function.name;
       let args;
       try { args = JSON.parse(call.function.arguments || "{}"); } catch { args = {}; }
+      onStep(STEP_TEXT[name] || `Running ${name}`);
       let result;
       try { result = await runTool(store, name, args); } catch (err) { result = { error: String(err.message || err) }; }
       let text = JSON.stringify(result);
@@ -270,6 +295,7 @@ export async function chat(store, apiKey, history) {
   // Out of tool rounds: ask for an answer from the results already gathered instead of discarding them.
   messages.push({ role: "user", content: "You have used all your tool calls. Answer now from the tool results above. " +
     "Say plainly which parts of the question you could not finish." });
+  onStep("Waiting for the language model's final answer");
   const final = await callModel(apiKey, messages, model, false);
   const answer = final.content || "I stopped after the maximum number of tool calls without reaching an answer. Try a narrower question.";
   return { answer, steps, model };
