@@ -70,7 +70,7 @@
 </head>
 <body>
 <main>
-  <nav><a href="../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold star schema</a><a href="silver_data_diagram.html">Silver layer</a></nav>
+  <nav><a href="../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold star schema</a><a href="bronze_data_diagram.html">Bronze layer</a></nav>
 
   <h1>Gold layer: star schema</h1>
 
@@ -87,9 +87,9 @@
       <path class="ln code" d="M1000,330 V380"/>
       <path class="ln ord" d="M880,534 H920 V440 H960"/>
       <path class="ln comp" d="M190,720 V975 H440"/>
-      <path class="ln comp" d="M580,770 V880"/>
+      <path class="ln comp" d="M580,824 V880"/>
       <path class="ln comp" d="M1300,720 V975 H720"/>
-      <path class="ln rej" d="M840,770 V850 H900"/>
+      <path class="ln rej" d="M840,824 V850 H900"/>
       <path class="ln rej" d="M1050,720 V790"/>
 
       <text class="lbl t-date" x="258" y="300">date</text>
@@ -100,9 +100,9 @@
       <text class="lbl t-code" x="1008" y="360">column_name + code</text>
       <text class="lbl t-ord" transform="translate(914,522) rotate(-90)">order_id</text>
       <text class="lbl t-comp" x="198" y="850">comp_id</text>
-      <text class="lbl t-comp" x="588" y="835">comp_id</text>
+      <text class="lbl t-comp" x="588" y="858">comp_id</text>
       <text class="lbl t-comp" x="1308" y="850">comp_id</text>
-      <text class="lbl t-rej" x="834" y="815" text-anchor="end">reject_code</text>
+      <text class="lbl t-rej" x="834" y="845" text-anchor="end">reject_code</text>
       <text class="lbl t-rej" x="1058" y="760">reject_code</text>
 
       <!-- ===== dim_date ===== -->
@@ -162,7 +162,7 @@
       <text class="ts" x="42" y="704">Each count is a number of distinct messages.</text>
 
       <!-- ===== fact_message ===== -->
-      <rect class="box fact" x="420" y="380" width="460" height="390" rx="8"/>
+      <rect class="box fact" x="420" y="380" width="460" height="444" rx="8"/>
       <path class="fact-h" d="M428,380 H872 Q880,380 880,388 V424 H420 V388 Q420,380 428,380 Z"/>
       <text class="tn" x="432" y="400">fact_message</text><text class="ts" x="432" y="417">2,169,820 rows · one row per distinct message, all 11 types</text>
       <text class="f k" x="432" y="444">message_id</text><text class="nt" x="868" y="444">key</text>
@@ -175,14 +175,17 @@
       <text class="f k" x="432" y="570">reject_code</text><text class="nt" x="868" y="570">→ dim_reject_code</text>
       <text class="f k" x="432" y="588">side, order_type, time_in_force,</text><text class="nt" x="868" y="588">→ dim_code</text>
       <text class="f k" x="432" y="606">execution_type, order_status, …</text><text class="nt" x="868" y="606">17 code columns</text>
-      <text class="f" x="432" y="624">client_order_id, orig_client_order_id</text>
-      <text class="f" x="432" y="642">execution_id, public_order_id</text>
-      <text class="f" x="432" y="660">order_quantity, limit_price</text>
-      <text class="f" x="432" y="678">executed_quantity, executed_price</text>
-      <text class="f" x="432" y="696">transact_time</text><text class="nt" x="868" y="696">JSE event time, UTC</text>
-      <text class="f" x="432" y="714">comp_id_filled, order_id_linked</text><text class="nt" x="868" y="714">set by gold.py</text>
-      <text class="f" x="432" y="732">copies</text><text class="nt" x="868" y="732">export rows merged</text>
-      <text class="ts" x="432" y="754">and 13 more columns, such as source_file and reject_reason</text>
+      <text class="f" x="432" y="624">side_name, order_type_name, …</text><text class="nt" x="868" y="624">19 meaning columns</text>
+      <text class="f" x="432" y="642">is_rejection</text><text class="nt" x="868" y="642">true for a rejection</text>
+      <text class="f" x="432" y="660">report_event</text><text class="nt" x="868" y="660">what happened, every month</text>
+      <text class="f" x="432" y="678">client_order_id, orig_client_order_id</text>
+      <text class="f" x="432" y="696">execution_id, public_order_id</text>
+      <text class="f" x="432" y="714">order_quantity, limit_price</text>
+      <text class="f" x="432" y="732">executed_quantity, executed_price</text>
+      <text class="f" x="432" y="750">transact_time</text><text class="nt" x="868" y="750">JSE event time, UTC</text>
+      <text class="f" x="432" y="768">comp_id_filled, order_id_linked</text><text class="nt" x="868" y="768">set by silver.py</text>
+      <text class="f" x="432" y="786">copies</text><text class="nt" x="868" y="786">export rows merged</text>
+      <text class="ts" x="432" y="808">and 13 more columns, such as source_file and reject_reason</text>
 
       <!-- ===== fact_order ===== -->
       <rect class="box fact" x="960" y="380" width="410" height="340" rx="8"/>
@@ -202,7 +205,7 @@
       <text class="f" x="972" y="642">execution_reports, trades</text>
       <text class="f" x="972" y="660">executed_quantity</text>
       <text class="f" x="972" y="678">amend_requests, cancel_requests</text>
-      <text class="ts" x="972" y="704">and 6 more columns, such as cancel_rejects</text>
+      <text class="ts" x="972" y="704">and 11 more columns, such as cancel_rejects and side_name</text>
 
       <!-- ===== dim_reject_code ===== -->
       <rect class="box dim" x="900" y="790" width="300" height="120" rx="8"/>
@@ -236,7 +239,7 @@
   <table class="sets">
     <thead><tr><th>Data set</th><th>Kind</th><th>One row per</th><th class="r">Rows</th><th>What it holds</th></tr></thead>
     <tbody>
-      <tr><td class="n"><code>fact_message</code></td><td>Fact</td><td>Distinct message</td><td class="r">2,169,820</td><td>Every message of the 11 silver data sets in one table, with repeated export rows merged. The table to start from for any question about what a CompID sent or received.</td></tr>
+      <tr><td class="n"><code>fact_message</code></td><td>Fact</td><td>Distinct message</td><td class="r">2,169,820</td><td>Every message of the silver table, with a column marking rejections, a column with the meaning beside each code, and a column saying what happened in each execution report. The table to start from for any question about what a CompID sent or received.</td></tr>
       <tr><td class="n"><code>fact_order</code></td><td>Fact</td><td>Order</td><td class="r">162,605</td><td>Each order from entry to end: how it was entered, how many reports, trades, amends and cancels it had, and its outcome (Filled, Cancelled, Expired or Rejected).</td></tr>
       <tr><td class="n"><code>fact_compid_day</code></td><td>Fact</td><td>CompID per day</td><td class="r">2,217</td><td>How many messages of each kind each CompID sent or received on each day. Shows which days a CompID tested and what it did on them.</td></tr>
       <tr><td class="n"><code>dim_compid</code></td><td>Dimension</td><td>CompID</td><td class="r">52</td><td>The fictitious CompIDs, with each one's first and last message and number of days active.</td></tr>

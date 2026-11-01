@@ -7,8 +7,8 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="web/style.css?v=9">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="modulepreload" href="web/agent.js?v=8">
-  <link rel="modulepreload" href="web/data.js?v=8">
+  <link rel="modulepreload" href="web/agent.js?v=9">
+  <link rel="modulepreload" href="web/data.js?v=9">
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 </head>
@@ -20,7 +20,7 @@
       <a href="docs/academy/agent_methodology.html" target="_blank" rel="noopener">Agent methodology</a>
       <a href="docs/academy/data_architecture.html" target="_blank" rel="noopener">Data architecture</a>
       <a href="docs/academy/gold_star_schema.html" target="_blank" rel="noopener">Gold star schema</a>
-      <a href="docs/academy/silver_data_diagram.html" target="_blank" rel="noopener">Silver layer</a>
+      <a href="docs/academy/bronze_data_diagram.html" target="_blank" rel="noopener">Bronze layer</a>
     </nav>
     <section>
       <h2>Data</h2>
@@ -49,9 +49,9 @@
     </form>
   </main>
 
-  <!-- ?v=8 is changed whenever a script changes, so the browser downloads all the new scripts together
+  <!-- ?v=9 is changed whenever a script changes, so the browser downloads all the new scripts together
        instead of mixing a saved old copy of one with a new copy of another. -->
-  <script type="module" src="web/app.js?v=8"></script>
+  <script type="module" src="web/app.js?v=9"></script>
   <script>
     // web/app.js sets window.appStarted. If it did not run, the page says so and shows the browser's error.
     const startErrors = [];

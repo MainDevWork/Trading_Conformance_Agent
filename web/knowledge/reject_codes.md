@@ -1,6 +1,6 @@
 # Reject codes
 
-The Native gateway sends a reject code in four places: Reject `3` (gateway validation, with `reject_reason` naming the field), Execution Report `8` with `execution_type` 8 (matching engine), Order Cancel Reject `9`, and Logon Response `B`.
+The Native gateway sends a reject code in four places: Reject `3` (gateway validation, with `reject_reason` naming the field), Execution Report `8` with `execution_type` 8 (matching engine), Order Cancel Reject `9`, and Logon Response `B`. On a Logon Response, codes 0 and 3 mean the logon succeeded, so they are not rejections. `is_rejection` in `fact_message` is true only for the messages that are rejections; filter on it when listing or counting reject codes.
 
 **Codes observed in the data, with their Volume 10 meaning**
 

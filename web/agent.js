@@ -31,13 +31,21 @@ The data: Vonnegut Excel exports for July, August and September 2026, arranged a
   3 Reject (gateway validation; ref_message_type is the type of the rejected message).
   order_id is filled on requests linked to their JSE reply, so WHERE order_id = '...' returns an order's
   New Order, amends, cancels and execution reports together.
+  is_rejection is true for every message that rejects something the client sent. Use WHERE is_rejection to find or
+  count rejections and their reject codes: reject_code is also filled on Logon Responses that are not rejections
+  (0 means logged in; 3 means logged in, with a password policy warning).
+  Every code column has a column beside it ending in _name with the code's meaning (side_name, order_type_name,
+  time_in_force_name, order_status_name, message_type_name, ...). report_event says what happened to the order in
+  an execution report (New (accepted), Amended, Cancelled, Expired, Rejected, Trade, ...) in every month; use it
+  instead of execution_type, which is empty in July, or order_status, which is empty in August.
 - fact_order: one row per order (order_id) with comp_id, how it was entered, outcome (Filled, Cancelled, Expired,
   Rejected, ...), reject_code, counts of execution reports, trades, amend and cancel requests.
 - fact_compid_day: one row per comp_id per date with counts of each kind of message. Use it first for any
   question about what a CompID did or when it tested.
 - dim_compid, dim_date, dim_security: one row per CompID, day and instrument.
-- dim_message_type, dim_code (column_name, code, meaning) and dim_reject_code (reject_code, meaning, seen_on):
-  join these to put the meaning of a code in the same query instead of looking it up separately.
+- dim_message_type, dim_code (column_name, code, meaning) and dim_reject_code (reject_code, meaning, seen_on).
+  Join dim_reject_code to put the meaning of a reject code in the same query; other codes already have
+  their meaning in the _name columns.
 Every table's columns and their meanings are listed at the end of these instructions, so do not call
 list_tables before writing a query.
 

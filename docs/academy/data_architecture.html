@@ -69,7 +69,7 @@
 </head>
 <body>
 <main>
-  <nav><a href="../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold star schema</a><a href="silver_data_diagram.html">Silver layer</a></nav>
+  <nav><a href="../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold star schema</a><a href="bronze_data_diagram.html">Bronze layer</a></nav>
 
   <h1>Data architecture</h1>
 
@@ -135,17 +135,22 @@
       <text class="role" x="344" y="296">original state</text>
       <text class="d" x="344" y="338">36 Excel files</text>
       <text class="d" x="344" y="358">Same folders and file names</text>
+      <text class="d" x="344" y="388">11 combined tables, one</text>
+      <text class="d" x="344" y="408">per message type</text>
+      <text class="d" x="344" y="428">Every value kept as text</text>
       <text class="n" x="344" y="462">3,763,516 rows</text>
       <rect class="b silver" x="610" y="200" width="200" height="280" rx="10"/>
       <text class="t" x="624" y="228">Silver</text>
       <text class="p" x="624" y="248">silver/</text>
-      <text class="role" x="624" y="278">Consolidated and</text>
-      <text class="role" x="624" y="296">transformed data</text>
-      <text class="d" x="624" y="338">11 tables, one per</text>
-      <text class="d" x="624" y="358">message type</text>
-      <text class="d" x="624" y="378">3 months combined</text>
-      <text class="d" x="624" y="398">Every export row kept</text>
-      <text class="n" x="624" y="462">3,763,516 rows</text>
+      <text class="role" x="624" y="278">Cleaned data, one</text>
+      <text class="role" x="624" y="296">row per message</text>
+      <text class="d" x="624" y="338">1 table, all 11</text>
+      <text class="d" x="624" y="358">message types</text>
+      <text class="d" x="624" y="378">Times and numbers typed</text>
+      <text class="d" x="624" y="398">Repeated rows merged</text>
+      <text class="d" x="624" y="418">CompIDs filled in</text>
+      <text class="d" x="624" y="438">Requests linked to orders</text>
+      <text class="n" x="624" y="462">2,169,820 messages</text>
       <rect class="b gold" x="890" y="200" width="200" height="280" rx="10"/>
       <text class="t" x="904" y="228">Gold</text>
       <text class="p" x="904" y="248">gold/</text>
@@ -153,14 +158,15 @@
       <text class="role" x="904" y="296">analytical model</text>
       <text class="d" x="904" y="338">3 fact tables</text>
       <text class="d" x="904" y="358">6 dimension tables</text>
-      <text class="d" x="904" y="378">Repeated rows merged</text>
+      <text class="d" x="904" y="378">Rejections marked</text>
+      <text class="d" x="904" y="398">Code meanings added</text>
       <text class="n" x="904" y="462">2,169,820 messages</text>
       <path class="arrow" d="M530,340 H606"/>
-      <text class="al" x="569" y="316">combine by</text>
-      <text class="al" x="569" y="330">message type</text>
+      <text class="al" x="569" y="316">clean and</text>
+      <text class="al" x="569" y="330">merge</text>
       <path class="arrow" d="M810,340 H886"/>
-      <text class="al" x="849" y="316">merge into</text>
-      <text class="al" x="849" y="330">star schema</text>
+      <text class="al" x="849" y="316">build star</text>
+      <text class="al" x="849" y="330">schema</text>
       <rect class="b web" x="1170" y="200" width="200" height="120" rx="10"/>
       <text class="t" x="1184" y="228">In-browser database</text>
       <text class="d" x="1184" y="256">The 9 gold tables,</text>
