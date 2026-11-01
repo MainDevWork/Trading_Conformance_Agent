@@ -7,8 +7,8 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="web/style.css">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="modulepreload" href="web/agent.js?v=3">
-  <link rel="modulepreload" href="web/data.js?v=3">
+  <link rel="modulepreload" href="web/agent.js?v=4">
+  <link rel="modulepreload" href="web/data.js?v=4">
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 </head>
@@ -48,9 +48,9 @@
     </form>
   </main>
 
-  <!-- ?v=3 is changed whenever a script changes, so the browser downloads all the new scripts together
+  <!-- ?v=4 is changed whenever a script changes, so the browser downloads all the new scripts together
        instead of mixing a saved old copy of one with a new copy of another. -->
-  <script type="module" src="web/app.js?v=3"></script>
+  <script type="module" src="web/app.js?v=4"></script>
   <script>
     // web/app.js sets window.appStarted. If it did not run, the page says so instead of doing nothing.
     window.addEventListener("load", () => {

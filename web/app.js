@@ -1,5 +1,5 @@
-import { chat } from "./agent.js?v=3";
-import { loadStore } from "./data.js?v=3";
+import { chat } from "./agent.js?v=4";
+import { loadStore } from "./data.js?v=4";
 
 window.appStarted = true;
 
@@ -65,19 +65,29 @@ function addMessage(role, text, steps) {
   return wrap;
 }
 
+// True while a question is being answered, so a second question waits for the first.
+let busy = false;
+
 async function send(text) {
   text = text.trim();
-  if (!text || sendBtn.disabled) return;
+  if (!text || busy) return;
   const apiKey = keyInput.value.trim();
   if (!apiKey) { addMessage("error", "Enter your OpenRouter key in the sidebar first."); return; }
+  if (!store && !loading) start();
+  if (!store && !loading) { addMessage("error", "Enter the Supabase key in the sidebar first."); return; }
   history.push({ role: "user", content: text });
   addMessage("user", text);
   input.value = "";
+  busy = true;
   sendBtn.disabled = true;
-  const pending = addMessage("assistant", "_Querying the message data…_");
+  const pending = addMessage("assistant", store ? "_Querying the message data…_" : "_Waiting for the data to finish loading…_");
   pending.querySelector(".body").classList.add("thinking");
 
   try {
+    // A question sent while the data is still loading is answered once loading ends.
+    await loadingDone;
+    if (!store) throw new Error("The data did not load, so the question could not be answered. See the message in the sidebar.");
+    pending.querySelector(".body").innerHTML = renderMarkdown("_Querying the message data…_");
     const data = await chat(store, apiKey, history);
     pending.remove();
     history.push({ role: "assistant", content: data.answer });
@@ -87,7 +97,8 @@ async function send(text) {
     history.pop(); // drop the unanswered question so it can be asked again
     addMessage("error", err.message);
   } finally {
-    sendBtn.disabled = !store;
+    busy = false;
+    sendBtn.disabled = false;
   }
 }
 
@@ -98,24 +109,26 @@ input.addEventListener("keydown", (e) => {
 document.getElementById("clear").addEventListener("click", () => { history = []; messagesEl.innerHTML = ""; });
 
 let loading = false;
+// Settles when the current load ends, whether it succeeded or failed.
+let loadingDone = Promise.resolve();
 
-async function start() {
+function start() {
   const supabaseKey = supabaseKeyInput.value.trim();
   if (!supabaseKey || loading) return;
   loading = true;
+  loadingDone = load(supabaseKey).finally(() => { loading = false; });
+}
+
+async function load(supabaseKey) {
   const text = document.getElementById("status-text");
-  sendBtn.disabled = true;
   try {
     store = await loadStore(supabaseKey, (message) => { text.textContent = message; });
   } catch (err) {
     text.textContent = `Loading failed: ${err.message || err}`;
     return;
-  } finally {
-    loading = false;
   }
   text.textContent = "Data loaded. The agent can answer questions.";
   const rows = Object.entries(store.manifest.tables).map(([name, t]) => `<tr><td>${name}</td><td>${t.rows.toLocaleString()}</td></tr>`);
   document.getElementById("tables").innerHTML = rows.join("");
-  sendBtn.disabled = false;
 }
 start();
