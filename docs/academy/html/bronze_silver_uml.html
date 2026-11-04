@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bronze and silver UML</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5f6b7a; --border: #cfd6de;
+    --bz: #fbefe2; --bz-edge: #a65f12;
+    --sv: #eceff3; --sv-edge: #4b5563;
+    --ex: #e5f4ec; --ex-edge: #1d7a4b;
+    --note: #fffbe6; --note-edge: #a3892b; --line: #1c2430;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c; --panel: #1a2029; --text: #e4e8ee; --muted: #98a3b1; --border: #2c3542;
+      --bz: #2f2214; --bz-edge: #e0a05a;
+      --sv: #232a34; --sv-edge: #a9b4c2;
+      --ex: #13291f; --ex-edge: #4fbf86;
+      --note: #2a2716; --note-edge: #c9b25a; --line: #c9d1dc;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1240px; margin: 0 auto; padding: 32px 16px 48px; }
+  nav { font-size: 13px; margin-bottom: 18px; color: var(--muted); }
+  nav a { color: inherit; margin-right: 14px; }
+  a { color: var(--muted); }
+  h1 { font-size: 24px; margin: 0 0 18px; }
+  h2 { font-size: 17px; margin: 30px 0 10px; }
+  code { font: 13px ui-monospace, Consolas, monospace; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+  .figure { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; overflow-x: auto; }
+  svg { display: block; width: 100%; min-width: 1150px; height: auto; }
+  svg text { fill: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .box { fill: var(--panel); stroke-width: 1.5; }
+  .bz { stroke: var(--bz-edge); } .bz-h { fill: var(--bz); stroke: var(--bz-edge); stroke-width: 1.5; } .bz-l { stroke: var(--bz-edge); stroke-width: 1.5; }
+  .sv { stroke: var(--sv-edge); } .sv-h { fill: var(--sv); stroke: var(--sv-edge); stroke-width: 1.5; } .sv-l { stroke: var(--sv-edge); stroke-width: 1.5; }
+  .ex { stroke: var(--ex-edge); } .ex-h { fill: var(--ex); stroke: var(--ex-edge); stroke-width: 1.5; } .ex-l { stroke: var(--ex-edge); stroke-width: 1.5; }
+  .pkg { fill: none; stroke: var(--muted); stroke-width: 1.2; }
+  svg .pk { font-weight: 700; font-size: 14px; }
+  svg .st { font-size: 11px; fill: var(--muted); }
+  svg .tn { font: 700 14px ui-monospace, Consolas, monospace; }
+  svg .it { font-style: italic; }
+  svg .ts { font-size: 11.5px; fill: var(--muted); }
+  svg .f { font: 12px ui-monospace, Consolas, monospace; }
+  svg .k { font-weight: 700; }
+  svg .m { font: 700 12px ui-monospace, Consolas, monospace; }
+  svg .lb { font-size: 12px; font-style: italic; fill: var(--muted); }
+  svg .nb { font-size: 12.5px; font-weight: 700; }
+  svg .nt { font: 11.5px ui-monospace, Consolas, monospace; }
+  .note { fill: var(--note); stroke: var(--note-edge); stroke-width: 1.2; }
+  .note-c { fill: none; stroke: var(--note-edge); stroke-width: 1.2; }
+  .ln { fill: none; stroke: var(--line); stroke-width: 1.4; }
+  .dash { stroke-dasharray: 5 4; stroke: var(--note-edge); }
+  .tri { fill: var(--panel); stroke: var(--line); stroke-width: 1.4; }
+  table { border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); font-size: 14px; width: 100%; }
+  th, td { padding: 9px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  thead th { font-size: 12px; color: var(--muted); }
+  td:first-child { white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <nav><a href="../../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold star schema</a><a href="bronze_data_diagram.html">Bronze layer</a><a href="bronze_silver_uml.html">Bronze and silver UML</a></nav>
+
+  <h1>Bronze and silver layers: UML class diagram</h1>
+
+  <div class="figure">
+    <svg viewBox="0 0 1420 1818" role="img" aria-label="UML class diagram: 36 Vonnegut Excel exports copied into 11 bronze combined tables, one per message type, which are merged into the single silver table message">
+      <path class="pkg" d="M16,42 V1175 H1380 V42 H186 V16 H16 Z"/>
+      <text class="pk" x="26" y="34">bronze</text>
+      <rect class="box ex" x="40" y="56" width="330" height="153" rx="2"/>
+      <rect class="ex-h" x="40" y="56" width="330" height="50" rx="2"/>
+      <line class="ex-l" x1="40" y1="106" x2="370" y2="106"/>
+      <text class="st" x="205" y="71" text-anchor="middle">«file»</text>
+      <text class="tn" x="205" y="87" text-anchor="middle">Vonnegut Excel export</text>
+      <text class="ts" x="205" y="101" text-anchor="middle">36 files in bronze/</text>
+      <text class="f" x="50" y="128">month folder : e.g. July_2026</text>
+      <text class="f" x="50" y="145">file name : e.g. New Order [D].xlsx</text>
+      <text class="f" x="50" y="162">sheet : Vonnegut Export</text>
+      <text class="f" x="50" y="179">columns : the Excel headers</text>
+      <text class="f" x="50" y="196">CompIDs : fictitious</text>
+      <rect class="box bz" x="540" y="56" width="300" height="153" rx="2"/>
+      <rect class="bz-h" x="540" y="56" width="300" height="50" rx="2"/>
+      <line class="bz-l" x1="540" y1="106" x2="840" y2="106"/>
+      <text class="st" x="690" y="71" text-anchor="middle">«table»</text>
+      <text class="tn it" x="690" y="87" text-anchor="middle">bronze_combined_table</text>
+      <text class="ts" x="690" y="101" text-anchor="middle">{abstract}</text>
+      <text class="f" x="550" y="128">Timestamp</text>
+      <text class="f" x="550" y="145">Comp ID</text>
+      <text class="f" x="550" y="162">Message Type</text>
+      <text class="f" x="550" y="179">source_file</text>
+      <text class="f" x="550" y="196">{every column is text}</text>
+      <path class="ln" d="M370,126 H540"/>
+      <text class="m" x="378" y="120">1..*</text>
+      <text class="m" x="532" y="120" text-anchor="end">1</text>
+      <text class="lb" x="455" y="142" text-anchor="middle">rows copied into</text>
+      <path class="note" d="M900,56 H1328 L1340,68 V204 H900 Z"/>
+      <path class="note-c" d="M1328,56 V68 H1340"/>
+      <text class="nb" x="910" y="78">bronze/combined/</text>
+      <text class="nt" x="910" y="94">One table per message type, with the rows of all</text>
+      <text class="nt" x="910" y="110">three months. Every value is text, exactly as</text>
+      <text class="nt" x="910" y="126">Vonnegut wrote it: &quot;6,065.0000&quot;, &quot;-1&quot;,</text>
+      <text class="nt" x="910" y="142">&quot;2026-07-01 20:15:01.7941 pm&quot;. An empty cell is empty.</text>
+      <text class="nt" x="910" y="158">A file&#x27;s rows go to the table of its Message Type.</text>
+      <text class="nt" x="910" y="174">Files of one type can have different columns; a row</text>
+      <text class="nt" x="910" y="190">from a file without a column is empty in it.</text>
+      <path class="ln dash" d="M840,86 H900"/>
+      <rect class="box bz" x="50" y="279" width="312" height="425" rx="2"/>
+      <rect class="bz-h" x="50" y="279" width="312" height="50" rx="2"/>
+      <line class="bz-l" x1="50" y1="329" x2="362" y2="329"/>
+      <text class="st" x="206" y="294" text-anchor="middle">«table»</text>
+      <text class="tn" x="206" y="310" text-anchor="middle">execution_report</text>
+      <text class="ts" x="206" y="324" text-anchor="middle">type 8 · 699,162 rows · 4 files</text>
+      <text class="f" x="60" y="351">Client Order ID</text>
+      <text class="f" x="60" y="368">Display Quantity</text>
+      <text class="f" x="60" y="385">Execution ID</text>
+      <text class="f" x="60" y="402">Working Indicator</text>
+      <text class="f" x="60" y="419">TypeofTrade</text>
+      <text class="f" x="60" y="436">Transact Time</text>
+      <text class="f" x="60" y="453">Side</text>
+      <text class="f" x="60" y="470">Public Order ID</text>
+      <text class="f" x="60" y="487">Reject Code</text>
+      <text class="f" x="60" y="504">Order ID</text>
+      <text class="f" x="60" y="521">Leaves Quantity</text>
+      <text class="f" x="60" y="538">Liquidity Indicator</text>
+      <text class="f" x="60" y="555">Execution Type</text>
+      <text class="f" x="60" y="572">Execution Instruction</text>
+      <text class="f" x="60" y="589">Executed Quantity</text>
+      <text class="f" x="60" y="606">Executed Price</text>
+      <text class="f" x="60" y="623">Indicator Flags</text>
+      <text class="f" x="60" y="640">Order Book</text>
+      <text class="f" x="60" y="657">Order Status</text>
+      <text class="f" x="60" y="674">Security ID</text>
+      <text class="f" x="60" y="691">Self Trade Prevention Key</text>
+      <path class="ln" d="M206.0,279 V257"/>
+      <rect class="box bz" x="382" y="279" width="312" height="357" rx="2"/>
+      <rect class="bz-h" x="382" y="279" width="312" height="50" rx="2"/>
+      <line class="bz-l" x1="382" y1="329" x2="694" y2="329"/>
+      <text class="st" x="538" y="294" text-anchor="middle">«table»</text>
+      <text class="tn" x="538" y="310" text-anchor="middle">new_order_single</text>
+      <text class="ts" x="538" y="324" text-anchor="middle">type D · 325,344 rows · 3 files</text>
+      <text class="f" x="392" y="351">Account</text>
+      <text class="f" x="392" y="368">Cancel on Disconnect</text>
+      <text class="f" x="392" y="385">Client Order ID</text>
+      <text class="f" x="392" y="402">Display Quantity</text>
+      <text class="f" x="392" y="419">Execution Instruction</text>
+      <text class="f" x="392" y="436">Limit Price</text>
+      <text class="f" x="392" y="453">Minimum Quantity</text>
+      <text class="f" x="392" y="470">Order Quantity</text>
+      <text class="f" x="392" y="487">Order Sub Type</text>
+      <text class="f" x="392" y="504">Order Type</text>
+      <text class="f" x="392" y="521">Security ID</text>
+      <text class="f" x="392" y="538">Self Trade Prevention Key</text>
+      <text class="f" x="392" y="555">Side</text>
+      <text class="f" x="392" y="572">Stop Price</text>
+      <text class="f" x="392" y="589">Time In Force</text>
+      <text class="f" x="392" y="606">Capacity</text>
+      <text class="f" x="392" y="623">Order Book</text>
+      <path class="ln" d="M538.0,279 V257"/>
+      <rect class="box bz" x="714" y="279" width="312" height="289" rx="2"/>
+      <rect class="bz-h" x="714" y="279" width="312" height="50" rx="2"/>
+      <line class="bz-l" x1="714" y1="329" x2="1026" y2="329"/>
+      <text class="st" x="870" y="294" text-anchor="middle">«table»</text>
+      <text class="tn" x="870" y="310" text-anchor="middle">order_cancel_replace_request</text>
+      <text class="ts" x="870" y="324" text-anchor="middle">type G · 929,951 rows · 3 files</text>
+      <text class="f" x="724" y="351">Client Order ID</text>
+      <text class="f" x="724" y="368">Display Quantity</text>
+      <text class="f" x="724" y="385">Limit Price</text>
+      <text class="f" x="724" y="402">Minimum Quantity</text>
+      <text class="f" x="724" y="419">Order ID</text>
+      <text class="f" x="724" y="436">Original Client Order ID</text>
+      <text class="f" x="724" y="453">Order Type</text>
+      <text class="f" x="724" y="470">Security ID</text>
+      <text class="f" x="724" y="487">Side</text>
+      <text class="f" x="724" y="504">Stop Price</text>
+      <text class="f" x="724" y="521">Time In Force</text>
+      <text class="f" x="724" y="538">Order Quantity</text>
+      <text class="f" x="724" y="555">Expire Time</text>
+      <path class="ln" d="M870.0,279 V257"/>
+      <rect class="box bz" x="1046" y="279" width="312" height="255" rx="2"/>
+      <rect class="bz-h" x="1046" y="279" width="312" height="50" rx="2"/>
+      <line class="bz-l" x1="1046" y1="329" x2="1358" y2="329"/>
+      <text class="st" x="1202" y="294" text-anchor="middle">«table»</text>
+      <text class="tn" x="1202" y="310" text-anchor="middle">order_cancel_reject</text>
+      <text class="ts" x="1202" y="324" text-anchor="middle">type 9 · 21,909 rows · 3 files</text>
+      <text class="f" x="1056" y="351">Client Order ID</text>
+      <text class="f" x="1056" y="368">Order Book</text>
+      <text class="f" x="1056" y="385">Order ID</text>
+      <text class="f" x="1056" y="402">Reject Code</text>
+      <text class="f" x="1056" y="419">Transact Time</text>
+      <text class="f" x="1056" y="436">Partition ID</text>
+      <text class="f" x="1056" y="453">Source</text>
+      <text class="f" x="1056" y="470">Destination</text>
+      <text class="f" x="1056" y="487">Bytes</text>
+      <text class="f" x="1056" y="504">Sequence No</text>
+      <text class="f" x="1056" y="521">Packet ID</text>
+      <path class="ln" d="M1202.0,279 V257"/>
+      <path class="ln" d="M30,257 H1202.0"/>
+      <rect class="box bz" x="50" y="768" width="312" height="221" rx="2"/>
+      <rect class="bz-h" x="50" y="768" width="312" height="50" rx="2"/>
+      <line class="bz-l" x1="50" y1="818" x2="362" y2="818"/>
+      <text class="st" x="206" y="783" text-anchor="middle">«table»</text>
+      <text class="tn" x="206" y="799" text-anchor="middle">reject</text>
+      <text class="ts" x="206" y="813" text-anchor="middle">type 3 · 1,127,014 rows · 5 files</text>
+      <text class="f" x="60" y="840">Client Order ID</text>
+      <text class="f" x="60" y="857">Message Type.1</text>
+      <text class="f" x="60" y="874">Reject Code</text>
+      <text class="f" x="60" y="891">Reject Reason</text>
+      <text class="f" x="60" y="908">Source</text>
+      <text class="f" x="60" y="925">Destination</text>
+      <text class="f" x="60" y="942">Bytes</text>
+      <text class="f" x="60" y="959">Sequence No</text>
+      <text class="f" x="60" y="976">Packet ID</text>
+      <path class="ln" d="M206.0,768 V746"/>
+      <rect class="box bz" x="382" y="768" width="312" height="170" rx="2"/>
+      <rect class="bz-h" x="382" y="768" width="312" height="50" rx="2"/>
+      <line class="bz-l" x1="382" y1="818" x2="694" y2="818"/>
+      <text class="st" x="538" y="783" text-anchor="middle">«table»</text>
+      <text class="tn" x="538" y="799" text-anchor="middle">order_cancel_request</text>
+      <text class="ts" x="538" y="813" text-anchor="middle">type F · 539,586 rows · 3 files</text>
+      <text class="f" x="392" y="840">Client Order ID</text>
+      <text class="f" x="392" y="857">Order Book</text>
+      <text class="f" x="392" y="874">Order ID</text>
+      <text class="f" x="392" y="891">Orig Client Order ID</text>
+      <text class="f" x="392" y="908">Security ID</text>
+      <text class="f" x="392" y="925">Side</text>
+      <path class="ln" d="M538.0,768 V746"/>
+      <rect class="box bz" x="714" y="768" width="312" height="170" rx="2"/>
+      <rect class="bz-h" x="714" y="768" width="312" height="50" rx="2"/>
+      <line class="bz-l" x1="714" y1="818" x2="1026" y2="818"/>
+      <text class="st" x="870" y="783" text-anchor="middle">«table»</text>
+      <text class="tn" x="870" y="799" text-anchor="middle">order_mass_cancel_request</text>
+      <text class="ts" x="870" y="813" text-anchor="middle">type q · 354 rows · 3 files</text>
+      <text class="f" x="724" y="840">Client Order ID</text>
+      <text class="f" x="724" y="857">Mass Cancel Request Type</text>
+      <text class="f" x="724" y="874">Security ID</text>
+      <text class="f" x="724" y="891">OrderSubType</text>
+      <text class="f" x="724" y="908">Segment</text>
+      <text class="f" x="724" y="925">OrderBook</text>
+      <path class="ln" d="M870.0,768 V746"/>
+      <rect class="box bz" x="1046" y="768" width="312" height="170" rx="2"/>
+      <rect class="bz-h" x="1046" y="768" width="312" height="50" rx="2"/>
+      <line class="bz-l" x1="1046" y1="818" x2="1358" y2="818"/>
+      <text class="st" x="1202" y="783" text-anchor="middle">«table»</text>
+      <text class="tn" x="1202" y="799" text-anchor="middle">order_mass_cancel_report</text>
+      <text class="ts" x="1202" y="813" text-anchor="middle">type r · 464 rows · 3 files</text>
+      <text class="f" x="1056" y="840">Client Order ID</text>
+      <text class="f" x="1056" y="857">Order Book</text>
+      <text class="f" x="1056" y="874">Partition ID</text>
+      <text class="f" x="1056" y="891">Reject Code</text>
+      <text class="f" x="1056" y="908">Status</text>
+      <text class="f" x="1056" y="925">Transact Time</text>
+      <path class="ln" d="M1202.0,768 V746"/>
+      <path class="ln" d="M30,746 H1202.0"/>
+      <rect class="box bz" x="50" y="1053" width="312" height="102" rx="2"/>
+      <rect class="bz-h" x="50" y="1053" width="312" height="50" rx="2"/>
+      <line class="bz-l" x1="50" y1="1103" x2="362" y2="1103"/>
+      <text class="st" x="206" y="1068" text-anchor="middle">«table»</text>
+      <text class="tn" x="206" y="1084" text-anchor="middle">logon</text>
+      <text class="ts" x="206" y="1098" text-anchor="middle">type A · 74,580 rows · 3 files</text>
+      <text class="f" x="60" y="1125">CompID</text>
+      <text class="f" x="60" y="1142">Protocol Version</text>
+      <path class="ln" d="M206.0,1053 V1031"/>
+      <rect class="box bz" x="382" y="1053" width="312" height="102" rx="2"/>
+      <rect class="bz-h" x="382" y="1053" width="312" height="50" rx="2"/>
+      <line class="bz-l" x1="382" y1="1103" x2="694" y2="1103"/>
+      <text class="st" x="538" y="1068" text-anchor="middle">«table»</text>
+      <text class="tn" x="538" y="1084" text-anchor="middle">logon_response</text>
+      <text class="ts" x="538" y="1098" text-anchor="middle">type B · 23,846 rows · 3 files</text>
+      <text class="f" x="392" y="1125">Password Expiry</text>
+      <text class="f" x="392" y="1142">Reject Code</text>
+      <path class="ln" d="M538.0,1053 V1031"/>
+      <rect class="box bz" x="714" y="1053" width="312" height="85" rx="2"/>
+      <rect class="bz-h" x="714" y="1053" width="312" height="50" rx="2"/>
+      <line class="bz-l" x1="714" y1="1103" x2="1026" y2="1103"/>
+      <text class="st" x="870" y="1068" text-anchor="middle">«table»</text>
+      <text class="tn" x="870" y="1084" text-anchor="middle">logout</text>
+      <text class="ts" x="870" y="1098" text-anchor="middle">type 5 · 21,306 rows · 3 files</text>
+      <text class="f" x="724" y="1125">Reason</text>
+      <path class="ln" d="M870.0,1053 V1031"/>
+      <path class="ln" d="M30,1031 H870.0"/>
+      <path class="ln" d="M690.0,223 V257"/>
+      <path class="ln" d="M30,257 V1031"/>
+      <path class="tri" d="M690.0,209 l-9,14 h18 Z"/>
+      <rect class="box sv" x="120" y="1285" width="800" height="493" rx="2"/>
+      <rect class="sv-h" x="120" y="1285" width="800" height="50" rx="2"/>
+      <line class="sv-l" x1="120" y1="1335" x2="920" y2="1335"/>
+      <text class="st" x="520" y="1300" text-anchor="middle">«table»</text>
+      <text class="tn" x="520" y="1316" text-anchor="middle">message</text>
+      <text class="ts" x="520" y="1330" text-anchor="middle">silver/message.parquet · 2,169,820 rows · one row per message, all 11 types</text>
+      <text class="f k" x="130" y="1357">message_id : integer {key}</text>
+      <text class="f" x="130" y="1374">timestamp : timestamp</text>
+      <text class="f k" x="130" y="1391">date : date</text>
+      <text class="f" x="130" y="1408">comp_id : text</text>
+      <text class="f k" x="130" y="1425">comp_id_filled : boolean</text>
+      <text class="f" x="130" y="1442">message_type : text</text>
+      <text class="f" x="130" y="1459">ref_message_type : text</text>
+      <text class="f" x="130" y="1476">client_order_id : text</text>
+      <text class="f" x="130" y="1493">orig_client_order_id : text</text>
+      <text class="f" x="130" y="1510">order_id : text</text>
+      <text class="f k" x="130" y="1527">order_id_linked : boolean</text>
+      <text class="f" x="130" y="1544">execution_id : text</text>
+      <text class="f" x="130" y="1561">public_order_id : text</text>
+      <text class="f" x="130" y="1578">security_id : text</text>
+      <text class="f" x="130" y="1595">side : text</text>
+      <text class="f" x="130" y="1612">order_type : text</text>
+      <text class="f" x="130" y="1629">order_sub_type : text</text>
+      <text class="f" x="130" y="1646">time_in_force : text</text>
+      <text class="f" x="130" y="1663">order_quantity : integer</text>
+      <text class="f" x="130" y="1680">display_quantity : integer</text>
+      <text class="f" x="130" y="1697">minimum_quantity : integer</text>
+      <text class="f" x="130" y="1714">limit_price : decimal</text>
+      <text class="f" x="130" y="1731">stop_price : decimal</text>
+      <text class="f" x="130" y="1748">account : text</text>
+      <text class="f" x="130" y="1765">capacity : text</text>
+      <text class="f" x="530" y="1357">cancel_on_disconnect : text</text>
+      <text class="f" x="530" y="1374">execution_instruction : text</text>
+      <text class="f" x="530" y="1391">order_book : text</text>
+      <text class="f" x="530" y="1408">self_trade_prevention_key : text</text>
+      <text class="f" x="530" y="1425">execution_type : text</text>
+      <text class="f" x="530" y="1442">order_status : text</text>
+      <text class="f" x="530" y="1459">working_indicator : text</text>
+      <text class="f" x="530" y="1476">liquidity_indicator : text</text>
+      <text class="f" x="530" y="1493">type_of_trade : text</text>
+      <text class="f" x="530" y="1510">indicator_flags : text</text>
+      <text class="f" x="530" y="1527">leaves_quantity : integer</text>
+      <text class="f" x="530" y="1544">executed_quantity : integer</text>
+      <text class="f" x="530" y="1561">executed_price : decimal</text>
+      <text class="f" x="530" y="1578">transact_time : timestamp</text>
+      <text class="f" x="530" y="1595">reject_code : text</text>
+      <text class="f" x="530" y="1612">reject_reason : text</text>
+      <text class="f" x="530" y="1629">partition_id : text</text>
+      <text class="f" x="530" y="1646">mass_cancel_request_type : text</text>
+      <text class="f" x="530" y="1663">mass_cancel_status : text</text>
+      <text class="f" x="530" y="1680">logon_compid : text</text>
+      <text class="f" x="530" y="1697">protocol_version : text</text>
+      <text class="f" x="530" y="1714">password_expiry : integer</text>
+      <text class="f" x="530" y="1731">logout_reason : text</text>
+      <text class="f k" x="530" y="1748">copies : integer</text>
+      <text class="f" x="530" y="1765">source_file : text</text>
+      <path class="ln" d="M120,1435 H80 V1515 H120"/>
+      <text class="m" x="114" y="1429" text-anchor="end">0..*</text>
+      <text class="m" x="114" y="1531" text-anchor="end">0..1</text>
+      <text class="lb" x="74" y="1471" text-anchor="end">order</text>
+      <text class="lb" x="74" y="1485" text-anchor="end">link</text>
+      <path class="note" d="M950,1285 H1358 L1370,1297 V1545 H950 Z"/>
+      <path class="note-c" d="M1358,1285 V1297 H1370"/>
+      <text class="nb" x="960" y="1307">How a silver row is made</text>
+      <text class="nt" x="960" y="1323">1. Text becomes times and numbers; spaces and</text>
+      <text class="nt" x="960" y="1339">   tabs around values are removed; ID and code</text>
+      <text class="nt" x="960" y="1355">   columns stay text.</text>
+      <text class="nt" x="960" y="1371">2. Repeated rows are merged: an execution report is</text>
+      <text class="nt" x="960" y="1387">   one row per execution_id, any other message one</text>
+      <text class="nt" x="960" y="1403">   row per set of identical values. copies counts</text>
+      <text class="nt" x="960" y="1419">   the bronze rows merged into the row.</text>
+      <text class="nt" x="960" y="1435">3. -1 becomes empty in reject_code, minimum_quantity,</text>
+      <text class="nt" x="960" y="1451">   stop_price and password_expiry.</text>
+      <text class="nt" x="960" y="1467">4. An empty comp_id is filled from rows with the same</text>
+      <text class="nt" x="960" y="1483">   order_id, then client_order_id (comp_id_filled).</text>
+      <text class="nt" x="960" y="1499">5. A D, F or G request with no order_id takes it from</text>
+      <text class="nt" x="960" y="1515">   the 8 or 9 reply with the same comp_id and</text>
+      <text class="nt" x="960" y="1531">   client_order_id, 0 to 1 second later (order_id_linked).</text>
+      <path class="note" d="M950,1565 H1358 L1370,1577 V1761 H950 Z"/>
+      <path class="note-c" d="M1358,1565 V1577 H1370"/>
+      <text class="nb" x="960" y="1587">Column names</text>
+      <text class="nt" x="960" y="1603">Comp ID → comp_id, and so on for every header</text>
+      <text class="nt" x="960" y="1619">Message Type.1 → ref_message_type</text>
+      <text class="nt" x="960" y="1635">Original Client Order ID → orig_client_order_id</text>
+      <text class="nt" x="960" y="1651">OrderBook → order_book, OrderSubType → order_sub_type</text>
+      <text class="nt" x="960" y="1667">TypeofTrade → type_of_trade</text>
+      <text class="nt" x="960" y="1683">Status (mass cancel report) → mass_cancel_status</text>
+      <text class="nt" x="960" y="1699">CompID (logon) → logon_compid</text>
+      <text class="nt" x="960" y="1715">Reason (logout) → logout_reason</text>
+      <text class="nt" x="960" y="1731">Left out: Source, Destination, Bytes, Sequence No,</text>
+      <text class="nt" x="960" y="1747">Packet ID, Expire Time, Segment</text>
+      <path class="ln dash" d="M920,1315 H950"/>
+      <path class="pkg" d="M16,1271 V1802 H1380 V1271 H186 V1245 H16 Z"/>
+      <text class="pk" x="26" y="1263">silver</text>
+      <path class="ln" d="M840,179 H870 V222 H1398 V1263 H800 V1285"/>
+      <text class="m" x="846" y="195">1..*</text>
+      <text class="m" x="808" y="1279">1</text>
+      <text class="lb" x="1390" y="1255" text-anchor="end">merged into</text>
+    </svg>
+  </div>
+
+  <h2>How to read the diagram</h2>
+  <table>
+    <thead><tr><th>What you see</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr><td>Frame with a tab: <b>bronze</b>, <b>silver</b></td><td>A layer: the folder of that name in cloud storage. Everything inside the frame is stored in that folder.</td></tr>
+      <tr><td>Box</td><td>One table, or the Excel files. The top part gives, in «angle quotes», what kind of thing it is, then its name, then its row count. The lower part lists its columns.</td></tr>
+      <tr><td><code>name : type</code></td><td>A column and the kind of value it holds: <code>text</code>; <code>integer</code>, a whole number; <code>decimal</code>, a number with decimals; <code>timestamp</code>, a date and time; <code>date</code>; <code>boolean</code>, true or false. The bronze columns have no type written beside them because every one is text.</td></tr>
+      <tr><td><code>{key}</code></td><td>A column with a different value on every row: <code>message_id</code> numbers the silver rows 1 to 2,169,820.</td></tr>
+      <tr><td>Bold column in <code>message</code></td><td>A column silver adds; it is not in bronze.</td></tr>
+      <tr><td>Name in italics, <code>{abstract}</code></td><td><code>bronze_combined_table</code> is not a stored table. It lists the 4 columns that all 11 bronze tables have.</td></tr>
+      <tr><td>Line ending in a hollow triangle</td><td>Each of the 11 tables at the plain ends has the columns of the box at the triangle, <code>Timestamp</code>, <code>Comp ID</code>, <code>Message Type</code> and <code>source_file</code>, as well as the columns listed in its own box.</td></tr>
+      <tr><td>Plain line with numbers at its ends</td><td>How many rows at one end go with one row at the other end. <code>1</code>: exactly one. <code>0..1</code>: none or one. <code>1..*</code>: one or more. <code>0..*</code>: any number, including none.</td></tr>
+      <tr><td>"rows copied into": <code>1..*</code> to <code>1</code></td><td>Each bronze table is made from one or more Excel files (the reject table from 5), and each file's rows go to exactly one table.</td></tr>
+      <tr><td>"merged into": <code>1..*</code> to <code>1</code></td><td>Each silver row is made from one or more bronze rows (the number is in <code>copies</code>), and each bronze row goes into exactly one silver row. 3,763,516 bronze rows become 2,169,820 silver rows.</td></tr>
+      <tr><td>"order link" on <code>message</code>: <code>0..*</code> to <code>0..1</code></td><td>The line starts and ends at the same table: it links rows of <code>message</code> to other rows of <code>message</code>. A New Order, cancel or amend request with no <code>order_id</code> takes the <code>order_id</code> of none or one JSE reply, and one reply can give its <code>order_id</code> to any number of requests.</td></tr>
+      <tr><td>Box with a folded corner, joined by a dashed line</td><td>A note about the box it is joined to.</td></tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

@@ -1,6 +1,6 @@
 // Loads the gold star schema tables into DuckDB-WASM (the version of DuckDB that runs in the browser).
 // The Parquet files and manifest.json are written to gold/ in a private Supabase Storage bucket by code/gold.py,
-// and the page downloads them with the Supabase key the user enters in the sidebar.
+// and the page downloads them with the Supabase publishable key, entered as the "database key" in the keys form.
 
 // DuckDB is downloaded inside startDuckDB, not with an import line at the top of this file: if the download failed
 // at the top, the browser would stop every script on the page without saying why.

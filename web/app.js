@@ -1,5 +1,5 @@
-import { chat } from "./agent.js?v=9";
-import { loadStore } from "./data.js?v=9";
+import { chat } from "./agent.js?v=10";
+import { loadStore } from "./data.js?v=10";
 
 window.appStarted = true;
 
@@ -10,17 +10,34 @@ const sendBtn = document.getElementById("send");
 const keyInput = document.getElementById("api-key");
 const supabaseKeyInput = document.getElementById("supabase-key");
 
-// The keys are never saved: they are held only in the text boxes and must be pasted again after a reload.
-// Keys saved by earlier versions of this page are deleted.
+// The keys are never saved: they are held only in the text boxes of the keys form and must be entered again after a
+// reload. Keys saved by earlier versions of this page are deleted.
 localStorage.removeItem("supabaseKey");
 localStorage.removeItem("openrouterKey");
-// Loading starts 0.6 seconds after the key is pasted or typed, without waiting for Enter or a click elsewhere.
-let keyTimer = null;
-supabaseKeyInput.addEventListener("input", () => {
-  clearTimeout(keyTimer);
-  keyTimer = setTimeout(() => { if (!store) start(); }, 600);
+
+// The Enter keys button opens the keys form. "Use these keys" closes it and starts loading the data; Cancel and the
+// Escape key close it and put back the keys entered before it was opened.
+const keysDialog = document.getElementById("keys-dialog");
+const keyState = document.getElementById("key-state");
+let keysBefore = ["", ""];
+function showKeyState() {
+  const state = (input) => (input.value.trim() ? "entered" : "not entered");
+  keyState.textContent = `Database key: ${state(supabaseKeyInput)} · AI API key: ${state(keyInput)}`;
+}
+function openKeys() {
+  keysBefore = [supabaseKeyInput.value, keyInput.value];
+  keysDialog.showModal();
+  (supabaseKeyInput.value ? keyInput : supabaseKeyInput).focus();
+}
+document.getElementById("open-keys").addEventListener("click", openKeys);
+document.getElementById("keys-cancel").addEventListener("click", () => keysDialog.close("cancel"));
+keysDialog.addEventListener("cancel", () => keysDialog.returnValue = "cancel");
+keysDialog.addEventListener("close", () => {
+  if (keysDialog.returnValue !== "save") [supabaseKeyInput.value, keyInput.value] = keysBefore;
+  keysDialog.returnValue = "";
+  showKeyState();
+  if (!store) start();
 });
-supabaseKeyInput.addEventListener("change", () => { clearTimeout(keyTimer); if (!store) start(); });
 // A model name saved by earlier versions of this page is deleted: the model is fixed in agent.js.
 localStorage.removeItem("model");
 
@@ -72,9 +89,9 @@ async function send(text) {
   text = text.trim();
   if (!text || busy) return;
   const apiKey = keyInput.value.trim();
-  if (!apiKey) { addMessage("error", "Enter your OpenRouter key in the sidebar first."); return; }
+  if (!apiKey) { addMessage("error", "Enter the AI API key first: click Enter keys in the sidebar."); return; }
   if (!store && !loading) start();
-  if (!store && !loading) { addMessage("error", "Enter the Supabase key in the sidebar first."); return; }
+  if (!store && !loading) { addMessage("error", "Enter the database key first: click Enter keys in the sidebar."); return; }
   history.push({ role: "user", content: text });
   addMessage("user", text);
   input.value = "";

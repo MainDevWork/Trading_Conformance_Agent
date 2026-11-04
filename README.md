@@ -7,11 +7,11 @@ A web chat page where a JSE Trading Operations analyst asks questions about the 
 | Path | Contents |
 |---|---|
 | `index.html` | The page. Stays in the root so GitHub Pages serves it as the site's home page. |
-| `web/` | The page's code: `app.js` (chat screen), `agent.js` (language model and its tools), `data.js` (loads the data into the browser), `style.css` |
+| `web/` | The page's code: `app.js` (chat screen and keys form), `agent.js` (language model and its tools), `data.js` (loads the data into the browser), `style.css`, `icon.svg` (the agent's icon, also the browser tab icon) |
 | `web/knowledge/` | The JSE conformance reference the agent reads (see below) |
 | `code/` | Python scripts that build the bronze, silver and gold layers in Supabase |
 | `docs/jse/` | The JSE specification documents the reference was taken from: Volumes 00E, 01E, 10, 201, 202 |
-| `docs/academy/html/` | The diagram pages: `system_architecture.html`, `agent_methodology.html`, `data_architecture.html`, `gold_star_schema.html`, `bronze_data_diagram.html` |
+| `docs/academy/html/` | The diagram pages: `system_architecture.html`, `agent_methodology.html`, `data_architecture.html`, `gold_star_schema.html`, `bronze_data_diagram.html`, `bronze_silver_uml.html` |
 | `docs/academy/pdf/` | Academy project brief, Group 6 problem statement, and `agent_methodology.pdf` |
 | `docs/academy/sql/` | SQL Server scripts that build the same bronze, silver and gold tables from the Excel files (see `docs/academy/sql/README.md`) |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are; must stay in the root |
@@ -20,18 +20,18 @@ A web chat page where a JSE Trading Operations analyst asks questions about the 
 
 The page runs entirely in the browser and needs only a static web server, such as GitHub Pages. To run it on your own computer, run `python -m http.server` in the repository root and open http://localhost:8000.
 
-Enter two keys in the sidebar. Neither is saved: paste them again after reloading the page.
+Click **Enter keys** in the sidebar and enter two keys in the form that opens. Neither is saved: enter them again after reloading the page.
 
-| Key | Use |
-|---|---|
-| Supabase key | The Supabase publishable key (starts `sb_publishable_`). `web/data.js` uses it to download the message data from the private Supabase Storage bucket `fix-data`. Never enter the service key here. |
-| OpenRouter key | `web/agent.js` sends it only to openrouter.ai, with each question. |
+| Key on the page | What to enter | Use |
+|---|---|---|
+| Database key | The Supabase publishable key (starts `sb_publishable_`). Never the service key. | `web/data.js` uses it to download the message data from the private Supabase Storage bucket `fix-data`. |
+| AI API key | An OpenRouter key (starts `sk-or-v1-`) | `web/agent.js` sends it only to openrouter.ai, with each question. |
 
 Every question is sent to the model `nvidia/nemotron-3.5-lightning:free`, set as `MODEL` in `web/agent.js`. The page has no setting to change it.
 
 ## How a question is answered
 
-1. When the Supabase key is entered, `web/data.js` downloads `gold/manifest.json` and the gold Parquet tables from Supabase (Parquet is a compressed file format for tables), and loads them into DuckDB-WASM, the version of the DuckDB SQL database that runs in the browser.
+1. When the database key is entered, `web/data.js` downloads `gold/manifest.json` and the gold Parquet tables from Supabase (Parquet is a compressed file format for tables), and loads them into DuckDB-WASM, the version of the DuckDB SQL database that runs in the browser.
 2. `web/agent.js` sends the conversation to OpenRouter with a system prompt describing conformance testing and the tables, followed by `web/knowledge/core.md`, plus five tools the model may call:
    - `list_tables`: every table, its description, row count and columns with their meanings.
    - `describe_table`: for one table, each column's meaning, distinct-value count, empty-value count and most common values, plus 5 sample rows.
