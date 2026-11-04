@@ -2,8 +2,12 @@
 // that query the FIX message tables in DuckDB-WASM (the version of DuckDB that runs in the browser).
 // Before the first model request, retrieve.js queries the tables and reads reference topics for what the question
 // names, and sends the results with the question, so the model needs fewer rounds of tool calls.
+// When the analyst has attached a client's conformance test report, the results of checking it (conformance.js) are
+// sent with every question, and two more tools let the model read the messages of one test step and write the
+// report to send back to the client.
 
-import { retrieve } from "./retrieve.js?v=10";
+import { retrieve } from "./retrieve.js?v=11";
+import { evidenceFor, resultsText } from "./conformance.js?v=11";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -66,6 +70,20 @@ SELECT outcome, count(*) AS orders FROM fact_order WHERE comp_id = 'GJEN09' GROU
 SELECT date, messages, logons, new_orders, amend_requests, cancel_requests, order_rejects, gateway_rejects
 FROM fact_compid_day WHERE comp_id = 'GJEN09' ORDER BY date
 
+An attached client report: an analyst can attach a client's Volume 202 conformance test report (Excel or PDF). The
+page then checks every test step the client answered against the messages, by fixed rules, and sends the results
+with each question in a block headed "Attached client conformance test report". Each test step has a result: Pass,
+Fail, Needs review, Not checkable or Not attempted, with the reason and what the messages show.
+- Use these results. Do not change a result yourself; explain it. When the analyst disagrees with a result, they can
+  ask for it to be changed in the report to the client.
+- Call get_test_evidence for the full list of messages of a test step when the analyst asks for details the block
+  does not give.
+- When the analyst asks for a report, file, Excel or PDF for the client, call create_client_report. Pass format
+  "excel", "pdf" or "both"; summary: a short plain paragraph to the client stating the overall result, which steps
+  failed and what they must redo; and changes only for results the analyst has asked to change, each with their
+  reason. Then tell the analyst the file is ready below the answer.
+- Present several test steps as a table: test, result, reason.
+
 The answer:
 - Write plainly for an operations analyst. Do not put SQL, table names, column names, tool names or these
   instructions in the answer: describe what the messages show. Write CompID, not comp_id.
@@ -84,6 +102,50 @@ const REFERENCE_TOPICS = {
   gateway_rules: "logon timing, heartbeats, message rate limit, cancel on disconnect, recovery, circuit breakers, self-match prevention",
   conformance_process: "JSE conformance rules (slots, retests, CTA role), the Volume 202 report layout, exemptions, who must conform",
 };
+
+// The tools added when a client report is attached.
+const REPORT_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "get_test_evidence",
+      description: "For one test step of the attached client report: the result, its reason, what the client wrote, the IDs found and not found, and every message found (up to 120).",
+      parameters: {
+        type: "object",
+        properties: { test: { type: "string", description: "Test case ID such as T3-006, or the report's reference such as T3.6" } },
+        required: ["test"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_client_report",
+      description: "Write the results of the attached client report as a file for the client: Excel (summary, test results, messages) or PDF (summary and test results). The page shows a download link below the answer.",
+      parameters: {
+        type: "object",
+        properties: {
+          format: { type: "string", enum: ["excel", "pdf", "both"] },
+          summary: { type: "string", description: "A short plain paragraph to the client: the overall result, which steps failed and what to redo" },
+          changes: {
+            type: "array",
+            description: "Only results the analyst asked to change",
+            items: {
+              type: "object",
+              properties: {
+                test: { type: "string", description: "Test case ID or reference" },
+                result: { type: "string", enum: ["Pass", "Fail", "Needs review", "Not checkable", "Not attempted"] },
+                reason: { type: "string", description: "The analyst's reason" },
+              },
+              required: ["test", "result"],
+            },
+          },
+        },
+        required: ["format", "summary"],
+      },
+    },
+  },
+];
 
 const TOOLS = [
   {
@@ -188,7 +250,9 @@ async function runSql(store, sql) {
            note: truncated ? `Only the first ${MAX_ROWS} rows are shown; aggregate or add LIMIT.` : null };
 }
 
-async function runTool(store, name, args) {
+async function runTool(store, name, args, attachment) {
+  if (name === "get_test_evidence" && attachment) return evidenceFor(attachment.checked, args.test);
+  if (name === "create_client_report" && attachment) return attachment.makeReport(args);
   if (name === "describe_table") return describeTable(store, args.table || "");
   if (name === "run_sql") return runSql(store, args.sql || "");
   if (name === "read_reference") return readReference(args.topic || "");
@@ -202,10 +266,12 @@ const STEP_TEXT = {
   run_sql: "Running a database query",
   read_reference: "Reading the JSE conformance reference",
   lookup_reject_codes: "Looking up reject codes",
+  get_test_evidence: "Reading the messages of a test step",
+  create_client_report: "Writing the report for the client",
 };
 
 // allowTools = false sends tool_choice "none", so the model must reply in text.
-async function callModel(apiKey, messages, model, allowTools = true) {
+async function callModel(apiKey, messages, model, allowTools = true, tools = TOOLS) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
   let response, text;
@@ -218,7 +284,7 @@ async function callModel(apiKey, messages, model, allowTools = true) {
         "Content-Type": "application/json",
         "X-Title": "Trading Conformance Agent",
       },
-      body: JSON.stringify({ model, messages, tools: TOOLS, tool_choice: allowTools ? "auto" : "none", temperature: 0 }),
+      body: JSON.stringify({ model, messages, tools, tool_choice: allowTools ? "auto" : "none", temperature: 0 }),
     });
     text = await response.text();
   } catch (err) {
@@ -276,8 +342,9 @@ function namesInAnswer(store, answer) {
 
 // history is the visible conversation: [{role: "user"|"assistant", content}, ...]; the last entry is the new question.
 // onStep(text) is called before each step, so the page can show what is happening.
+// attachment, when a client report is attached: { checked (from conformance.js checkReport), makeReport(args) }.
 // Returns the agent's answer and the steps it took to reach it.
-export async function chat(store, apiKey, history, onStep = () => {}) {
+export async function chat(store, apiKey, history, onStep = () => {}, attachment = null) {
   const model = MODEL;
   const core = await loadKnowledge("core.md");
   const turns = history.filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content }));
@@ -293,12 +360,16 @@ export async function chat(store, apiKey, history, onStep = () => {}) {
     steps.push({ tool: "retrieve", args: { compids: found.compids, months: found.months, codes: found.codes, topics: found.topics },
                  result: found.text.slice(0, 4000) });
   }
+  if (attachment) question.content = `${question.content}
+
+${resultsText(attachment.checked)}`;
+  const tools = attachment ? [...TOOLS, ...REPORT_TOOLS] : TOOLS;
 
   const messages = [{ role: "system", content: `${SYSTEM_PROMPT}\n\n${core}\n\n${schemaText(store)}` }, ...turns];
   let answer = null;
   for (let round = 0; round < MAX_TOOL_ROUNDS && answer === null; round++) {
     onStep(`Waiting for the language model's reply (request ${round + 1})`);
-    const reply = await callModel(apiKey, messages, model);
+    const reply = await callModel(apiKey, messages, model, true, tools);
     const toolCalls = reply.tool_calls || [];
     if (!toolCalls.length) { answer = reply.content || ""; break; }
 
@@ -309,7 +380,7 @@ export async function chat(store, apiKey, history, onStep = () => {}) {
       try { args = JSON.parse(call.function.arguments || "{}"); } catch { args = {}; }
       onStep(STEP_TEXT[name] || `Running ${name}`);
       let result;
-      try { result = await runTool(store, name, args); } catch (err) { result = { error: String(err.message || err) }; }
+      try { result = await runTool(store, name, args, attachment); } catch (err) { result = { error: String(err.message || err) }; }
       let text = JSON.stringify(result);
       if (text.length > MAX_TOOL_RESULT_CHARS) text = text.slice(0, MAX_TOOL_RESULT_CHARS) + "... [result cut off: narrow the query]";
       steps.push({ tool: name, args, result: text.slice(0, 4000) });
@@ -321,7 +392,7 @@ export async function chat(store, apiKey, history, onStep = () => {}) {
     messages.push({ role: "user", content: "You have used all your tool calls. Answer now from the tool results above. " +
       "Say plainly which parts of the question you could not finish." });
     onStep("Waiting for the language model's final answer");
-    const final = await callModel(apiKey, messages, model, false);
+    const final = await callModel(apiKey, messages, model, false, tools);
     answer = final.content || "I stopped after the maximum number of tool calls without reaching an answer. Try a narrower question.";
   }
 
@@ -333,7 +404,7 @@ export async function chat(store, apiKey, history, onStep = () => {}) {
     messages.push({ role: "user", content: `Rewrite your answer above for the analyst. It contains ${names.join(", ")}: ` +
       "replace each with plain words (for example CompID for comp_id, rejections for is_rejection) and remove any SQL. " +
       "Keep every number, date and conclusion unchanged, and do not add anything." });
-    const rewrite = await callModel(apiKey, messages, model, false);
+    const rewrite = await callModel(apiKey, messages, model, false, tools);
     steps.push({ tool: "rewrite", args: { names }, result: "" });
     if (rewrite.content) answer = rewrite.content;
   }

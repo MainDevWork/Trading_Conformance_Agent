@@ -4,12 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Trading Conformance Agent</title>
-  <link rel="icon" href="web/icon.svg?v=10" type="image/svg+xml">
-  <link rel="stylesheet" href="web/style.css?v=10">
+  <link rel="icon" href="web/icon.svg?v=11" type="image/svg+xml">
+  <link rel="stylesheet" href="web/style.css?v=11">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="modulepreload" href="web/agent.js?v=10">
-  <link rel="modulepreload" href="web/data.js?v=10">
-  <link rel="modulepreload" href="web/retrieve.js?v=10">
+  <link rel="modulepreload" href="web/agent.js?v=11">
+  <link rel="modulepreload" href="web/data.js?v=11">
+  <link rel="modulepreload" href="web/retrieve.js?v=11">
+  <link rel="modulepreload" href="web/attachments.js?v=11">
+  <link rel="modulepreload" href="web/conformance.js?v=11">
+  <link rel="modulepreload" href="web/client_report.js?v=11">
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 </head>
@@ -56,22 +59,30 @@
   </dialog>
 
   <main>
+    <button id="toggle-sidebar" type="button" aria-controls="sidebar" aria-expanded="true" title="Hide the sidebar">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" stroke-width="2"/></svg>
+    </button>
     <div id="messages"></div>
     <!-- Shown in the middle of the chat area while there are no messages (see #messages:empty in style.css). -->
     <div id="welcome" aria-hidden="true">
-      <img src="web/icon.svg?v=10" width="112" height="112" alt="">
+      <img src="web/icon.svg?v=11" width="112" height="112" alt="">
       <div class="welcome-title">Trading Conformance Agent</div>
-      <div class="welcome-text">Ask about the conformance test messages of July to September 2026.</div>
+      <div class="welcome-text">Ask about the conformance test messages of July to September 2026, or attach a client's conformance test report (Excel or PDF) to check it.</div>
     </div>
+    <div id="attached" hidden><span></span><button id="detach" type="button" title="Remove the attached report">Remove</button></div>
     <form id="composer" onsubmit="return false">
+      <input id="file-input" type="file" accept=".xlsx,.xlsm,.xls,.pdf" hidden>
+      <button id="attach" type="button" title="Attach a client's conformance test report (Excel or PDF)" aria-label="Attach a report">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
       <textarea id="input" rows="2" placeholder="Ask about the FIX messages… (Enter to send, Shift+Enter for a new line)"></textarea>
       <button id="send" type="submit">Send</button>
     </form>
   </main>
 
-  <!-- ?v=10 is changed whenever a script changes, so the browser downloads all the new scripts together
+  <!-- ?v=11 is changed whenever a script changes, so the browser downloads all the new scripts together
        instead of mixing a saved old copy of one with a new copy of another. -->
-  <script type="module" src="web/app.js?v=10"></script>
+  <script type="module" src="web/app.js?v=11"></script>
   <script>
     // web/app.js sets window.appStarted. If it did not run, the page says so and shows the browser's error.
     const startErrors = [];

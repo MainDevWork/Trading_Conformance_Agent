@@ -1,7 +1,24 @@
-import { chat } from "./agent.js?v=10";
-import { loadStore } from "./data.js?v=10";
+import { chat } from "./agent.js?v=11";
+import { loadStore } from "./data.js?v=11";
+import { readAttachment } from "./attachments.js?v=11";
+import { checkReport } from "./conformance.js?v=11";
+import { makeClientReport } from "./client_report.js?v=11";
 
 window.appStarted = true;
+
+// The sidebar is hidden and shown by the button at the top left of the chat area. Whether it is hidden is kept in
+// this browser's local storage, so it stays the same after a reload.
+const sidebarButton = document.getElementById("toggle-sidebar");
+function setSidebar(hidden) {
+  document.body.classList.toggle("sidebar-hidden", hidden);
+  sidebarButton.setAttribute("aria-expanded", String(!hidden));
+  sidebarButton.title = hidden ? "Show the sidebar" : "Hide the sidebar";
+  try { localStorage.setItem("sidebarHidden", hidden ? "1" : "0"); } catch {}
+}
+let sidebarHidden = false;
+try { sidebarHidden = localStorage.getItem("sidebarHidden") === "1"; } catch {}
+setSidebar(sidebarHidden);
+sidebarButton.addEventListener("click", () => setSidebar(!document.body.classList.contains("sidebar-hidden")));
 
 const messagesEl = document.getElementById("messages");
 const form = document.getElementById("composer");
@@ -56,7 +73,7 @@ function renderMarkdown(text) {
 function addMessage(role, text, steps) {
   const wrap = document.createElement("div");
   wrap.className = `msg ${role}`;
-  const who = { user: "You", assistant: "Agent", error: "Error" }[role] || role;
+  const who = { user: "You", assistant: "Agent", error: "Error", attachment: "Attached report" }[role] || role;
   wrap.innerHTML = `<div class="who">${who}</div><div class="body"></div>`;
   const body = wrap.querySelector(".body");
   if (role === "assistant") body.innerHTML = renderMarkdown(text);
@@ -111,10 +128,21 @@ async function send(text) {
     // A question sent while the data is still loading is answered once loading ends.
     await loadingDone;
     if (!store) throw new Error("The data did not load, so the question could not be answered. See the message in the sidebar.");
-    const data = await chat(store, apiKey, history, (text) => { step = text; showStep(); });
+    const made = [];
+    const context = attached ? {
+      checked: attached.checked,
+      // Called by the create_client_report tool: the files are shown as download links under the answer.
+      makeReport: async (args) => {
+        const report = await makeClientReport(attached.checked, args);
+        made.push(...report.files);
+        return { created: report.files.map((f) => f.name), overall: report.overall, results: report.counts, changes_applied: report.applied };
+      },
+    } : null;
+    const data = await chat(store, apiKey, history, (text) => { step = text; showStep(); }, context);
     pending.remove();
     history.push({ role: "assistant", content: data.answer });
-    addMessage("assistant", data.answer);
+    const answerEl = addMessage("assistant", data.answer);
+    if (made.length) answerEl.querySelector(".body").append(downloadLinks(made));
   } catch (err) {
     pending.remove();
     history.pop(); // drop the unanswered question so it can be asked again
@@ -130,7 +158,104 @@ form.addEventListener("submit", (e) => { e.preventDefault(); send(input.value); 
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input.value); }
 });
-document.getElementById("clear").addEventListener("click", () => { history = []; messagesEl.innerHTML = ""; });
+document.getElementById("clear").addEventListener("click", () => { history = []; messagesEl.innerHTML = ""; detach(); });
+
+// ---- Attached client reports ----
+// One report is attached at a time. It is read and checked in this browser; the results are sent to the model with
+// each question until the report is removed or a new conversation is started.
+let attached = null;
+const fileInput = document.getElementById("file-input");
+const attachedChip = document.getElementById("attached");
+
+function downloadLinks(files) {
+  const box = document.createElement("div");
+  box.className = "downloads";
+  for (const f of files) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(f.blob);
+    a.download = f.name;
+    a.textContent = `Download ${f.name}`;
+    box.append(a);
+  }
+  return box;
+}
+
+function detach() {
+  attached = null;
+  attachedChip.hidden = true;
+  attachedChip.querySelector("span").textContent = "";
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text ?? "";
+  return div.innerHTML;
+}
+
+// The card shown in the chat when a report is attached: the counts of each result, a table of the test steps the
+// client answered, and buttons that write the report for the client without asking the model.
+function showChecked(card, checked) {
+  const body = card.querySelector(".body");
+  const answered = checked.results.filter((r) => r.answered);
+  const cls = (r) => `result-${r.result.toLowerCase().replace(/\s+/g, "-")}`;
+  body.innerHTML = `<p><strong>${escapeHtml(checked.file)}</strong>: ${checked.results.length} test steps, ${answered.length} answered by the client` +
+    ` (CompID ${escapeHtml(checked.compids.join(", ") || "none")}). Overall: <strong>${escapeHtml(checked.overall)}</strong>.</p>` +
+    `<p>${Object.entries(checked.counts).map(([k, v]) => `${escapeHtml(k)}: ${v}`).join(" · ")}</p>` +
+    (checked.mandatoryMissing.length ? `<p>Mandatory steps with no response: ${escapeHtml(checked.mandatoryMissing.map((r) => r.id).join(", "))}</p>` : "") +
+    `<table><thead><tr><th>Ref</th><th>Test</th><th>Result</th><th>Reason</th></tr></thead><tbody>${answered.map((r) =>
+      `<tr><td>${escapeHtml(r.ref)}</td><td>${escapeHtml(r.id)} ${escapeHtml(r.title.slice(0, 70))}</td><td class="${cls(r)}">${escapeHtml(r.result)}</td><td>${escapeHtml(r.reason)}</td></tr>`).join("")}</tbody></table>` +
+    `<p class="hint">Ask the agent about any test step, or write the report for the client:</p>`;
+  const buttons = document.createElement("div");
+  buttons.className = "report-buttons";
+  for (const [label, format] of [["Excel report", "excel"], ["PDF report", "pdf"]]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { body.append(downloadLinks((await makeClientReport(checked, { format })).files)); }
+      catch (err) { addMessage("error", `The report could not be written: ${err.message || err}`); }
+      finally { b.disabled = false; }
+    });
+    buttons.append(b);
+  }
+  body.append(buttons);
+}
+
+async function attach(file) {
+  if (!file) return;
+  if (!store && !loading) start();
+  if (!store && !loading) { addMessage("error", "Enter the database key first: click Enter keys in the sidebar. The report is checked against the message data."); return; }
+  const card = addMessage("attachment", "");
+  const cardBody = card.querySelector(".body");
+  cardBody.classList.add("thinking");
+  cardBody.textContent = `Reading ${file.name}…`;
+  try {
+    const report = await readAttachment(file);
+    cardBody.textContent = `Read ${report.tests.length} test steps. Waiting for the data to finish loading…`;
+    await loadingDone;
+    if (!store) throw new Error("The data did not load, so the report could not be checked. See the message in the sidebar.");
+    const checked = await checkReport(store, report, (text) => { cardBody.textContent = `${text}…`; });
+    cardBody.classList.remove("thinking");
+    attached = { checked };
+    attachedChip.hidden = false;
+    attachedChip.querySelector("span").textContent = `Attached: ${file.name}`;
+    showChecked(card, checked);
+  } catch (err) {
+    card.remove();
+    addMessage("error", err.message || String(err));
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+document.getElementById("attach").addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => { attach(fileInput.files[0]); fileInput.value = ""; });
+document.getElementById("detach").addEventListener("click", detach);
+// A file dropped anywhere on the chat area is attached.
+const mainEl = document.querySelector("main");
+mainEl.addEventListener("dragover", (e) => { e.preventDefault(); mainEl.classList.add("dropping"); });
+mainEl.addEventListener("dragleave", (e) => { if (!mainEl.contains(e.relatedTarget)) mainEl.classList.remove("dropping"); });
+mainEl.addEventListener("drop", (e) => { e.preventDefault(); mainEl.classList.remove("dropping"); attach(e.dataTransfer.files[0]); });
 
 let loading = false;
 // Settles when the current load ends, whether it succeeded or failed.

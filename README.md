@@ -9,12 +9,13 @@ A web chat page where a JSE Trading Operations analyst asks questions about the 
 | Path               | Contents                                                                                                                                                                                                                                                                                              |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `index.html`     | The page. Stays in the root so GitHub Pages serves it as the site's home page.                                                                                                                                                                                                                        |
-| `web/`           | The page's code: `app.js` (chat screen and keys form), `retrieve.js` (facts and reference found before the model is asked), `agent.js` (language model and its tools), `data.js` (loads the data into the browser), `style.css`, `icon.svg` (the agent's icon, also the browser tab icon) |
+| `web/`           | The page's code: `app.js` (chat screen, keys form, attached reports, sidebar button), `retrieve.js` (facts and reference found before the model is asked), `agent.js` (language model and its tools), `data.js` (loads the data into the browser), `attachments.js` (reads an attached client report), `conformance.js` (checks it against the messages), `client_report.js` (writes the report to the client), `style.css`, `icon.svg` (the agent's icon, also the browser tab icon) |
 | `web/knowledge/` | The JSE conformance reference the agent reads (see below)                                                                                                                                                                                                                                             |
 | `code/`          | Python scripts that build the bronze, silver and gold layers in Supabase                                                                                                                                                                                                                              |
 | `academy/html/`  | The diagram pages: `system_architecture.html`, `agent_methodology.html`, `data_architecture.html`, `bronze_data_diagram.html` (bronze layer), `silver_layer.html` (silver layer), `gold_star_schema.html` (gold layer)                                                                    |
-| `academy/docs/`  | Academy project brief, Group 6 problem statement, `agent_methodology.pdf`, and `raw_data_dictionary.pdf`: every field of the 11 raw datasets, its format in the export, its meaning, the months it appears in and how often it is filled                                                          |
+| `academy/docs/`  | Academy project brief, Group 6 problem statement, `agent_methodology.pdf`, `raw_data_dictionary.pdf`: every field of the 11 raw datasets, its format in the export, its meaning, the months it appears in and how often it is filled, and `client_report_template.xlsx`: the layout of the report to the client, with each cell saying what goes in it |
 | `academy/sql/`   | SQL Server stored procedures, one per layer, that build the same bronze, silver and gold tables from the Excel files (see `academy/sql/README.md`)                                                                                                                                                  |
+| `Clients_Conformance_Tests/` | Clients' Volume 202 reports with real CompIDs. Excluded from git. `Fictitious_CompIDs/` in it holds copies with the fictitious CompIDs, as Excel and PDF, made by `code/anonymise_reports.py`; use only these with the page |
 | `.nojekyll`      | Tells GitHub Pages to serve the files as they are; must stay in the root                                                                                                                                                                                                                              |
 
 ## Use the page
@@ -30,6 +31,29 @@ Click **Enter keys** in the sidebar and enter two keys in the form that opens. N
 
 Every question is sent to the model `nvidia/nemotron-3.5-lightning:free`, set as `MODEL` in `web/agent.js`. The page has no setting to change it.
 
+## Check a client's conformance test report
+
+A client sends its Volume 202 conformance test report: one row per test step, with the CompID, test time and IDs (order ID, client order ID, execution ID) the client recorded. To check it:
+
+1. Click the paperclip button beside the question box, or drop the file on the chat area. Excel (`.xlsx`, `.xls`) and PDF files are read, in the browser; the file is not uploaded anywhere.
+2. `web/attachments.js` finds each test step by the column headed "Test Case ID", and the other columns by their headings, so moved or extra columns do not matter. A PDF has no columns, so the table is rebuilt from where each piece of text is on the page.
+3. `web/conformance.js` looks up every ID the client wrote in `fact_message`, collects every message of those orders, and gives each step one result by a fixed rule for that test (from `web/knowledge/tests.md`):
+
+   | Result | Meaning |
+   | --- | --- |
+   | Pass | The messages show the step was done as Volume 202 requires. |
+   | Fail | The messages show it was not, or the report's IDs belong to another CompID. The reason says what is wrong. |
+   | Needs review | The messages do not settle it: some messages are not in the export, a column is empty in that month's export, or the report's test time is more than 5 minutes from the messages. |
+   | Not checkable | The step uses a gateway or service whose messages are not exported (market data, Post Trade, Drop Copy, FIX, derivatives). |
+   | Not attempted | The client gave no response. |
+
+4. The page shows the results in the chat. From then on, the results are sent to the model with every question, so the analyst can ask about any step. The model has two more tools: `get_test_evidence` (every message of one step) and `create_client_report`.
+5. The **Excel report** and **PDF report** buttons, or asking the agent for a report, write the file for the client: a summary, then one row per test step with its result and reason, then (Excel only) every message found. The analyst can ask the agent to change a result; the report then says the analyst changed it and keeps the automatic reason. The layout is in `academy/docs/client_report_template.xlsx`.
+
+The September 2026 export has no time in force or order quantity on new orders and no liquidity indicator on execution reports, so tests that need those (for example T21-001) get Needs review, with what the timing of the messages shows.
+
+To make the fictitious copies of new client reports, put the reports in `Clients_Conformance_Tests/` and run `python code/anonymise_reports.py`. It replaces every real CompID from `CompID_Key.xlsx`, in the cells, comments and file name. It stops without writing a copy if the CompID column holds a CompID that is not in the key. A copy whose original file name holds no CompID is named after its most used CompID, because the name may hold another client identifier.
+
 ## How a question is answered
 
 1. When the database key is entered, `web/data.js` downloads `gold/manifest.json` and the gold Parquet tables from Supabase (Parquet is a compressed file format for tables), and loads them into DuckDB-WASM, the version of the DuckDB SQL database that runs in the browser.
@@ -42,6 +66,8 @@ Every question is sent to the model `nvidia/nemotron-3.5-lightning:free`, set as
      `web/agent.js` runs each tool call the model makes and returns the result to the model, up to 12 rounds, until the model replies with text.
 4. If the answer contains a table name, a column name with an underscore or an SQL query, `web/agent.js` asks the model once to rewrite it in plain words, with tools switched off.
 5. The page shows the answer text only; the tool calls and their SQL are not shown.
+
+The button at the top left of the chat area (a rectangle with a line down its left side) hides and shows the sidebar. The choice is kept in the browser, so it stays after a reload.
 
 ## Reference files: `web/knowledge/`
 
