@@ -1,0 +1,1321 @@
+-- Creates gold.build_gold, which builds the gold layer from silver.message: the reference tables, then the star
+-- schema (3 fact tables and 6 dimension tables). Run it with: EXEC gold.build_gold;
+
+USE TradingConformance;
+GO
+
+CREATE OR ALTER PROCEDURE gold.build_gold
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;   -- the first error stops the procedure
+
+    -- Gold, step 1: the three reference tables that the gold tables look codes up in. Their contents are typed in here;
+    -- they do not come from the Excel files.
+    --   dim_message_type        the name of each message type code (FIX tag 35, MsgType)
+    --   dim_code                the meaning of each code value, per column, from JSE Volume 01E (Native Trading Gateway)
+    --   volume10_reject_reason  every reject code in JSE Volume 10 (Reject Codes and Reasons), copied from web/knowledge/reject_codes.json,
+    --                           with its reason and the JSE system that sends it; a code can have several entries
+
+    DROP TABLE IF EXISTS gold.dim_message_type;
+    CREATE TABLE gold.dim_message_type (
+        message_type nvarchar(255) NOT NULL PRIMARY KEY,
+        message_name nvarchar(255) NOT NULL,
+        sent_by      nvarchar(255) NOT NULL,
+        silver_table nvarchar(255) NOT NULL   -- the combined bronze table of this message type (the column keeps its earlier name)
+    );
+    INSERT INTO gold.dim_message_type (message_type, message_name, sent_by, silver_table) VALUES
+        (N'A', N'Logon', N'client', N'logon'),
+        (N'B', N'Logon Response', N'JSE', N'logon_response'),
+        (N'5', N'Logout', N'client or JSE', N'logout'),
+        (N'D', N'New Order', N'client', N'new_order_single'),
+        (N'F', N'Order Cancel Request', N'client', N'order_cancel_request'),
+        (N'G', N'Order Cancel/Replace Request (amend)', N'client', N'order_cancel_replace_request'),
+        (N'q', N'Order Mass Cancel Request', N'client', N'order_mass_cancel_request'),
+        (N'8', N'Execution Report', N'JSE', N'execution_report'),
+        (N'9', N'Order Cancel Reject', N'JSE', N'order_cancel_reject'),
+        (N'r', N'Order Mass Cancel Report', N'JSE', N'order_mass_cancel_report'),
+        (N'3', N'Reject (message failed gateway validation)', N'JSE', N'reject');
+
+    DROP TABLE IF EXISTS gold.dim_code;
+    CREATE TABLE gold.dim_code (
+        column_name nvarchar(255) NOT NULL,
+        code        nvarchar(255) NOT NULL,
+        meaning     nvarchar(255) NOT NULL,
+        PRIMARY KEY (column_name, code)
+    );
+    INSERT INTO gold.dim_code (column_name, code, meaning) VALUES
+        (N'side', N'1', N'Buy'),
+        (N'side', N'2', N'Sell'),
+        (N'order_type', N'1', N'Market'),
+        (N'order_type', N'2', N'Limit'),
+        (N'order_type', N'3', N'Stop'),
+        (N'order_type', N'4', N'Stop Limit'),
+        (N'order_type', N'50', N'Pegged'),
+        (N'order_type', N'51', N'Pegged Limit'),
+        (N'time_in_force', N'0', N'DAY (expires at market end)'),
+        (N'time_in_force', N'1', N'GTC Good Till Cancel'),
+        (N'time_in_force', N'3', N'IOC Immediate or Cancel'),
+        (N'time_in_force', N'4', N'FOK Fill or Kill'),
+        (N'time_in_force', N'5', N'OPG At the Open (opening auction only)'),
+        (N'time_in_force', N'6', N'GTD Good Till Date'),
+        (N'time_in_force', N'8', N'GTT Good Till Time'),
+        (N'time_in_force', N'9', N'GFA Good for Auction (next auction only)'),
+        (N'time_in_force', N'10', N'ATC At the Close (closing auction only)'),
+        (N'time_in_force', N'12', N'CPX Closing Price Cross'),
+        (N'time_in_force', N'50', N'GDX Good for EOD Volume Auction Uncross (removed)'),
+        (N'time_in_force', N'51', N'GFX Good for Intraday Auction'),
+        (N'capacity', N'2', N'Principal'),
+        (N'capacity', N'3', N'Agency'),
+        (N'cancel_on_disconnect', N'0', N'Do not cancel'),
+        (N'cancel_on_disconnect', N'1', N'Cancel'),
+        (N'execution_instruction', N'0', N'None'),
+        (N'execution_instruction', N'2', N'Include in EOD Volume Auction Uncross (removed)'),
+        (N'order_sub_type', N'0', N'Order (normal)'),
+        (N'order_sub_type', N'50', N'Pegged to Mid'),
+        (N'order_sub_type', N'51', N'Pegged to Bid'),
+        (N'order_sub_type', N'52', N'Pegged to Offer'),
+        (N'order_book', N'1', N'Regular'),
+        (N'execution_type', N'0', N'New (accepted)'),
+        (N'execution_type', N'4', N'Cancelled'),
+        (N'execution_type', N'5', N'Amended'),
+        (N'execution_type', N'8', N'Rejected'),
+        (N'execution_type', N'9', N'Suspended'),
+        (N'execution_type', N'C', N'Expired'),
+        (N'execution_type', N'F', N'Trade'),
+        (N'execution_type', N'G', N'Trade Correct'),
+        (N'execution_type', N'H', N'Trade Cancel'),
+        (N'execution_type', N'D', N'Restated'),
+        (N'execution_type', N'L', N'Triggered'),
+        (N'order_status', N'0', N'New'),
+        (N'order_status', N'1', N'Partially Filled'),
+        (N'order_status', N'2', N'Filled'),
+        (N'order_status', N'4', N'Cancelled'),
+        (N'order_status', N'6', N'Expired'),
+        (N'order_status', N'8', N'Rejected'),
+        (N'order_status', N'9', N'Suspended'),
+        (N'working_indicator', N'0', N'Unset'),
+        (N'working_indicator', N'1', N'Order is being worked'),
+        (N'working_indicator', N'2', N'Not currently working (unelected stop)'),
+        (N'liquidity_indicator', N'0', N'Unset'),
+        (N'liquidity_indicator', N'1', N'Added liquidity (passive)'),
+        (N'liquidity_indicator', N'2', N'Removed liquidity (aggressive)'),
+        (N'liquidity_indicator', N'4', N'Auction'),
+        (N'type_of_trade', N'0', N'Visible passive'),
+        (N'type_of_trade', N'1', N'Hidden passive'),
+        (N'type_of_trade', N'2', N'Not specified (aggressive)'),
+        (N'type_of_trade', N'3', N'Pegged passive'),
+        (N'indicator_flags', N'0', N'Passive (both sides 0 in auctions)'),
+        (N'indicator_flags', N'1', N'This order was the aggressor'),
+        (N'mass_cancel_request_type', N'3', N'All firm orders for an instrument'),
+        (N'mass_cancel_request_type', N'4', N'All firm orders for a segment'),
+        (N'mass_cancel_request_type', N'7', N'All orders for this CompID'),
+        (N'mass_cancel_request_type', N'8', N'All orders for the firm'),
+        (N'mass_cancel_request_type', N'9', N'This CompID''s orders for an instrument'),
+        (N'mass_cancel_request_type', N'15', N'This CompID''s orders for a segment'),
+        (N'mass_cancel_status', N'7', N'Accepted'),
+        (N'mass_cancel_status', N'0', N'Rejected (reason in reject_code)'),
+        (N'protocol_version', N'0', N'System default'),
+        (N'protocol_version', N'1', N'Version 1'),
+        (N'protocol_version', N'2', N'Version 2 (needed for iceberg orders)'),
+        (N'protocol_version', N'3', N'Version 3 (needed for self-match prevention)');
+
+    DROP TABLE IF EXISTS gold.volume10_reject_reason;
+    CREATE TABLE gold.volume10_reject_reason (
+        code     nvarchar(255)  NOT NULL,   -- without leading zeros
+        entry_no int            NOT NULL,   -- order of the entry in Volume 10
+        reason   nvarchar(1000) NOT NULL,
+        [system] nvarchar(255)  NOT NULL,   -- the JSE system that sends this code with this reason
+        messages nvarchar(255)  NOT NULL,   -- short names of the messages that carry it, as Volume 10 writes them
+        PRIMARY KEY (code, entry_no)
+    );
+    INSERT INTO gold.volume10_reject_reason (code, entry_no, reason, [system], messages) VALUES
+        (N'0', 1, N'Other', N'FIX Trading Gateway (5.0)|FAST Gateway', N'BR'),
+        (N'0', 2, N'Unknown instrument', N'FAST Gateway', N'MDRR'),
+        (N'1', 1, N'Unknown order', N'FIX Trading Gateway (5.0)', N'OCR'),
+        (N'1', 2, N'Unknown instrument', N'FIX Trading Gateway (5.0)', N'OMCR'),
+        (N'1', 3, N'Required tag missing', N'FIX Trading Gateway (5.0)', N'R'),
+        (N'1', 4, N'Invalid User ID or password', N'Native Trading Gateway', N'LR'),
+        (N'1', 5, N'Unknown ID', N'FAST Gateway', N'BR'),
+        (N'1', 6, N'Unknown symbol', N'Drop Copy Gateway (5.0)', N'ER'),
+        (N'1', 7, N'UNAUTHORIZED_USER', N'AuthServer', N'LR'),
+        (N'2', 1, N'Exchange closed', N'FIX Trading Gateway (5.0)', N'ER'),
+        (N'2', 2, N'Unknown instrument', N'FIX Trading Gateway (5.0)|Post Trade Gateway', N'BR|TCR Ack'),
+        (N'2', 3, N'Unknown Symbol', N'FIX Trading Gateway (5.0)', N'BR'),
+        (N'2', 4, N'Unknown Security', N'FIX Trading Gateway (5.0)', N'BR'),
+        (N'2', 5, N'Unknown underlying', N'FIX Trading Gateway (5.0)', N'OMCR'),
+        (N'2', 6, N'Strategy already exists', N'FIXTradingGateway (5.0)', N'SD'),
+        (N'2', 7, N'Tag not defined for this message type', N'FIX Trading Gateway (5.0)', N'R'),
+        (N'2', 8, N'ALREADY_LOGGED', N'AuthServer', N'LR'),
+        (N'2', 9, N'Unknown Instrument', N'Post Trade Gateway', N'TCR Ack'),
+        (N'3', 1, N'Order exceeds limit (i.e. rejected by risk system)', N'FIXTradingGateway (5.0)', N'ER'),
+        (N'3', 2, N'Unsupported message type', N'FIX Trading Gateway (5.0)|FAST Gateway', N'BR'),
+        (N'3', 3, N'NON_COMPLIANT_NEW_CREDENTIALS', N'AuthServer', N'LR'),
+        (N'4', 1, N'Tag specified without a value', N'FIX Trading Gateway (5.0)', N'R'),
+        (N'4', 2, N'Application not available', N'FIX Trading Gateway (5.0)', N'BR'),
+        (N'4', 3, N'Invalid TrdSubType (829)', N'Post Trade Gateway', N'TCR Ack'),
+        (N'4', 4, N'Unsupported SubscriptionRequestType', N'FAST Gateway', N'MDRR'),
+        (N'4', 5, N'USER_NOT_FOUND', N'AuthServer', N'LR'),
+        (N'5', 1, N'Unknown order', N'FIX Trading Gateway (5.0)', N'ER'),
+        (N'5', 2, N'Value is incorrect (out of range) for this tag', N'FIX Trading Gateway (5.0)', N'R'),
+        (N'5', 3, N'Conditionally required field missing', N'FIX Trading Gateway (5.0)|FAST Gateway', N'BR'),
+        (N'5', 4, N'FLAGGED_FOR_DELETION', N'AuthServer', N'LR'),
+        (N'5', 5, N'User Flagged for Delete', N'NativeTradingGateway', N'LR'),
+        (N'6', 1, N'Duplicate order', N'FIX Trading Gateway (5.0)', N'ER|OCR'),
+        (N'6', 2, N'Duplicate quote', N'FIX Trading Gateway (5.0)', N'QSR|MQA'),
+        (N'6', 3, N'Unauthorized to submit a RFQ', N'FIX Trading Gateway (5.0)', N'QRR'),
+        (N'6', 4, N'Incorrect data format for value', N'FIX Trading Gateway (5.0)', N'R'),
+        (N'6', 5, N'BROKER_SUSPENDED', N'AuthServer', N'LR'),
+        (N'6', 6, N'Firm Suspended', N'NativeTradingGateway', N'LR'),
+        (N'7', 1, N'Invalid bid/ask spread', N'FIXTradingGateway', N'QSR|MQA'),
+        (N'8', 1, N'Price exceeds current price band', N'FIXTradingGateway (5.0)', N'OCR'),
+        (N'8', 2, N'Unsupported MDEntryType', N'FAST Gateway', N'MDRR'),
+        (N'8', 3, N'ACCOUNT_LOCKED', N'AuthServer', N'LR'),
+        (N'8', 4, N'Invalid BidPx (132) or OfferPx (133)', N'FIX Trading Gateway (5.0)', N'QSR|MQA'),
+        (N'8', 5, N'Message rate exceeded', N'FIX Trading Gateway (5.0)', N'BR'),
+        (N'9', 1, N'Trading mnemonic not registered to quote instrument', N'FIX Trading Gateway (5.0)', N'QSR|MQA'),
+        (N'9', 2, N'CompID problem', N'FIX Trading Gateway (5.0)', N'R'),
+        (N'9', 3, N'Invalid Sender CompID', N'FIX Gateway (5.0, 4.2)', N'R'),
+        (N'9', 4, N'Invalid Target CompID', N'FIX Gateway (5.0, 4.2)', N'R'),
+        (N'9', 5, N'Not Authorized', N'Post Trade Gateway', N'TCRR Ack'),
+        (N'9', 6, N'ACCOUNT_EXPIRED', N'AuthServer', N'LR'),
+        (N'9', 7, N'Account Expired', N'NativeTradingGateway', N'LR'),
+        (N'10', 1, N'UNAUTHORIZED_MACHINE', N'AuthServer', N'LR'),
+        (N'10', 2, N'Price exceeds current price band', N'FIX Trading Gateway (5.0)', N'QSR|MQA'),
+        (N'10', 3, N'Inaccurate OrigSendingTime value', N'FIXTradingGateway (5.0)', N'R'),
+        (N'10', 4, N'SendingTime accuracy problem', N'FIXTradingGateway (5.0)', N'R'),
+        (N'10', 5, N'Unauthorized Machine', N'NativeTradingGateway', N'LR'),
+        (N'11', 1, N'Unsupported order characteristic', N'FIX Trading Gateway (5.0)', N'ER'),
+        (N'11', 2, N'Invalid MsgType', N'FIX Trading Gateway (5.0)', N'R'),
+        (N'11', 3, N'UNAUTHORIZED_FE', N'AuthServer', N'LR'),
+        (N'11', 4, N'Unauthorized User', N'NativeTradingGateway', N'LR'),
+        (N'12', 1, N'Legs inconsistent with strategy type', N'FIXTradingGateway (5.0)', N'SD'),
+        (N'13', 1, N'Tag appears more than once', N'FIX Trading Gateway (5.0)', N'R'),
+        (N'14', 1, N'Tag specified out of required order', N'FIX Trading Gateway (5.0)', N'R'),
+        (N'14', 2, N'MIN_PSWD_LEN', N'AuthServer', N'LR'),
+        (N'15', 1, N'Repeating group fields out of order', N'FIX Trading Gateway (5.0)', N'R'),
+        (N'15', 2, N'MAX_PSWD_LEN', N'AuthServer', N'LR'),
+        (N'16', 1, N'Price exceeds current price band', N'FIXTradingGateway (5.0)', N'ER'),
+        (N'16', 2, N'MIN_PSWD_DIGITS', N'AuthServer', N'LR'),
+        (N'18', 1, N'Invalid price increment', N'FIX Trading Gateway (5.0)', N'ER|OCR'),
+        (N'18', 2, N'Invalid or unsupported application version', N'FIX Trading Gateway (5.0)', N'R'),
+        (N'50', 1, N'Staggered Start', N'NativeTradingGateway', N'LR'),
+        (N'50', 2, N'LOGIN_CONTEXT_NOT_FOUND', N'AuthServer', N'LR'),
+        (N'53', 1, N'Role Flagged for Delete', N'NativeTradingGateway', N'LR'),
+        (N'53', 2, N'ROLE_FLAGGED_FOR_DELETE', N'AuthServer', N'LR'),
+        (N'17', 1, N'MIN_PSWD_DIFF', N'AuthServer', N'LR'),
+        (N'19', 1, N'INVALID_PROCESS', N'AuthServer', N'LR'),
+        (N'20', 1, N'NO_TIME_ZONE', N'AuthServer', N'LR'),
+        (N'22', 1, N'USER_LOGGEDIN', N'AuthServer', N'LR'),
+        (N'23', 1, N'USER_NOT_LOGGEDIN', N'AuthServer', N'LR'),
+        (N'24', 1, N'INIT_USER_LOGIN', N'AuthServer', N'LR'),
+        (N'26', 1, N'PAM_SAME_AS_OLD', N'AuthServer', N'LR'),
+        (N'27', 1, N'PAM_PALINDROME', N'AuthServer', N'LR'),
+        (N'28', 1, N'PAM_CASE_CHANGES_ONLY', N'AuthServer', N'LR'),
+        (N'29', 1, N'PAM_TOO_SIMILAR', N'AuthServer', N'LR'),
+        (N'30', 1, N'PAM_TOO_SIMPLE', N'AuthServer', N'LR'),
+        (N'31', 1, N'PAM_ROTATED_VERSION', N'AuthServer', N'LR'),
+        (N'32', 1, N'USER_NOT_LOCKED', N'AuthServer', N'LR'),
+        (N'33', 1, N'INVALID_FE_VERSION', N'AuthServer', N'LR'),
+        (N'51', 1, N'INVALID_LOGIN_PRIV_CODE', N'AuthServer', N'LR'),
+        (N'52', 1, N'MISMATCH_IN_CONTEXT_ID', N'AuthServer', N'LR'),
+        (N'54', 1, N'NODE_SUSPENDED', N'AuthServer', N'LR'),
+        (N'55', 1, N'User attached node or one or more upper nodes suspended', N'NativeTradingGateway', N'LR'),
+        (N'55', 2, N'NODE_HIERARCHY_SUSPENSION', N'AuthServer', N'LR'),
+        (N'56', 1, N'Node Flagged for Delete', N'NativeTradingGateway', N'LR'),
+        (N'56', 2, N'NODE_FLG_DELETE', N'AuthServer', N'LR'),
+        (N'57', 1, N'Node Hierarchy Flagged for Delete', N'NativeTradingGateway', N'LR'),
+        (N'57', 2, N'NODE_HIERARCHY_FLG_DELETE', N'AuthServer', N'LR'),
+        (N'99', 1, N'Other', N'FIX Trading Gateway (5.0)', N'ER|OCR|R'),
+        (N'100', 1, N'Cannot Match Selection Criteria', N'Post Trade Gateway', N'TCRR Ack'),
+        (N'100', 2, N'Not logged into real-time channel', N'Native Trading Gateway', N'LR'),
+        (N'105', 1, N'Login request being processed', N'Native Trading Gateway', N'R'),
+        (N'107', 1, N'Not logged in', N'Native Trading Gateway', N'R'),
+        (N'500', 1, N'Request Limit for Day Reached', N'Post Trade Gateway', N'TCRR Ack'),
+        (N'624', 1, N'UNAUTHORIZED_GATEWAY', N'AuthServer', N'LR'),
+        (N'625', 1, N'USER_ROLE_NOT_FOUND', N'AuthServer', N'LR'),
+        (N'626', 1, N'ACCOUNT_SUSPENDED', N'AuthServer', N'LR'),
+        (N'627', 1, N'ACCOUNT_DELETED', N'AuthServer', N'LR'),
+        (N'628', 1, N'ACCOUNT_INACTIVATED', N'AuthServer', N'LR'),
+        (N'628', 2, N'User Inactivated', N'NativeTradingGateway', N'LR'),
+        (N'630', 1, N'SYSTEM_END_OF_DAY', N'AuthServer', N'LR'),
+        (N'630', 2, N'System is in End of Day', N'NativeTradingGateway', N'LR'),
+        (N'1000', 1, N'Invalid order size (≤ zero)', N'Matching Engine', N'ER'),
+        (N'1001', 1, N'Invalid order size (< minimum size)', N'Matching Engine', N'ER'),
+        (N'1002', 1, N'Invalid order size (not multiple of lot size)', N'Matching Engine', N'ER'),
+        (N'1003', 1, N'Invalid order size (> maximum size)', N'Matching Engine', N'ER'),
+        (N'1004', 1, N'Invalid order size', N'Matching Engine', N'ER'),
+        (N'1005', 1, N'Invalid order size (> maximum order value)', N'Matching Engine', N'ER'),
+        (N'1006', 1, N'Invalid order size (will breach maximum gross consideration)', N'MatchingEngine', N'ER'),
+        (N'1007', 1, N'Invalid order size (< minimum reserve order value)', N'Matching Engine', N'ER'),
+        (N'1008', 1, N'Invalid order size (< minimum reserve order size)', N'Matching Engine', N'ER'),
+        (N'1009', 1, N'Bid exceeds maximum order value', N'MatchingEngine', N'ER'),
+        (N'1010', 1, N'Offer exceeds maximum order value', N'MatchingEngine', N'ER'),
+        (N'1011', 1, N'Order exeeds maximum order size', N'MatchingEngine', N'ER'),
+        (N'1012', 1, N'Bid exceeds maximum order size', N'MatchingEngine', N'ER'),
+        (N'1013', 1, N'Offer exceeds maximum order size', N'MatchingEngine', N'ER'),
+        (N'1014', 1, N'Order/Quote breaches the net consideration limit', N'MatchingEngine', N'ER'),
+        (N'1015', 1, N'Invalid order value (< minimum iceberg order value)', N'MatchingEngine', N'ER'),
+        (N'1100', 1, N'Invalid display size (< zero)', N'Matching Engine', N'ER'),
+        (N'1101', 1, N'Invalid display quantity (greater than order quantity)', N'Matching Engine', N'ER'),
+        (N'1102', 1, N'Invalid display size (not multiple of lot size)', N'MatchingEngine', N'ER'),
+        (N'1103', 1, N'Invalid display size', N'Matching Engine', N'ER'),
+        (N'1104', 1, N'Orders with hidden size not permitted during auction call', N'Matching Engine', N'ER'),
+        (N'1105', 1, N'Iceberg orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1106', 1, N'Fully hidden orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1107', 1, N'New hidden orders not permitted during auction call', N'Matching Engine', N'ER'),
+        (N'1108', 1, N'Orders with hidden sizes not permitted for order book', N'MatchingEngine', N'ER'),
+        (N'1149', 1, N'Not a valid reject code. Reserved for use by development.', N'-', N'-'),
+        (N'1150', 1, N'Invalid minimum size (> order size)', N'Matching Engine', N'ER'),
+        (N'1151', 1, N'Invalid minimum size (not multiple of lot size)', N'Matching Engine', N'ER'),
+        (N'1152', 1, N'Orders with minimum size not permitted during auction call', N'Matching Engine', N'ER'),
+        (N'1153', 1, N'Orders with minimum size not permitted during Pause session', N'Matching Engine', N'ER'),
+        (N'1154', 1, N'Minimum fill orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1155', 1, N'Orders with minimum size not permitted for order book', N'MatchingEngine', N'ER'),
+        (N'1156', 1, N'Visible orders are not permitted to order book', N'MatchingEngine', N'ER'),
+        (N'1201', 1, N'Invalid limit price (not multiple of tick)', N'Matching Engine', N'ER'),
+        (N'1202', 1, N'Invalid limit price (price band breached)', N'MatchingEngine', N'ER'),
+        (N'1203', 1, N'Invalid limit price (> maximum price)', N'Matching Engine', N'ER'),
+        (N'1204', 1, N'Invalid limit price (< minimum price)', N'Matching Engine', N'ER'),
+        (N'1205', 1, N'Invalid limit price (short sale failed tick test)', N'MatchingEngine', N'ER'),
+        (N'1206', 1, N'Invalid limit price (short sale failed bid test)', N'MatchingEngine', N'ER'),
+        (N'1207', 1, N'Invalid limit price (not equal to closing price)', N'Matching Engine', N'ER'),
+        (N'1208', 1, N'Invalid limit price (order book locked)', N'MatchingEngine', N'QSR'),
+        (N'1209', 1, N'Invalid limit price (order book crossed)', N'MatchingEngine', N'QSR'),
+        (N'1212', 1, N'Order is not in a last look phase', N'MatchingEngine', N'QSR'),
+        (N'1213', 1, N'Order owner is not the liquidity provider', N'MatchingEngine', N'QSR'),
+        (N'1214', 1, N'No benchmark instrument attached for spread trading', N'MatchingEngine', N'ER|QSR'),
+        (N'1215', 1, N'Spread trading not support for benchmark instruments', N'MatchingEngine', N'ER|QSR'),
+        (N'1216', 1, N'GTT TIF not supported for benchmark instruments', N'MatchingEngine', N'ER'),
+        (N'1217', 1, N'Price type cannot be amended', N'MatchingEngine', N'ER|QSR'),
+        (N'1218', 1, N'Cannot aggress using spread', N'MatchingEngine', N'ER'),
+        (N'1219', 1, N'Benchmark price not available', N'MatchingEngine', N'ER|QSR'),
+        (N'1220', 1, N'Spread cannot be zero', N'MatchingEngine', N'ER'),
+        (N'1221', 1, N'Trade Amendments not allowed during this session', N'MatchingEngine', N'Service Desk Request Reply'),
+        (N'1223', 1, N'Order Quantity does not match aggressing quantity', N'MatchingEngine', N'ER'),
+        (N'1224', 1, N'Price does not match aggressing price', N'MatchingEngine', N'ER'),
+        (N'1225', 1, N'Side does not match aggressing side', N'MatchingEngine', N'ER'),
+        (N'1226', 1, N'Price not equal to Static Reference Price', N'MatchingEngine', N'ER|QSR'),
+        (N'1227', 1, N'Expired (circuit breaker breached)', N'MatchingEngine', N'ER'),
+        (N'1300', 1, N'Invalid trigger price (less than or equal to zero)', N'Matching Engine', N'ER'),
+        (N'1301', 1, N'Invalid trigger price (not multiple of tick)', N'Matching Engine', N'ER'),
+        (N'1302', 1, N'Stop Price cannot be specified for Trailing Stop orders', N'MatchingEngine', N'ER'),
+        (N'1303', 1, N'Stop Price cannot be amended in Trailing Stop orders', N'MatchingEngine', N'ER'),
+        (N'1304', 1, N'Trailing Offset cannot be added to Stop orders', N'MatchingEngine', N'ER'),
+        (N'1305', 1, N'Invalid stop price (price band breached)', N'MatchingEngine', N'ER|OCR'),
+        (N'1396', 1, N'Not a valid reject code. Reserved for use by development.', N'-', N'-'),
+        (N'1397', 1, N'Not a valid reject code. Reserved for use by development.', N'-', N'-'),
+        (N'1398', 1, N'Not a valid reject code. Reserved for use by development.', N'-', N'-'),
+        (N'1399', 1, N'Not a valid reject code. Reserved for use by development.', N'-', N'-'),
+        (N'1400', 1, N'Invalid order type (unknown)', N'Matching Engine', N'ER'),
+        (N'1401', 1, N'Invalid order type (market/stop/MIT order with limit price)', N'Matching Engine', N'ER'),
+        (N'1402', 1, N'Invalid order type (market or limit order with a stop price)', N'Matching Engine', N'ER'),
+        (N'1403', 1, N'Market orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1404', 1, N'Stop orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1405', 1, N'Market to limit orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1406', 1, N'Invalid order type (market to limit order with limit price)', N'Matching Engine', N'ER'),
+        (N'1407', 1, N'Stop orders are not permitted during this session', N'Matching Engine', N'ER'),
+        (N'1408', 1, N'Market orders are not permitted during an auction call', N'Matching Engine', N'ER'),
+        (N'1409', 1, N'Invalid type (only limit orders permitted for order book)', N'MatchingEngine', N'ER'),
+        (N'1410', 1, N'MIT orders disabled for instrument', N'MatchingEngine', N'ER'),
+        (N'1411', 1, N'MIT orders are not permitted during this session', N'MatchingEngine', N'ER'),
+        (N'1413', 1, N'Trailing Stop/Stop limit orders disabled for instrument', N'MatchingEngine', N'ER'),
+        (N'1414', 1, N'Market or limit order with a Trailing Offset', N'MatchingEngine', N'ER'),
+        (N'1415', 1, N'Market if Touch order with a Trailing Offset', N'MatchingEngine', N'ER'),
+        (N'1416', 1, N'LTP/BBO is not available', N'MatchingEngine', N'ER'),
+        (N'1417', 1, N'Invalid order type (Not permitted for order book)', N'MatchingEngine', N'ER'),
+        (N'1418', 1, N'Order Type amendments only allowed in Regular Trading', N'MatchingEngine', N'OCR'),
+        (N'1419', 1, N'Invalid order type (Not permitted for passive only orders)', N'MatchingEngine', N'ER|QSR'),
+        (N'1420', 1, N'MinFill attribute is not supported for passive only orders', N'MatchingEngine', N'ER|QSR'),
+        (N'1421', 1, N'Passive only orders are not allowed', N'MatchingEngine', N'ER|QSR'),
+        (N'1422', 1, N'Passive only orders are not permitted during this session', N'MatchingEngine', N'ER|QSR'),
+        (N'1427', 1, N'Maximum stop order limit reached for instrument', N'MatchingEngine', N'ER'),
+        (N'1500', 1, N'Invalid TIF (unknown)', N'Matching Engine', N'ER'),
+        (N'1501', 1, N'Invalid expire time (elapsed)', N'Matching Engine', N'ER'),
+        (N'1502', 1, N'Invalid expire time (time is for a future date)', N'Matching Engine', N'ER'),
+        (N'1503', 1, N'Invalid expire date (elapsed)', N'Matching Engine', N'ER'),
+        (N'1505', 1, N'Invalid TIF (OPG stop orders not permitted)', N'Matching Engine', N'ER'),
+        (N'1506', 1, N'Invalid TIF (IOC & FOK not permitted during auction calls)', N'Matching Engine', N'ER'),
+        (N'1507', 1, N'Invalid TIF (OPG not permitted outside opening auction call)', N'Matching Engine', N'ER|OCR|QSR'),
+        (N'1508', 1, N'Invalid TIF (invalid date format)', N'Matching Engine', N'ER'),
+        (N'1509', 1, N'No time qualifier specified', N'Matching Engine', N'ER'),
+        (N'1511', 1, N'Invalid TIF (GFA orders not supported)', N'Matching Engine', N'ER'),
+        (N'1513', 1, N'Invalid TIF (ATC stop orders not permitted)', N'Matching Engine', N'ER'),
+        (N'1514', 1, N'Invalid TIF (GFA stop orders not permitted)', N'Matching Engine', N'ER'),
+        (N'1515', 1, N'Invalid TIF (IOC & FOK not permitted during Pause session)', N'Matching Engine', N'ER'),
+        (N'1516', 1, N'GTD orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1517', 1, N'GTT orders disabled for instrument', N'Matching Engine', N'ER|QSR'),
+        (N'1518', 1, N'FOK orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1519', 1, N'GTC orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1520', 1, N'OPG orders disabled for instrument', N'Matching Engine', N'ER|QSR'),
+        (N'1521', 1, N'ATC orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1522', 1, N'Invalid TIF (only DAY and GTT permitted for order book)', N'Matching Engine', N'ER'),
+        (N'1523', 1, N'Invalid TIF (CPX stop orders not permitted)', N'Matching Engine', N'ER'),
+        (N'1524', 1, N'Invalid TIF (not permitted during this session)', N'Matching Engine', N'ER|OCR'),
+        (N'1525', 1, N'Invalid TIF (GFA market to limit orders not permitted)', N'Matching Engine', N'ER|OCR'),
+        (N'1526', 1, N'CPX orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1527', 1, N'Maximum parked order limit reached for instrument', N'MatchingEngine', N'ER'),
+        (N'1528', 1, N'IOC orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1529', 1, N'GTS orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1530', 1, N'Invalid TIF (GTS Stop/Stop Limit orders not permitted)', N'Matching Engine', N'ER'),
+        (N'1531', 1, N'Invalid TIF (GTS orders not permitted during Pause session)', N'Matching Engine', N'ER'),
+        (N'1532', 1, N'Invalid TIF (Not permitted for MIT orders)', N'MatchingEngine', N'ER'),
+        (N'1533', 1, N'TIF amendments not allowed for order book', N'MatchingEngine', N'ER'),
+        (N'1534', 1, N'TIF amendments not allowed', N'MatchingEngine', N'ER|OCR'),
+        (N'1535', 1, N'Invalid TIF (Not permitted for passive only orders)', N'MatchingEngine', N'ER|QSR'),
+        (N'1550', 1, N'Expired (end of day)', N'Matching Engine', N'ER'),
+        (N'1551', 1, N'Invalid TIF (Pending closing price for trading)', N'Matching Engine', N'ER'),
+        (N'1700', 1, N'Invalid clearing details (details not provided or invalid)', N'Matching Engine', N'ER'),
+        (N'1701', 1, N'Firm ID Not Matched for Committed Cross', N'Matching Engine', N'ER'),
+        (N'1702', 1, N'Firm ID Not Specified for Cross Order', N'Matching Engine', N'ER'),
+        (N'1800', 1, N'User not registered to submit interest for instrument', N'Matching Engine', N'ER|QA'),
+        (N'1801', 1, N'User not registered to submit interest for %s', N'Matching Engine', N'ER'),
+        (N'1802', 1, N'Invalid order type for sponsored user (market order)', N'Matching Engine', N'ER'),
+        (N'1803', 1, N'Invalid order type for sponsored user (stop/MIT order)', N'Matching Engine', N'ER'),
+        (N'1804', 1, N'Invalid order type for sponsored user (quote)', N'Matching Engine', N'ER|QSR|MQA'),
+        (N'1806', 1, N'%s not registered to submit orders for instrument', N'Matching Engine', N'ER'),
+        (N'1808', 1, N'Invalid order for sponsored user (multi-legged instrument)', N'Matching Engine', N'ER'),
+        (N'1809', 1, N'Invalid order for sponsored user (market to limit order)', N'Matching Engine', N'ER'),
+        (N'1810', 1, N'% is not permitted to submit short sell orders', N'Matching Engine', N'ER'),
+        (N'1812', 1, N'Expired (Attached to Negative group)', N'Matching Engine', N'ER'),
+        (N'1900', 1, N'Invalid side', N'Matching Engine', N'ER'),
+        (N'1901', 1, N'Invalid order status (%d)', N'Matching Engine', N'ER'),
+        (N'1902', 1, N'Received Prior to First Trading Date of instrument', N'Matching Engine', N'ER|QRR'),
+        (N'1903', 1, N'Last Trading Date of instrument elapsed', N'Matching Engine', N'ER|QRR'),
+        (N'1904', 1, N'Invalid order capacity', N'Matching Engine', N'ER'),
+        (N'1905', 1, N'Invalid instrument set up (no tick structure)', N'Matching Engine', N'ER'),
+        (N'1906', 1, N'Short sales disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1907', 1, N'Named orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'1908', 1, N'Only named orders permitted for order book', N'Matching Engine', N'ER'),
+        (N'1909', 1, N'Short sales disabled (reference price unavailable)', N'Matching Engine', N'ER'),
+        (N'1910', 1, N'Short sale market order failed tick test (invalid best bid)', N'Matching Engine', N'ER'),
+        (N'1911', 1, N'Short sale market orders disabled (bid test enabled)', N'Matching Engine', N'ER'),
+        (N'1912', 1, N'Monitoring user from sponsoring firm not connected', N'Matching Engine', N'ER'),
+        (N'1913', 1, N'Monitoring user from sponsoring firm disconnected', N'Matching Engine', N'ER'),
+        (N'1914', 1, N'Invalid order source [Reserved for future use]', N'Matching Engine', N'ER'),
+        (N'1915', 1, N'Invalid order source [Reserved for future use]', N'Matching Engine', N'ER'),
+        (N'1926', 1, N'Maximum number of active Orders per book limit reached', N'MatchingEngine', N'QSR|ER'),
+        (N'1927', 1, N'Maximum active order limit reached for matching thread', N'MatchingEngine', N'QSR|ER'),
+        (N'1928', 1, N'Max active order limit reached for user for matching thread', N'MatchingEngine', N'QSR|ER'),
+        (N'1929', 1, N'Buy orders are not allowed for the auction at this time', N'MatchingEngine', N'ER'),
+        (N'1930', 1, N'Sell orders are not allowed for the auction at this time', N'MatchingEngine', N'ER'),
+        (N'1931', 1, N'Invalid Price (worse than IAP)', N'MatchingEngine', N'ER'),
+        (N'1932', 1, N'Invalid Size (greater than imbalance size)', N'MatchingEngine', N'ER|OCR'),
+        (N'1933', 1, N'Invalid counterparty group (Unknown)', N'MatchingEngine', N'ER'),
+        (N'1934', 1, N'Counterparty priority higher than the user priority', N'MatchingEngine', N'ER'),
+        (N'1935', 1, N'Counterparty  group not allowed (User Priority disabled)', N'MatchingEngine', N'ER'),
+        (N'1936', 1, N'Counterparty group not allowed for order book', N'MatchingEngine', N'ER'),
+        (N'1937', 1, N'Cross orders disabled for instrument', N'MatchingEngine', N'ER'),
+        (N'1940', 1, N'Cannot Enter Cross Orders (Price range Not Available)', N'MatchingEngine', N'ER'),
+        (N'1942', 1, N'Price Outside applicable range for Cross Order', N'MatchingEngine', N'ER'),
+        (N'1945', 1, N'Invalid Session (Cross Orders are Not Allowed)', N'MatchingEngine', N'ER'),
+        (N'1948', 1, N'Value cannot be determined (ref price unavailable)', N'MatchingEngine', N'ER'),
+        (N'1949', 1, N'Max Order Value Breached for Order/Quote', N'MatchingEngine', N'ER|QSR'),
+        (N'1950', 1, N'Max Daily amount breached', N'MatchingEngine', N'ER'),
+        (N'2000', 1, N'Order not found (too late to cancel or unknown order)', N'Matching Engine', N'OCR|QSR'),
+        (N'2001', 1, N'User not registered to mass cancel interest', N'Matching Engine', N'MCR|OMCR'),
+        (N'2002', 1, N'User not registered to mass cancel interest for firm', N'Matching Engine', N'MCR|OMCR'),
+        (N'2003', 1, N'Unknown user (submitting Trader ID)', N'Matching Engine', N'MCR|OMCR'),
+        (N'2004', 1, N'Unknown instrument', N'Matching Engine', N'MCR'),
+        (N'2005', 1, N'Unknown underlying', N'Matching Engine', N'MCR'),
+        (N'2006', 1, N'Unknown segment', N'Matching Engine', N'MCR|OMCR'),
+        (N'2007', 1, N'Unknown firm', N'Matching Engine', N'MCR|OMCR'),
+        (N'2009', 1, N'Unknown user (target Owner ID)', N'Matching Engine', N'MCR|OMCR'),
+        (N'2010', 1, N'Unknown user (target Trader ID)', N'Matching Engine', N'MCR|OMCR'),
+        (N'2011', 1, N'Invalid mass cancel type', N'Matching Engine', N'MCR|OMCR'),
+        (N'2012', 1, N'No orders for instrument/underlying', N'Matching Engine', N'MCR|OMCR'),
+        (N'2013', 1, N'Unknown Order Book Definition', N'Matching Engine', N'MCR|OMCR'),
+        (N'2014', 1, N'Unknown Node ID', N'MatchingEngine', N'-'),
+        (N'2015', 1, N'Matching partition suspended', N'MatchingEngine', N'MCR|OMCR'),
+        (N'2016', 1, N'Implied orders cannot be cancelled', N'MatchingEngine', N'ER'),
+        (N'2017', 1, N'Reference price for the underlying instrument is unavailable', N'MatchingEngine', N'MQA'),
+        (N'3000', 1, N'Invalid order size (< filled size)', N'Matching Engine', N'OCR'),
+        (N'3001', 1, N'Size amendment of this order is not allowed at this time', N'MatchingEngine', N'OCR'),
+        (N'3002', 1, N'Size reduction of this order is not allowed at this time', N'MatchingEngine', N'OCR'),
+        (N'3100', 1, N'Invalid display size (> order size)', N'Matching Engine', N'OCR'),
+        (N'3101', 1, N'Conversion of fully hidden order to iceberg order prohibited', N'Matching Engine', N'OCR'),
+        (N'3102', 1, N'Conversion of fully hidden order to fully visible prohibited', N'Matching Engine', N'OCR'),
+        (N'3103', 1, N'Conversion of iceberg order to fully hidden order prohibited', N'Matching Engine', N'OCR'),
+        (N'3104', 1, N'Conversion of fully visible order to fully hidden prohibited', N'Matching Engine', N'OCR'),
+        (N'3700', 1, N'Invalid owner (different from original order)', N'Matching Engine', N'OCR'),
+        (N'3800', 1, N'User not registered to manage interest for instrument', N'Matching Engine', N'OCR'),
+        (N'3801', 1, N'User not registered to manage interest for %s', N'Matching Engine', N'OCR'),
+        (N'3900', 1, N'Invalid side (different from original order)', N'Matching Engine', N'OCR'),
+        (N'3902', 1, N'Side may not be amended (order is a short sale)', N'Matching Engine', N'OCR'),
+        (N'3903', 1, N'Stop orders may not be amended during this session', N'Matching Engine', N'OCR'),
+        (N'3904', 1, N'Price amendment prohibited (order eligible for CPX session)', N'MatchingEngine', N'OCR'),
+        (N'3905', 1, N'Invalid price (price may not be better than closing price)', N'Matching Engine', N'OCR'),
+        (N'3906', 1, N'Order type may not be amended', N'MatchingEngine', N'OCR'),
+        (N'3907', 1, N'Trigger price of an elected stop/MIT order may not be amended', N'Matching Engine', N'OCR'),
+        (N'3908', 1, N'Stop/MIT order electable on entry', N'MatchingEngine', N'OCR'),
+        (N'3009', 1, N'MIT order electable on entry', N'MatchingEngine', N'OCR'),
+        (N'3010', 1, N'Unsupported TIF amendment', N'MatchingEngine', N'QSR|MQA|ER|OCR'),
+        (N'3911', 1, N'Price amendment of this order is not allowed at this time', N'MatchingEngine', N'OCR'),
+        (N'3912', 1, N'Implied orders can not be amended', N'Matching Engine', N'ER'),
+        (N'3913', 1, N'Cannot amend Cross Orders', N'Matching Engine', N'ER'),
+        (N'3914', 1, N'Invalid exec instructions (different from original order)', N'MatchingEngine', N'QSR'),
+        (N'3916', 1, N'Invalid price type (different from original quote)', N'MatchingEngine', N'QSR'),
+        (N'3917', 1, N'Invalid Order Type amendment', N'Matching Engine', N'OCR'),
+        (N'3918', 1, N'Passive only attribute cannot be amended', N'MatchingEngine', N'QSR|ER'),
+        (N'3919', 1, N'Order cancellations/amendments not allowed (valid IAP exists)', N'MatchingEngine', N'ER|OCR'),
+        (N'4000', 1, N'Invalid bid size (> maximum size)', N'Matching Engine', N'ER'),
+        (N'4001', 1, N'Invalid offer size (> maximum size)', N'Matching Engine', N'ER'),
+        (N'4002', 1, N'Invalid bid size (not multiple of lot size)', N'Matching Engine', N'ER'),
+        (N'4003', 1, N'Invalid offer size (not multiple of lot size)', N'Matching Engine', N'ER'),
+        (N'4004', 1, N'Invalid Level ID <Level ID>', N'MatchingEngine', N'MQA'),
+        (N'4005', 1, N'Invalid bid size (< minimum size)', N'MatchingEngine', N'QSR|ER'),
+        (N'4006', 1, N'Invalid offer size (< minimum size)', N'MatchingEngine', N'QSR|ER'),
+        (N'4007', 1, N'Minimum bid quantity must match the original value', N'MatchingEngine', N'QSR'),
+        (N'4008', 1, N'Minimum offer quantity must match the original value', N'MatchingEngine', N'QSR'),
+        (N'4200', 1, N'Invalid bid price (≤ zero)', N'MatchingEngine', N'QSR|ER'),
+        (N'4201', 1, N'Invalid offer price (≤ zero)', N'MatchingEngine', N'QSR|ER'),
+        (N'4202', 1, N'Invalid bid price (not multiple of tick)', N'MatchingEngine', N'QSR|ER'),
+        (N'4203', 1, N'Invalid offer price (not multiple of tick)', N'MatchingEngine', N'QSR|ER'),
+        (N'4204', 1, N'Invalid offer price (quote is locked or crossed)', N'MatchingEngine', N'QSR|ER'),
+        (N'4205', 1, N'Exceeds maximum quote spread', N'MatchingEngine', N'QSR|ER'),
+        (N'4206', 1, N'Price exceeds current price band', N'MatchingEngine', N'MQA'),
+        (N'4300', 1, N'Specified TIF is not valid for a quote', N'Matching Engine', N'QSR|ER'),
+        (N'4302', 1, N'Invalid expire time (elapsed)', N'Matching Engine', N'QSR|ER'),
+        (N'4303', 1, N'Invalid expire time (time is for a future date)', N'MatchingEngine', N'QSR|ER'),
+        (N'4306', 1, N'Invalid TIF (GFA Quotes are not supported)', N'MatchingEngine', N'QSR|ER'),
+        (N'4307', 1, N'Anonymity indication may not be amended', N'MatchingEngine', N'QSR'),
+        (N'4800', 1, N'User not registered to submit quotes for instrument', N'MatchingEngine', N'QSR|ER'),
+        (N'4900', 1, N'Quote does not include a bid', N'MatchingEngine', N'QSR|ER'),
+        (N'4901', 1, N'Quote does not include an offer', N'MatchingEngine', N'QSR|ER'),
+        (N'4902', 1, N'Quote is same as previous quote', N'MatchingEngine', N'QSR|ER'),
+        (N'4904', 1, N'Invalid quote (not submitted as a limit order)', N'MatchingEngine', N'QSR|ER'),
+        (N'4905', 1, N'%s not registered to submit quotes for instrument', N'MatchingEngine', N'QSR|ER'),
+        (N'4905', 2, N'Invalid quote (submitted with stop price)', N'MatchingEngine', N'QSR|ER'),
+        (N'4906', 1, N'Invalid quote (amend order message used to update quote)', N'MatchingEngine', N'QSR|ER'),
+        (N'4907', 1, N'Invalid quote (submitted in an agency capacity)', N'MatchingEngine', N'QSR|ER'),
+        (N'4908', 1, N'Quotes disabled for instrument', N'MatchingEngine', N'QSR|ER'),
+        (N'4909', 1, N'Mass quotes not permitted for order book', N'MatchingEngine', N'MQA'),
+        (N'4910', 1, N'Quotes not permitted during CPX session', N'MatchingEngine', N'QSR|ER'),
+        (N'4916', 1, N'Mass Quotes not allowed for the instrument type', N'MatchingEngine', N'MQA'),
+        (N'4917', 1, N'Quotes not allowed for the instrument type', N'MatchingEngine', N'QSR'),
+        (N'4919', 1, N'No effective change to quote', N'MatchingEngine', N'MQA'),
+        (N'4920', 1, N'Reserved for ATOM', N'MatchingEngine', N''),
+        (N'4921', 1, N'Quotes cannot be submitted for IPO instruments', N'MatchingEngine', N'ER|QSR'),
+        (N'6000', 1, N'User not registered to submit RFQs for instrument', N'MatchingEngine', N'QRR'),
+        (N'6005', 1, N'RFQs not allowed', N'MatchingEngine', N'QRR'),
+        (N'6006', 1, N'Negotiations order book not attached', N'MatchingEngine', N'QRR'),
+        (N'6007', 1, N'Private RFQs not allowed for this book', N'MatchingEngine', N'QRR'),
+        (N'6008', 1, N'Only private RFQs allowed for this book', N'MatchingEngine', N'QRR'),
+        (N'6009', 1, N'Private RFQs not allowed', N'MatchingEngine', N'QRR'),
+        (N'6010', 1, N'Public RFQs not allowed', N'MatchingEngine', N'QRR'),
+        (N'6011', 1, N'Instrument not in Regular Trading', N'MatchingEngine', N'QRR'),
+        (N'6012', 1, N'Duplicate RFQ ID', N'MatchingEngine', N'QRR'),
+        (N'6013', 1, N'Invalid market maker for instrument', N'MatchingEngine', N'QRR'),
+        (N'6014', 1, N'User not registered to submit quotes for instrument', N'MatchingEngine', N'QA'),
+        (N'6015', 1, N'Private quotes not allowed for this book', N'MatchingEngine', N'QA'),
+        (N'6016', 1, N'Instrument not in Regular Trading', N'MatchingEngine', N'QA'),
+        (N'6017', 1, N'Quote has to be Day or GTT', N'MatchingEngine', N'QA'),
+        (N'6018', 1, N'Have to specify at least one side for a quote', N'MatchingEngine', N'QA'),
+        (N'6019', 1, N'Price should be zero if size is zero', N'MatchingEngine', N'QA'),
+        (N'6021', 1, N'Cannot amend a single sided quote to a double sided quote', N'MatchingEngine', N'QA'),
+        (N'6022', 1, N'Cannot amend a double sided quote to a single sided quote', N'MatchingEngine', N'QA'),
+        (N'6023', 1, N'Side of a single sided quote cannot be amended', N'MatchingEngine', N'QA'),
+        (N'6024', 1, N'No market makers for the specified instrument', N'MatchingEngine', N'QRR'),
+        (N'6026', 1, N'Already elapsed response time', N'MatchingEngine', N'QRR'),
+        (N'6027', 1, N'Response Time is for a future date', N'MatchingEngine', N'QRR'),
+        (N'6029', 1, N'Invalid RFQ ID', N'MatchingEngine', N'QSR'),
+        (N'6031', 1, N'Discrepancy in trade terms. Price.', N'MatchingEngine', N'QSR'),
+        (N'6032', 1, N'Size larger than contra-party quote', N'MatchingEngine', N'QSR'),
+        (N'6033', 1, N'Size should be at least minimum size', N'MatchingEngine', N'QSR'),
+        (N'6034', 1, N'RFQ is already rejected', N'MatchingEngine', N'QA'),
+        (N'6035', 1, N'Invalid value for Quote Response Type', N'MatchingEngine', N'QSR'),
+        (N'6036', 1, N'Invalid symbol for negotiation', N'MatchingEngine', N'QSR'),
+        (N'6037', 1, N'Invalid side for negotiation', N'MatchingEngine', N'QSR'),
+        (N'6038', 1, N'Discrepancy in trade terms. Side', N'MatchingEngine', N'QA'),
+        (N'6039', 1, N'Already negotiated', N'MatchingEngine', N'QSR'),
+        (N'6041', 1, N'Unknown firm', N'FIX Trading Gateway (5.0)', N'BR'),
+        (N'6043', 1, N'Invalid symbol for negotiation', N'MatchingEngine', N'QSR'),
+        (N'6044', 1, N'Size cannot be zero for negotiation', N'MatchingEngine', N'QSR'),
+        (N'6049', 1, N'Invalid or unsupported party role for trade negotiations', N'FIX Trading Gateway (5.0)', N'BR'),
+        (N'6050', 1, N'Size should be zero if price is zero', N'MatchingEngine', N'QA'),
+        (N'6051', 1, N'Invalid minimum size (> bid size)', N'MatchingEngine', N'QA'),
+        (N'6052', 1, N'Invalid minimum size (> offer size)', N'MatchingEngine', N'QA'),
+        (N'6053', 1, N'Unknown RFQ', N'MatchingEngine', N'QA|QR'),
+        (N'6054', 1, N'Anonymous RFQ negotiation is in progress', N'MatchingEngine', N'QRR'),
+        (N'6055', 1, N'Unknown quote', N'MatchingEngine', N'QSR'),
+        (N'6056', 1, N'Expiry Time exceeds private quote negotiation duration', N'MatchingEngine', N'QRR'),
+        (N'6057', 1, N'Normal Book is not in Regular Trading', N'MatchingEngine', N'QRR|QA'),
+        (N'6059', 1, N'Both Bid ID and Offer ID are specified', N'MatchingEngine', N'QSR'),
+        (N'6062', 1, N'Required party identifiers missing', N'FIX Trading Gateway (5.0)', N'BR'),
+        (N'6063', 1, N'No Normal book is attached', N'MatchingEngine', N'QRR'),
+        (N'6064', 1, N'Price cannot be specified when matching at best', N'MatchingEngine', N'QSR'),
+        (N'6065', 1, N'No Bid /offer to match with', N'MatchingEngine', N'QSR'),
+        (N'6100', 1, N'RFQ is not eligible to be published', N'MatchingEngine', N'QSR'),
+        (N'6101', 1, N'RFQ is already published', N'MatchingEngine', N'QSR'),
+        (N'6102', 1, N'Interest cancelled due to suspension of user', N'MatchingEngine', N'DSG RFQ ER'),
+        (N'6103', 1, N'Expired (auto inactivation on user logout)', N'MatchingEngine', N'DSG RFQ ER'),
+        (N'6104', 1, N'Only a single quote can be submitted by a CompID for an RFQ', N'MatchingEngine', N'QAK|OCR'),
+        (N'7000', 1, N'Invalid trade price (≤ zero)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7001', 1, N'Invalid trade size (≤ zero)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7002', 1, N'Invalid trade time', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7003', 1, N'Invalid off-book trade type', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7004', 1, N'Unknown Trade ID', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7005', 1, N'Unknown executing firm', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7006', 1, N'Unknown contra firm', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7007', 1, N'Unknown executing user (Owner ID)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7008', 1, N'Unknown executing user (Trader ID)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7009', 1, N'Unknown contra user (Owner ID)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7010', 1, N'Unknown contra user (Default User)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7011', 1, N'User not registered to submit trade reports for instrument', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7012', 1, N'User not registered to submit third party trade reports', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7013', 1, N'Executing firm not registered to submit trade reports', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7014', 1, N'Contra firm not registered to submit trade reports', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7015', 1, N'Not registered to trade report for executing firm (Owner ID)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7016', 1, N'Not registered to trade report for contra firm (Owner ID)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7017', 1, N'User not authorised to pre-release trade', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7018', 1, N'User not authorised to cancel trade', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7019', 1, N'Trade already cancelled', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7020', 1, N'Trade already published', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7021', 1, N'Invalid trade reporting model', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7022', 1, N'Unknown executing user (Default User)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7023', 1, N'Trade exempt from publication', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7024', 1, N'Executing user (Owner ID) not from executing firm', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7025', 1, N'Contra user (Owner ID) not from contra firm', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7027', 1, N'Unknown instrument', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7028', 1, N'Invalid order capacity', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7029', 1, N'Invalid contra firm', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7030', 1, N'Invalid settlement date', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7031', 1, N'Discrepancy in trade terms (price)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7032', 1, N'Discrepancy in trade terms (size)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7033', 1, N'Discrepancy in trade terms (off-book trade type)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7034', 1, N'Discrepancy in trade terms (execution time)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7035', 1, N'Discrepancy in trade terms (instrument)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7036', 1, N'Discrepancy in trade terms (settlement date)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7037', 1, N'Discrepancy in trade terms (publication indicator)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7038', 1, N'Discrepancy in trade terms (publication delay)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7039', 1, N'Discrepancy in trade terms (publication delay)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7040', 1, N'Discrepancy in trade terms (contra party)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7041', 1, N'Discrepancy in trade terms (side)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7042', 1, N'Discrepancy in trade terms (FirmTradeID)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7043', 1, N'Invalid trade size (> maximum size)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7044', 1, N'Trade reporting disabled for multi-legged instruments', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7045', 1, N'User not authorised to amend trade', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7046', 1, N'Trade already confirmed', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7047', 1, N'Trade confirmation process cancelled', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7048', 1, N'Trade time not specified', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7050', 1, N'Cancellation process terminated', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7051', 1, N'Pre-release process initiated', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7052', 1, N'Cancellation process initiated', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7053', 1, N'Third party trade reports not permitted', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7054', 1, N'Invalid side for contra firm', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7055', 1, N'Invalid publication indicator (trade must be published)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7056', 1, N'Invalid trade size (must be an integer)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7057', 1, N'Request does not include the trade term to be amended', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7058', 1, N'Invalid side for executing firm', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7059', 1, N'Trade is not confirmed', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7060', 1, N'Request already accepted/declined', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7061', 1, N'Duplicate Firm Trade ID', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7062', 1, N'Invalid trade size (< minimum size)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7063', 1, N'Invalid trade value (< minimum value)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7064', 1, N'Waiting for market operations approval', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7065', 1, N'Invalid Trade Price (price band breached)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7500', 1, N'Trade reporting disabled for instrument', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7501', 1, N'Trade reporting disabled for instrument (no order book)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7502', 1, N'Off-book trade reporting prohibited (not in session)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7503', 1, N'Instrument halted', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7504', 1, N'Instrument suspended', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7505', 1, N'Instrument inactive', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7506', 1, N'Instrument in Post Close Session', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7507', 1, N'Received Prior to First Trading Date of instrument', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7508', 1, N'Last Trading Date of instrument elapsed', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7600', 1, N'Non-binary trades may not be cancelled', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7601', 1, N'Cancel request for trade already submitted', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7602', 1, N'Unknown Trade ID (for instrument)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7702', 1, N'Invalid flag combination', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7800', 1, N'TradeHandlingInstr not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7801', 1, N'FirmTradeID not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7802', 1, N'TradeReportType not specified', N'Post Trade Gateway', N'TCR Ack');
+    INSERT INTO gold.volume10_reject_reason (code, entry_no, reason, [system], messages) VALUES
+        (N'7803', 1, N'Off-book trade type not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7804', 1, N'Price not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7805', 1, N'Size not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7806', 1, N'Order capacity not specified (executing firm)', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7806', 2, N'Order capacity not specified (executing firm)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7807', 1, N'Order capacity not specified (contra firm)', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7807', 2, N'Order capacity not specified (contra firm)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7808', 1, N'Executing firm not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7809', 1, N'Contra firm not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7810', 1, N'Invalid TradeHandlingInstr', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7811', 1, N'Invalid TradeReportType', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7812', 1, N'Invalid TradeReportTransType', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7813', 1, N'TradeReportTransType not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7814', 1, N'Invalid TradePublishIndicator', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7815', 1, N'Invalid NoSides', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7816', 1, N'Invalid Side', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7817', 1, N'Invalid NoPartyIDs', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7818', 1, N'Invalid PartyIDSource', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7819', 1, N'Invalid PartyRole', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7820', 1, N'Invalid OrderCapacity', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7821', 1, N'TradeID not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7822', 1, N'Instrument not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7823', 1, N'User not authorised to amend trade for this customer', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7824', 1, N'PartyRole not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'7825', 1, N'NoPartyIDs not specified', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7826', 1, N'Trade is not confirmed', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7827', 1, N'Trade registration request was rejected/withdrawn', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7900', 1, N'Invalid instrument set up (no delay table)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7901', 1, N'Invalid instrument set up (no trade sub type table)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7902', 1, N'Invalid system set up (no trade type table)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7903', 1, N'Invalid instrument set up (empty trade type table)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7904', 1, N'Invalid instrument set up (unsupported reporting model)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7905', 1, N'Invalid instrument set up (delay not defined in delay table)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7906', 1, N'Invalid instrument set up (undefined share class)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7907', 1, N'Invalid instrument set up (threshold range not defined)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7908', 1, N'Invalid instrument set up (invalid trading cycle)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'6066', 1, N'Invalid quantity (not multiple of lot size)', N'MatchingEngine', N'QRR|QSR'),
+        (N'6067', 1, N'User not authorized to cancel the RFQ', N'MatchingEngine', N'QSR'),
+        (N'6068', 1, N'Not invited to the negotiation', N'MatchingEngine', N'QA'),
+        (N'6069', 1, N'Preferred Marker Makers should be specified', N'MatchingEngine', N'QRR'),
+        (N'6070', 1, N'Exceeds the number of allowed Market Makers', N'MatchingEngine', N'QRR'),
+        (N'6071', 1, N'User not authorized to accept the quote', N'MatchingEngine', N'QSR'),
+        (N'6072', 1, N'RFQ quantity is not specified', N'MatchingEngine', N'QRR'),
+        (N'6073', 1, N'RFQ value is less than the RFQ Min Value', N'MatchingEngine', N'QRR'),
+        (N'6074', 1, N'Bid value is less than the RFQ Min Value', N'MatchingEngine', N'QAK'),
+        (N'6075', 1, N'RFQ/quote value cannot be determined (ref price unavailable)', N'MatchingEngine', N'QRR'),
+        (N'6076', 1, N'Invalid RFQ/RFQ quote value (> maximum RFQ/RFQ quote value)', N'MatchingEngine', N'QRR'),
+        (N'6077', 1, N'Ask value is less than the RFQ Min Value', N'MatchingEngine', N'QAK'),
+        (N'6078', 1, N'Minimum value is less than the RFQ Min Value', N'MatchingEngine', N'QAK'),
+        (N'6079', 1, N'RFQ side is not specified', N'MatchingEngine', N'QRR'),
+        (N'6080', 1, N'Manual RFQs not allowed', N'MatchingEngine', N'QRR'),
+        (N'6081', 1, N'Automatic RFQs not allowed', N'MatchingEngine', N'QRR'),
+        (N'6082', 1, N'Side not specified for auto RFQ', N'MatchingEngine', N'QRR'),
+        (N'6083', 1, N'RFQ execution falls after the expiration time', N'MatchingEngine', N'QRR'),
+        (N'6084', 1, N'Quote''s price is worse than the limit price', N'MatchingEngine', N'QSR'),
+        (N'6085', 1, N'Cannot execute an auto RFQ manually', N'MatchingEngine', N'QSR'),
+        (N'6086', 1, N'RFQ quantity is not amendable', N'MatchingEngine', N'QSR'),
+        (N'6087', 1, N'No change to the limit price', N'MatchingEngine', N'QSR'),
+        (N'6088', 1, N'User not authorized to modify the RFQ', N'MatchingEngine', N'QSR'),
+        (N'6089', 1, N'Duplicate Quote Msg ID', N'MatchingEngine', N'QSR'),
+        (N'6090', 1, N'Auto RFQ Execution strategy unavailable', N'MatchingEngine', N'QRR'),
+        (N'6091', 1, N'Anonymity cannot be specified for the auto RFQ strategy', N'MatchingEngine', N'QRR'),
+        (N'6092', 1, N'Pre Trade LIS is not defined', N'MatchingEngine', N'QRR'),
+        (N'6093', 1, N'Quantity not specified for auto RFQ', N'MatchingEngine', N'QRR'),
+        (N'6094', 1, N'Bid size/offer size is less than the auto RFQ quantity', N'MatchingEngine', N'QAK'),
+        (N'6095', 1, N'Bid Ask Prices are out of allowed price tolerance', N'MatchingEngine', N'QAK'),
+        (N'6096', 1, N'Executable price is outside the market price tolerance', N'MatchingEngine', N'QSR'),
+        (N'6097', 1, N'BBO is not available', N'MatchingEngine', N'QAK|QSR'),
+        (N'6098', 1, N'Bid value is less than the Min RFQ Quote Value', N'MatchingEngine', N'QAK'),
+        (N'6099', 1, N'Ask value is less than the Min RFQ Quote Value', N'MatchingEngine', N'QAK'),
+        (N'8001', 1, N'Invalid client order ID', N'Matching Engine', N'ER'),
+        (N'9000', 1, N'Unknown instrument', N'MatchingEngine', N'OCR|QA|QRR'),
+        (N'9000', 2, N'Unknown instrument', N'Native Trading Gateway', N'BR'),
+        (N'4915', 1, N'The total number of quote entries in a Mass Quote message exceeds the maximum quote entries allowed', N'NativeTradingGateway', N'R'),
+        (N'9001', 1, N'Unknown order book', N'Native Trading Gateway', N'BR'),
+        (N'9001', 2, N'Unknown Order Book', N'MatchingEngine', N'ER|QSR|MQA|QRR'),
+        (N'9002', 1, N'Instrument halted', N'Matching Engine', N'ER|QSR'),
+        (N'9003', 1, N'Instrument halted or suspended', N'Matching Engine', N'ER|QSR'),
+        (N'9004', 1, N'Instrument halted (last trading day reached)', N'Matching Engine', N'ER|QSR'),
+        (N'9005', 1, N'Market is closed', N'Matching Engine', N'ER|QSR'),
+        (N'9006', 1, N'Instrument halted (market suspended)', N'Matching Engine', N'ER|QSR'),
+        (N'9007', 1, N'Instrument halted (invalid trading session)', N'Matching Engine', N'ER|QSR'),
+        (N'9008', 1, N'Session is closed', N'Matching Engine', N'ER|QSR'),
+        (N'9009', 1, N'Instrument halted (order book in invalid state)', N'Matching Engine', N'ER|QSR'),
+        (N'9011', 1, N'Instrument in Post-Close session', N'Matching Engine', N'ER|QSR'),
+        (N'9012', 1, N'Instrument halted (invalid set up)', N'Matching Engine', N'ER|QSR'),
+        (N'9013', 1, N'Instrument halted (invalid order book set up)', N'Matching Engine', N'ER|QSR'),
+        (N'9014', 1, N'Instrument in Pre-Trading session', N'Matching Engine', N'ER|QSR'),
+        (N'9015', 1, N'Instrument in Closing Price Publication session', N'Matching Engine', N'ER|QSR'),
+        (N'9016', 1, N'Instrument in Closing Price Cross session', N'MatchingEngine', N'ER|QSR'),
+        (N'9100', 1, N'Unknown user (Owner ID)', N'Matching Engine', N'ER|QSR'),
+        (N'9101', 1, N'Unknown user (Trader ID)', N'Matching Engine', N'ER|QSR'),
+        (N'9102', 1, N'User suspended', N'Matching Engine', N'ER|QSR'),
+        (N'9103', 1, N'User inactive', N'Matching Engine', N'ER|QSR'),
+        (N'9104', 1, N'Invalid user (not attached to trading firm)', N'Matching Engine', N'ER|QSR'),
+        (N'9105', 1, N'Firm inactive', N'Matching Engine', N'ER|QSR'),
+        (N'9106', 1, N'Order exceeds risk threshold (Rejected by risk system)', N'MatchingEngine', N'ER|QSR|MQA'),
+        (N'9107', 1, N'System user is not allowed to submit orders', N'MatchingEngine', N'ER|QSR|MQA'),
+        (N'9108', 1, N'User Log-on Pending at Matching System', N'MatchingEngine', N'ER|QSR|MQA'),
+        (N'9200', 1, N'Invalid trading session (unknown)', N'Matching Engine', N'ER|QSR|MQA'),
+        (N'9201', 1, N'Invalid new order message', N'Matching Engine', N'ER|QSR'),
+        (N'9202', 1, N'Invalid amend order message', N'Matching Engine', N'ER|QSR'),
+        (N'9203', 1, N'Invalid cancel order message', N'Matching Engine', N'ER|QSR'),
+        (N'9204', 1, N'Reserved by development.', N'MatchingEngine', N'ER|QSR|MQA'),
+        (N'9205', 1, N'Invalid order management request. (Not the active partition)', N'MatchingEngine', N'ER|QSR'),
+        (N'9205', 2, N'Invalid order management request. (Not the active partition)', N'MatchingEngine', N'ER|QSR|MQA'),
+        (N'9900', 1, N'Required field missing', N'Native Trading Gateway', N'R'),
+        (N'9901', 1, N'Invalid value in field', N'Native Trading Gateway', N'R'),
+        (N'9903', 1, N'Concurrent login limit reached', N'Native Trading Gateway', N'LR'),
+        (N'9904', 1, N'Invalid gateway (not configured for sponsored access)', N'Native Trading Gateway', N'LR'),
+        (N'9905', 1, N'System unavailable (to sponsored users)', N'NativeTradingGateway', N'LR'),
+        (N'9906', 1, N'Logons not allowed at this time', N'Native Trading Gateway', N'LR'),
+        (N'9906', 2, N'Logons not allowed at this time', N'NativeTradingGateway', N'LR'),
+        (N'9907', 1, N'Value not allowed for field', N'NativeTradingGateway', N'R'),
+        (N'9908', 1, N'Invalid value in field', N'NativeTradingGateway', N'R'),
+        (N'9910', 1, N'Required field is empty', N'NativeTradingGateway', N'R'),
+        (N'9911', 1, N'Native message not supported', N'NativeTradingGateway', N'R'),
+        (N'9912', 1, N'Invalid message length for native message', N'NativeTradingGateway', N'R'),
+        (N'9913', 1, N'Native message version not supported', N'NativeTradingGateway', N'R'),
+        (N'9914', 1, N'Invalid character in field', N'NativeTradingGateway', N'R'),
+        (N'9990', 1, N'Maximum message rate exceeded', N'Native Trading Gateway', N'R'),
+        (N'9998', 1, N'Matching partition suspended', N'Native Trading Gateway', N'BR'),
+        (N'9999', 1, N'System suspended', N'Native Trading Gateway', N'BR'),
+        (N'10000', 1, N'No open orders for specified Party ID', N'Drop Copy Gateway (5.0)', N'ER'),
+        (N'10001', 1, N'Request limit for day reached', N'Drop Copy Gateway (5.0)', N'ER'),
+        (N'10003', 1, N'Order download not permitted for specified Party ID', N'Drop Copy Gateway (5.0)', N'ER'),
+        (N'10004', 1, N'Not authorised to request an open order download', N'Drop Copy Gateway (5.0)', N'ER'),
+        (N'10005', 1, N'Open order download not permitted at this time', N'Drop Copy Gateway (5.0)', N'ER'),
+        (N'10006', 1, N'Unknown Party ID', N'Drop Copy Gateway (5.0)', N'ER'),
+        (N'10007', 1, N'Instrument not specified', N'Drop Copy Gateway (5.0)', N'ER'),
+        (N'10008', 1, N'No open orders for specified instrument', N'Drop Copy Gateway (5.0)', N'ER'),
+        (N'10009', 1, N'Segment not specified', N'Drop Copy Gateway (5.0)', N'ER'),
+        (N'10010', 1, N'Unknown Segment', N'Drop Copy Gateway (5.0)', N'ER'),
+        (N'10011', 1, N'No open orders for specified segment', N'Drop Copy Gateway (5.0)', N'ER'),
+        (N'7909', 1, N'Third party trade reports not supported by reporting model', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'7910', 1, N'Eligibility criteria not met for delay publication', N'Post Trade Transaction Processing Server', N'TCK Ack'),
+        (N'7911', 1, N'Invalid Account type', N'Post Trade Transaction Processing Server', N'TCK Ack'),
+        (N'7700', 1, N'Post trade flag mismatch with the original trade', N'Post Trade Transaction Processing Server', N'TCK Ack'),
+        (N'7701', 1, N'Invalid flag for instrument', N'Post Trade Transaction Processing Server', N'TCK Ack'),
+        (N'7703', 1, N'ILQD flag cannot be applied', N'Post Trade Transaction Processing Server', N'TCK Ack'),
+        (N'113114', 1, N'Discrepancy in Dealing Capacity', N'Post Trade Transaction Processing Server', N'PTTPS'),
+        (N'9206', 1, N'Orders are not allowed to be cancelled at this time', N'MatchingEngine', N'OCR'),
+        (N'9207', 1, N'Prices of orders can only be improved at this time', N'MatchingEngine', N'OCR'),
+        (N'9208', 1, N'Sizes of orders can only be increased at this time', N'MatchingEngine', N'OCR'),
+        (N'9209', 1, N'Orders cannot be removed from the auction call at this time', N'MatchingEngine', N'OCR'),
+        (N'9210', 1, N'Amendments to buy side of quote not allowed at this time', N'MatchingEngine', N'QSR'),
+        (N'9211', 1, N'Amendments to sell side of quote not allowed at this time', N'MatchingEngine', N'QSR'),
+        (N'9212', 1, N'Invalid Price (not allowed at this time)', N'MatchingEngine', N'OCR|QSR'),
+        (N'9213', 1, N'Invalid Price for Buy Side (worse than IAP)', N'MatchingEngine', N'QSR'),
+        (N'9214', 1, N'Invalid Price for Sell Side (worse than IAP)', N'MatchingEngine', N'QSR'),
+        (N'9215', 1, N'Invalid Size for Buy Side (greater than imbalance size)', N'MatchingEngine', N'QSR'),
+        (N'9216', 1, N'Invalid Size for Sell Side (greater than imbalance size)', N'MatchingEngine', N'QSR'),
+        (N'9996', 1, N'Quote locked or crossed', N'MatchingEngine', N'MQA'),
+        (N'121403', 1, N'Invalid Message Type for Lit Book', N'Matching Engine', N'ER'),
+        (N'134001', 1, N'Invalid TIF (GFX orders not allowed in this session)', N'Matching Engine', N'ER|OCR'),
+        (N'134002', 1, N'Invalid TIF (GFX/No Intra-Day Auction scheduled)', N'Matching Engine', N'ER|OCR'),
+        (N'134003', 1, N'Invalid TIF (GFX stop orders not permitted)', N'Matching Engine', N'ER|OCR'),
+        (N'134004', 1, N'Invalid Client ID (not specified)', N'Matching Engine', N'ER|OCR'),
+        (N'134005', 1, N'Invalid limit price (= zero or no limit price)', N'Matching Engine', N'ER|OCR'),
+        (N'134006', 1, N'Hidden limit orders not allowed for this session', N'Matching Engine', N'ER|OCR'),
+        (N'134007', 1, N'Cannot submit/amend orders in session', N'Matching Engine', N'ER|OCR'),
+        (N'134008', 1, N'Cannot submit hidden orders in session', N'Matching Engine', N'ER|OCR'),
+        (N'134009', 1, N'Invalid TIF (ATC/No Closing Auction scheduled)', N'Matching Engine', N'ER|OCR'),
+        (N'134010', 1, N'Invalid minimum execution size (= zero)', N'Matching Engine', N'ER|OCR'),
+        (N'134011', 1, N'Invalid minimum execution size (not multiple of lot size)', N'Matching Engine', N'ER|OCR'),
+        (N'134012', 1, N'Invalid minimum execution size (< minimum reserve size)', N'Matching Engine', N'ER|OCR'),
+        (N'134013', 1, N'Invalid order size (< minimum execution size)', N'Matching Engine', N'ER|OCR'),
+        (N'134014', 1, N'Invalid TIF (not permitted for hidden orders)', N'Matching Engine', N'ER|OCR'),
+        (N'134015', 1, N'Invalid minimum execution size (not valid for visible order)', N'Matching Engine', N'ER|OCR'),
+        (N'134016', 1, N'TIF Amendment not permitted', N'Matching Engine', N'OCR'),
+        (N'134018', 1, N'Invalid order type (not permitted for hidden orders)', N'Matching Engine', N'ER'),
+        (N'134019', 1, N'Invalid order type (not permitted for EHL orders)', N'Matching Engine', N'ER'),
+        (N'134020', 1, N'EHL is not permitted for this order book', N'Matching Engine', N'ER'),
+        (N'134021', 1, N'EHL not allowed during this session', N'Matching Engine', N'ER'),
+        (N'134022', 1, N'EHL orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'134023', 1, N'Expiry time cannot be amended for EHL orders', N'Matching Engine', N'ER'),
+        (N'134024', 1, N'Invalid TIF (not permitted for EHL orders)', N'Matching Engine', N'ER'),
+        (N'134025', 1, N'Hidden order cannot be EHL', N'Matching Engine', N'ER'),
+        (N'134026', 1, N'Invalid trade sub type for instrument', N'Matching Engine', N'RFQ'),
+        (N'134027', 1, N'This trade sub type can be directed only to banks', N'Matching Engine', N'RFQ'),
+        (N'134028', 1, N'Trader not allowed to submit RFQs of this trade sub type', N'Matching Engine', N'RFQ'),
+        (N'134029', 1, N'Instrument not in Continuous Trading', N'Matching Engine', N'RFQ'),
+        (N'134030', 1, N'Trader not allowed to submit quotes for this trade sub type', N'Matching Engine', N'RFQ'),
+        (N'134031', 1, N'Spot price is required for trades of this sub type', N'Matching Engine', N'RFQ'),
+        (N'134032', 1, N'All in Price is required for for trades of this trade sub type', N'Matching Engine', N'RFQ'),
+        (N'134033', 1, N'Start Date-End Date-Volume required for Repo Instruments', N'Matching Engine', N'RFQ'),
+        (N'134034', 1, N'Start Date and End Date should fall on valid business days', N'Matching Engine', N'RFQ'),
+        (N'134035', 1, N'Start Date should be before the End Date', N'Matching Engine', N'RFQ'),
+        (N'134036', 1, N'Interest Rate is required for Repo Instruments', N'Matching Engine', N'RFQ'),
+        (N'134037', 1, N'Leg 1 Reference Price is mandatory for strategy Instruments', N'Matching Engine', N'RFQ'),
+        (N'134038', 1, N'Leg 1 Reference Price cannot be negative', N'Matching Engine', N'RFQ'),
+        (N'134039', 1, N'Quantity should be greater than or equal to RFQ quantity', N'Matching Engine', N'RFQ'),
+        (N'134040', 1, N'Client Information required for instruments in this market', N'Matching Engine', N'RFQ'),
+        (N'134041', 1, N'Invalid format for Start Date or End Date', N'Matching Engine', N'RFQ'),
+        (N'134050', 1, N'GFX orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'134051', 1, N'Invalid value for options', N'Matching Engine', N'Delta Options'),
+        (N'134052', 1, N'Underlying reference price of leg 2 is unavailable or zero', N'Matching Engine', N'Delta Options'),
+        (N'134056', 1, N'Invalid order size (<minimum cross order size)', N'Matching Engine', N'ER'),
+        (N'134057', 1, N'Cross order breaches CB limits', N'Matching Engine', N'ER'),
+        (N'134065', 1, N'Order sub type not supported', N'Matching Engine', N'ER'),
+        (N'134066', 1, N'Hard Limit not permitted for pegged', N'Matching Engine', N'ER'),
+        (N'134067', 1, N'Invalid TIF (Pegged Orders can only be DAY)', N'Matching Engine', N'ER'),
+        (N'134068', 1, N'Invalid Order Type (Pegged Orders)', N'Matching Engine', N'ER'),
+        (N'134069', 1, N'Invalid Display Qty (Not Zero)', N'Matching Engine', N'ER'),
+        (N'134070', 1, N'Invalid Limit Price (Pegged Order)', N'Matching Engine', N'ER'),
+        (N'134072', 1, N'Pegged orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'134073', 1, N'Pegged orders not permitted during this session', N'Matching Engine', N'ER'),
+        (N'134075', 1, N'GDX orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'134076', 1, N'Display Qty should be zero for GDX orders', N'Matching Engine', N'ER'),
+        (N'134077', 1, N'MES Cannot be specified for GDX orders', N'Matching Engine', N'ER'),
+        (N'134078', 1, N'Invalid Order Type (not valid for GDX)', N'Matching Engine', N'ER'),
+        (N'134079', 1, N'Invalid Exec Inst (not valid for TIF)', N'Matching Engine', N'ER'),
+        (N'134080', 1, N'Invalid TIF (GDX orders not allowed in this session)', N'Matching Engine', N'ER'),
+        (N'134081', 1, N'Price change not allowed while taking part in EOD VAC session', N'Matching Engine', N'ER'),
+        (N'134082', 1, N'Invalid Limit Price (not multiple of Price Improvement Tick)', N'Matching Engine', N'ER'),
+        (N'134083', 1, N'Pegged to Mid Orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'134084', 1, N'Pegged to Bid Orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'134085', 1, N'Pegged to Offer Orders disabled for instrument', N'Matching Engine', N'ER'),
+        (N'134086', 1, N'Invalid Order Type/TIF Combinations for FX Auction', N'Matching Engine', N'ER'),
+        (N'7828', 1, N'MarketID not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'134100', 1, N'Tag not defined for this message type (64)', N'Post Trade Gateway', N'TCR Ack'),
+        (N'134104', 1, N'Executing Firm Trader ID not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'134124', 1, N'Transact Time backdated more than allowed days', N'Post Trade Gateway', N'TCR Ack'),
+        (N'134126', 1, N'Orig TradeDate is invalid', N'Post Trade Gateway', N'TCR Ack'),
+        (N'134132', 1, N'Contra Capacity not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'134133', 1, N'Unknown User', N'Post Trade Gateway', N'TCR Ack'),
+        (N'134134', 1, N'Unknown Contra user', N'Post Trade Gateway', N'TCR Ack'),
+        (N'134135', 1, N'Incorrect number of decimal places', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134136', 1, N'Discrepancy in trade terms', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134137', 1, N'Spot Rate is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134138', 1, N'All-in-Price is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134139', 1, N'Clean Price is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134140', 1, N'Accrued Interest is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134141', 1, N'Settlement Date is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134142', 1, N'Reference Instrument is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134143', 1, N'Reference Instrument Yield is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134144', 1, N'2nd Leg Clean Price is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134145', 1, N'2nd Leg Yield is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134146', 1, N'2nd Leg All-in-Price is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134147', 1, N'2nd Leg Accrued Interest is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134148', 1, N'2nd Leg Settlement Date is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134149', 1, N'Rate is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134150', 1, N'Interest Rate Spread is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134151', 1, N'Conditionally required field missing (Strategy Type)', N'Post Trade Gateway', N'BR'),
+        (N'134152', 1, N'Strategy Link ID not specified', N'Post Trade Gateway', N'TCR Ack'),
+        (N'134153', 1, N'Underlying Reference Price is required', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134154', 1, N'Backdated Transact time falls on a non trading day', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134155', 1, N'Conditionally Required field missing (Commission Type)', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134156', 1, N'Commission field not specified', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134157', 1, N'Invalid Commission Type value', N'Post Trade Transaction Processing Server', N'TCR Ack'),
+        (N'134200', 1, N'Unknown User', N'Native Trading Gateway', N'R'),
+        (N'9300', 1, N'Unsupported strategy type', N'FIX Trading Gateway (5.0)', N'SD'),
+        (N'9301', 1, N'User not registered to create tailor-made instruments', N'FIX Trading Gateway (5.0)', N'SD'),
+        (N'134300', 1, N'Unknown User', N'FIX Trading Gateway (5.0)', N'R'),
+        (N'162001', 1, N'Instrument not permitted', N'Native Trading Gateway', N'R'),
+        (N'162002', 1, N'Instrument not found', N'Native Trading Gateway', N'R'),
+        (N'162003', 1, N'Mass cancel type not permitted', N'Native Trading Gateway', N'R'),
+        (N'162004', 1, N'Similar instrument already exists', N'Exchange Manager', N'SD'),
+        (N'162005', 1, N'Source Instrument is not provided', N'Native Trading Gateway', N'SD'),
+        (N'162006', 1, N'Reference Instrument not found', N'Native Trading Gateway', N'SD|R'),
+        (N'162007', 1, N'Invalid Reference Instrument', N'Native Trading Gateway', N'R'),
+        (N'162007', 2, N'Source Instrument should be a Future Instrument', N'Exchange Manager', N'SD'),
+        (N'162008', 1, N'Underlying Instrument is not found in the System', N'Exchange Manager, Native Trading Gateway', N'SD|R'),
+        (N'162009', 1, N'Invalid Reference Price', N'Exchange Manager', N'SD'),
+        (N'162010', 1, N'Invalid Underlying Definition', N'Exchange Manager', N'SD'),
+        (N'162011', 1, N'Allow User Defined is disabled in Underlying Instrument', N'Exchange Manager', N'SD'),
+        (N'162012', 1, N'Not a valid Future to create an Anyday', N'Exchange Manager', N'SD'),
+        (N'162013', 1, N'Maturity date is a non-trading day', N'Exchange Manager', N'SD'),
+        (N'162014', 1, N'Expiry Date should be less than Max Expiry Date in the same series', N'Exchange Manager', N'SD'),
+        (N'162015', 1, N'Instrument creation common validation failed', N'Exchange Manager', N'SD'),
+        (N'162016', 1, N'Invalid Security Sub Type for Multi Legged Instrument', N'Exchange Manager', N'SD'),
+        (N'162017', 1, N'Leg 1 of the Delta Option should be Future Instrument', N'Exchange Manager', N'SD'),
+        (N'162018', 1, N'Leg 2 of the Delta Option should be Option Instrument', N'Exchange Manager', N'SD'),
+        (N'162019', 1, N'No Option expires specified for the underlying Future', N'Exchange Manager', N'SD'),
+        (N'162020', 1, N'The expiry date of the Option should fall on or before that of the underlying.', N'Exchange Manager', N'SD'),
+        (N'162021', 1, N'Maturity date should be equal to underlying Instrument', N'Exchange Manager', N'SD'),
+        (N'162022', 1, N'Strike Price of the Option should be multiplication of Option Strike Interval in the Underlying', N'Exchange Manager', N'SD'),
+        (N'162023', 1, N'Option Strike Interval should be a valid value in Leg 1', N'Exchange Manager', N'SD'),
+        (N'162024', 1, N'Invalid Far Month Maturity', N'Exchange Manager', N'SD'),
+        (N'162025', 1, N'Near month & Far month type does not match the Time Different in the Reference Instrument', N'Exchange Manager', N'SD'),
+        (N'162026', 1, N'User Created Requests Not Allowed at this time', N'Exchange Manager', N'SD');
+
+    -- Gold, step 2: gold.fact_message, one row per message of every type. It is silver.message with these columns added:
+    -- - is_rejection: 1 when the message rejects something the client sent. Every Reject (3) and Order Cancel Reject (9);
+    --   an Execution Report (8) with execution_type or order_status 8; an Order Mass Cancel Report (r) with status 0; a
+    --   Logon Response (B) with a reject_code other than 0 (logged in) and 3 (logged in, but the new password does not
+    --   meet the password policy). Every other message is 0.
+    -- - a column ending in _name beside each code column, holding the code's meaning from gold.dim_code (side_name "Buy"
+    --   beside side "1"), and message_type_name and ref_message_type_name from gold.dim_message_type. A code with no
+    --   meaning in the JSE list gets "Code not in the JSE list". Reject code meanings are in gold.dim_reject_code.
+    -- - report_event: what happened to the order in an execution report. execution_type gives it when filled (August
+    --   and September). July reports have only order_status, so it is worked out: a trade when executed_quantity is
+    --   above 0; for order_status 0 (New), "New (accepted)" on the order's first report and "Amended" on a later one;
+    --   "Amended or Restated" for order_status 1 without a trade; Cancelled, Expired, Rejected or Suspended for
+    --   order_status 4, 6, 8 and 9.
+
+    DROP TABLE IF EXISTS gold.fact_message;
+
+    WITH m AS (
+        -- first_of_order is 1 on the first message of each type for each order_id, in order of capture time, then JSE
+        -- event time (transact_time; an empty one counts as last), then execution_id.
+        SELECT s.*,
+               CASE WHEN ROW_NUMBER() OVER (PARTITION BY s.message_type, s.order_id
+                                            ORDER BY s.[timestamp], CASE WHEN s.transact_time IS NULL THEN 1 ELSE 0 END,
+                                                     s.transact_time, s.execution_id) = 1 THEN 1 ELSE 0 END AS first_of_order
+        FROM silver.message s
+    )
+    SELECT m.message_id,
+           m.[timestamp],
+           m.[date],
+           m.comp_id,
+           m.comp_id_filled,
+           m.message_type,
+           t.message_name AS message_type_name,
+           CAST(CASE m.message_type
+                    WHEN N'3' THEN 1
+                    WHEN N'9' THEN 1
+                    WHEN N'8' THEN CASE WHEN m.execution_type = N'8' OR m.order_status = N'8' THEN 1 ELSE 0 END
+                    WHEN N'r' THEN CASE WHEN m.mass_cancel_status = N'0' THEN 1 ELSE 0 END
+                    WHEN N'B' THEN CASE WHEN m.reject_code NOT IN (N'0', N'3') THEN 1 ELSE 0 END
+                    ELSE 0 END AS bit) AS is_rejection,
+           m.ref_message_type,
+           rt.message_name AS ref_message_type_name,
+           m.client_order_id,
+           m.orig_client_order_id,
+           m.order_id,
+           m.order_id_linked,
+           m.execution_id,
+           m.public_order_id,
+           m.security_id,
+           m.side,
+           CASE WHEN m.side IS NULL THEN NULL ELSE COALESCE(c_side.meaning, N'Code not in the JSE list') END AS side_name,
+           m.order_type,
+           CASE WHEN m.order_type IS NULL THEN NULL ELSE COALESCE(c_order_type.meaning, N'Code not in the JSE list') END AS order_type_name,
+           m.order_sub_type,
+           CASE WHEN m.order_sub_type IS NULL THEN NULL ELSE COALESCE(c_order_sub_type.meaning, N'Code not in the JSE list') END AS order_sub_type_name,
+           m.time_in_force,
+           CASE WHEN m.time_in_force IS NULL THEN NULL ELSE COALESCE(c_time_in_force.meaning, N'Code not in the JSE list') END AS time_in_force_name,
+           m.order_quantity,
+           m.display_quantity,
+           m.minimum_quantity,
+           m.limit_price,
+           m.stop_price,
+           m.account,
+           m.capacity,
+           CASE WHEN m.capacity IS NULL THEN NULL ELSE COALESCE(c_capacity.meaning, N'Code not in the JSE list') END AS capacity_name,
+           m.cancel_on_disconnect,
+           CASE WHEN m.cancel_on_disconnect IS NULL THEN NULL ELSE COALESCE(c_cancel_on_disconnect.meaning, N'Code not in the JSE list') END AS cancel_on_disconnect_name,
+           m.execution_instruction,
+           CASE WHEN m.execution_instruction IS NULL THEN NULL ELSE COALESCE(c_execution_instruction.meaning, N'Code not in the JSE list') END AS execution_instruction_name,
+           m.order_book,
+           CASE WHEN m.order_book IS NULL THEN NULL ELSE COALESCE(c_order_book.meaning, N'Code not in the JSE list') END AS order_book_name,
+           m.self_trade_prevention_key,
+           m.execution_type,
+           CASE WHEN m.execution_type IS NULL THEN NULL ELSE COALESCE(c_execution_type.meaning, N'Code not in the JSE list') END AS execution_type_name,
+           m.order_status,
+           CASE WHEN m.order_status IS NULL THEN NULL ELSE COALESCE(c_order_status.meaning, N'Code not in the JSE list') END AS order_status_name,
+           CASE WHEN m.message_type <> N'8' THEN NULL
+                WHEN m.execution_type IS NOT NULL THEN COALESCE(c_execution_type.meaning, N'Code not in the JSE list')
+                WHEN m.executed_quantity > 0 THEN N'Trade'
+                WHEN m.order_status = N'0' AND m.first_of_order = 1 THEN N'New (accepted)'
+                WHEN m.order_status = N'0' THEN N'Amended'
+                WHEN m.order_status = N'1' THEN N'Amended or Restated'
+                WHEN m.order_status = N'4' THEN N'Cancelled'
+                WHEN m.order_status = N'6' THEN N'Expired'
+                WHEN m.order_status = N'8' THEN N'Rejected'
+                WHEN m.order_status = N'9' THEN N'Suspended'
+                END AS report_event,
+           m.working_indicator,
+           CASE WHEN m.working_indicator IS NULL THEN NULL ELSE COALESCE(c_working_indicator.meaning, N'Code not in the JSE list') END AS working_indicator_name,
+           m.liquidity_indicator,
+           CASE WHEN m.liquidity_indicator IS NULL THEN NULL ELSE COALESCE(c_liquidity_indicator.meaning, N'Code not in the JSE list') END AS liquidity_indicator_name,
+           m.type_of_trade,
+           CASE WHEN m.type_of_trade IS NULL THEN NULL ELSE COALESCE(c_type_of_trade.meaning, N'Code not in the JSE list') END AS type_of_trade_name,
+           m.indicator_flags,
+           CASE WHEN m.indicator_flags IS NULL THEN NULL ELSE COALESCE(c_indicator_flags.meaning, N'Code not in the JSE list') END AS indicator_flags_name,
+           m.leaves_quantity,
+           m.executed_quantity,
+           m.executed_price,
+           m.transact_time,
+           m.reject_code,
+           m.reject_reason,
+           m.partition_id,
+           m.mass_cancel_request_type,
+           CASE WHEN m.mass_cancel_request_type IS NULL THEN NULL ELSE COALESCE(c_mass_cancel_request_type.meaning, N'Code not in the JSE list') END AS mass_cancel_request_type_name,
+           m.mass_cancel_status,
+           CASE WHEN m.mass_cancel_status IS NULL THEN NULL ELSE COALESCE(c_mass_cancel_status.meaning, N'Code not in the JSE list') END AS mass_cancel_status_name,
+           m.logon_compid,
+           m.protocol_version,
+           CASE WHEN m.protocol_version IS NULL THEN NULL ELSE COALESCE(c_protocol_version.meaning, N'Code not in the JSE list') END AS protocol_version_name,
+           m.password_expiry,
+           m.logout_reason,
+           m.copies,
+           m.source_file
+    INTO gold.fact_message
+    FROM m
+    LEFT JOIN gold.dim_message_type t ON t.message_type = m.message_type
+    LEFT JOIN gold.dim_message_type rt ON rt.message_type = m.ref_message_type
+    LEFT JOIN gold.dim_code c_side ON c_side.column_name = N'side' AND c_side.code = m.side
+    LEFT JOIN gold.dim_code c_order_type ON c_order_type.column_name = N'order_type' AND c_order_type.code = m.order_type
+    LEFT JOIN gold.dim_code c_time_in_force ON c_time_in_force.column_name = N'time_in_force' AND c_time_in_force.code = m.time_in_force
+    LEFT JOIN gold.dim_code c_capacity ON c_capacity.column_name = N'capacity' AND c_capacity.code = m.capacity
+    LEFT JOIN gold.dim_code c_cancel_on_disconnect ON c_cancel_on_disconnect.column_name = N'cancel_on_disconnect' AND c_cancel_on_disconnect.code = m.cancel_on_disconnect
+    LEFT JOIN gold.dim_code c_execution_instruction ON c_execution_instruction.column_name = N'execution_instruction' AND c_execution_instruction.code = m.execution_instruction
+    LEFT JOIN gold.dim_code c_order_sub_type ON c_order_sub_type.column_name = N'order_sub_type' AND c_order_sub_type.code = m.order_sub_type
+    LEFT JOIN gold.dim_code c_order_book ON c_order_book.column_name = N'order_book' AND c_order_book.code = m.order_book
+    LEFT JOIN gold.dim_code c_execution_type ON c_execution_type.column_name = N'execution_type' AND c_execution_type.code = m.execution_type
+    LEFT JOIN gold.dim_code c_order_status ON c_order_status.column_name = N'order_status' AND c_order_status.code = m.order_status
+    LEFT JOIN gold.dim_code c_working_indicator ON c_working_indicator.column_name = N'working_indicator' AND c_working_indicator.code = m.working_indicator
+    LEFT JOIN gold.dim_code c_liquidity_indicator ON c_liquidity_indicator.column_name = N'liquidity_indicator' AND c_liquidity_indicator.code = m.liquidity_indicator
+    LEFT JOIN gold.dim_code c_type_of_trade ON c_type_of_trade.column_name = N'type_of_trade' AND c_type_of_trade.code = m.type_of_trade
+    LEFT JOIN gold.dim_code c_indicator_flags ON c_indicator_flags.column_name = N'indicator_flags' AND c_indicator_flags.code = m.indicator_flags
+    LEFT JOIN gold.dim_code c_mass_cancel_request_type ON c_mass_cancel_request_type.column_name = N'mass_cancel_request_type' AND c_mass_cancel_request_type.code = m.mass_cancel_request_type
+    LEFT JOIN gold.dim_code c_mass_cancel_status ON c_mass_cancel_status.column_name = N'mass_cancel_status' AND c_mass_cancel_status.code = m.mass_cancel_status
+    LEFT JOIN gold.dim_code c_protocol_version ON c_protocol_version.column_name = N'protocol_version' AND c_protocol_version.code = m.protocol_version;
+
+    ALTER TABLE gold.fact_message ADD CONSTRAINT pk_fact_message PRIMARY KEY (message_id);
+    CREATE INDEX ix_fact_message_order ON gold.fact_message (order_id, message_type);
+    CREATE INDEX ix_fact_message_compid ON gold.fact_message (comp_id, [date]);
+
+    -- Gold, step 3: gold.fact_order, one row per order, identified by the JSE order_id. It is built from the order's
+    -- execution reports, its New Order request (D) and the cancel (F) and amend (G) requests and cancel rejects (9) that
+    -- name the order.
+    --
+    -- "First" and "last" report mean first and last in order of capture time (timestamp), then JSE event time
+    -- (transact_time; an empty one counts as last), then execution_id. Where a column is empty on the last report,
+    -- last_execution_type, last_order_status and last_leaves_quantity take the last report on which it is filled
+    -- (July reports have no execution_type and August reports have no order_status).
+    -- FIRST_VALUE and LAST_VALUE with IGNORE NULLS take the first or last filled value in that order; they need
+    -- SQL Server 2022 or later.
+    --
+    -- outcome: Filled when a report has order_status 2 or the order traded and nothing is left open; otherwise
+    -- Cancelled, Expired or Rejected when a report says so (checked in that order); otherwise "Partly filled, no closing
+    -- report" or "Open, no closing report".
+
+    DROP TABLE IF EXISTS gold.fact_order;
+
+    WITH reports AS (
+        SELECT order_id, comp_id, [timestamp], execution_type, order_status, reject_code, executed_quantity,
+               FIRST_VALUE(client_order_id) IGNORE NULLS OVER report_order AS first_client_order_id,
+               LAST_VALUE(leaves_quantity) IGNORE NULLS OVER report_order AS last_leaves_quantity,
+               LAST_VALUE(execution_type) IGNORE NULLS OVER report_order AS last_execution_type,
+               LAST_VALUE(order_status) IGNORE NULLS OVER report_order AS last_order_status
+        FROM gold.fact_message
+        WHERE message_type = N'8'
+        WINDOW report_order AS (PARTITION BY order_id
+                                ORDER BY [timestamp], CASE WHEN transact_time IS NULL THEN 1 ELSE 0 END, transact_time, execution_id
+                                ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)
+    ),
+    orders AS (
+        SELECT order_id,
+               MAX(comp_id) AS comp_id,
+               MIN([timestamp]) AS first_report_at,
+               MAX([timestamp]) AS last_report_at,
+               COUNT(*) AS execution_reports,
+               MAX(first_client_order_id) AS first_client_order_id,
+               MAX(CASE WHEN execution_type = N'8' OR order_status = N'8' THEN 1 ELSE 0 END) AS rejected,
+               MAX(CASE WHEN execution_type = N'8' OR order_status = N'8' THEN reject_code END) AS reject_code,
+               SUM(CASE WHEN executed_quantity > 0 THEN 1 ELSE 0 END) AS trades,
+               COALESCE(SUM(executed_quantity), 0) AS executed_quantity,
+               SUM(CASE WHEN execution_type = N'5' THEN 1 ELSE 0 END) AS amended_reports,
+               MAX(CASE WHEN execution_type = N'4' OR order_status = N'4' THEN 1 ELSE 0 END) AS cancelled,
+               MAX(CASE WHEN execution_type = N'C' OR order_status = N'6' THEN 1 ELSE 0 END) AS expired,
+               MAX(CASE WHEN order_status = N'2' THEN 1 ELSE 0 END) AS filled_status,
+               MAX(last_leaves_quantity) AS last_leaves_quantity,
+               MAX(last_execution_type) AS last_execution_type,
+               MAX(last_order_status) AS last_order_status
+        FROM reports
+        GROUP BY order_id
+    ),
+    new_order_rows AS (
+        -- Each column takes its value from the earliest New Order with that order_id on which it is filled.
+        SELECT order_id, [timestamp],
+               FIRST_VALUE(message_id) IGNORE NULLS OVER first_request AS new_order_message_id,
+               FIRST_VALUE(security_id) IGNORE NULLS OVER first_request AS security_id,
+               FIRST_VALUE(side) IGNORE NULLS OVER first_request AS side,
+               FIRST_VALUE(order_type) IGNORE NULLS OVER first_request AS order_type,
+               FIRST_VALUE(time_in_force) IGNORE NULLS OVER first_request AS time_in_force,
+               FIRST_VALUE(order_quantity) IGNORE NULLS OVER first_request AS order_quantity,
+               FIRST_VALUE(display_quantity) IGNORE NULLS OVER first_request AS display_quantity,
+               FIRST_VALUE(limit_price) IGNORE NULLS OVER first_request AS limit_price
+        FROM gold.fact_message
+        WHERE message_type = N'D' AND order_id IS NOT NULL
+        WINDOW first_request AS (PARTITION BY order_id ORDER BY [timestamp]
+                                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)
+    ),
+    new_orders AS (
+        SELECT order_id, MAX(new_order_message_id) AS new_order_message_id, MIN([timestamp]) AS new_order_at,
+               MAX(security_id) AS security_id, MAX(side) AS side, MAX(order_type) AS order_type,
+               MAX(time_in_force) AS time_in_force, MAX(order_quantity) AS order_quantity,
+               MAX(display_quantity) AS display_quantity, MAX(limit_price) AS limit_price
+        FROM new_order_rows
+        GROUP BY order_id
+    ),
+    requests AS (
+        SELECT order_id,
+               SUM(CASE WHEN message_type = N'G' THEN 1 ELSE 0 END) AS amend_requests,
+               SUM(CASE WHEN message_type = N'F' THEN 1 ELSE 0 END) AS cancel_requests,
+               SUM(CASE WHEN message_type = N'9' THEN 1 ELSE 0 END) AS cancel_rejects
+        FROM gold.fact_message
+        WHERE message_type IN (N'F', N'G', N'9') AND order_id IS NOT NULL
+        GROUP BY order_id
+    ),
+    f AS (
+        SELECT o.order_id, o.comp_id, n.new_order_message_id, n.new_order_at, o.first_report_at, o.last_report_at,
+               o.first_client_order_id, n.security_id, n.side, n.order_type, n.time_in_force, n.order_quantity,
+               n.display_quantity, n.limit_price,
+               CASE WHEN o.filled_status = 1 OR (o.trades > 0 AND o.last_leaves_quantity = 0) THEN N'Filled'
+                    WHEN o.cancelled = 1 THEN N'Cancelled'
+                    WHEN o.expired = 1 THEN N'Expired'
+                    WHEN o.rejected = 1 THEN N'Rejected'
+                    WHEN o.trades > 0 THEN N'Partly filled, no closing report'
+                    ELSE N'Open, no closing report' END AS outcome,
+               o.reject_code, o.execution_reports, o.trades, o.executed_quantity, o.amended_reports,
+               COALESCE(r.amend_requests, 0) AS amend_requests, COALESCE(r.cancel_requests, 0) AS cancel_requests,
+               COALESCE(r.cancel_rejects, 0) AS cancel_rejects,
+               o.last_execution_type, o.last_order_status, o.last_leaves_quantity
+        FROM orders o
+        LEFT JOIN new_orders n ON n.order_id = o.order_id
+        LEFT JOIN requests r ON r.order_id = o.order_id
+    )
+    SELECT ISNULL(f.order_id, N'') AS order_id,
+           f.comp_id,
+           f.new_order_message_id,
+           f.new_order_at,
+           f.first_report_at,
+           f.last_report_at,
+           f.first_client_order_id,
+           f.security_id,
+           f.side,
+           CASE WHEN f.side IS NULL THEN NULL ELSE COALESCE(c_side.meaning, N'Code not in the JSE list') END AS side_name,
+           f.order_type,
+           CASE WHEN f.order_type IS NULL THEN NULL ELSE COALESCE(c_order_type.meaning, N'Code not in the JSE list') END AS order_type_name,
+           f.time_in_force,
+           CASE WHEN f.time_in_force IS NULL THEN NULL ELSE COALESCE(c_time_in_force.meaning, N'Code not in the JSE list') END AS time_in_force_name,
+           f.order_quantity,
+           f.display_quantity,
+           f.limit_price,
+           f.outcome,
+           f.reject_code,
+           f.execution_reports,
+           f.trades,
+           f.executed_quantity,
+           f.amended_reports,
+           f.amend_requests,
+           f.cancel_requests,
+           f.cancel_rejects,
+           f.last_execution_type,
+           CASE WHEN f.last_execution_type IS NULL THEN NULL ELSE COALESCE(c_last_execution_type.meaning, N'Code not in the JSE list') END AS last_execution_type_name,
+           f.last_order_status,
+           CASE WHEN f.last_order_status IS NULL THEN NULL ELSE COALESCE(c_last_order_status.meaning, N'Code not in the JSE list') END AS last_order_status_name,
+           f.last_leaves_quantity
+    INTO gold.fact_order
+    FROM f
+    LEFT JOIN gold.dim_code c_side ON c_side.column_name = N'side' AND c_side.code = f.side
+    LEFT JOIN gold.dim_code c_order_type ON c_order_type.column_name = N'order_type' AND c_order_type.code = f.order_type
+    LEFT JOIN gold.dim_code c_time_in_force ON c_time_in_force.column_name = N'time_in_force' AND c_time_in_force.code = f.time_in_force
+    LEFT JOIN gold.dim_code c_last_execution_type ON c_last_execution_type.column_name = N'execution_type' AND c_last_execution_type.code = f.last_execution_type
+    LEFT JOIN gold.dim_code c_last_order_status ON c_last_order_status.column_name = N'order_status' AND c_last_order_status.code = f.last_order_status;
+
+    ALTER TABLE gold.fact_order ADD CONSTRAINT pk_fact_order PRIMARY KEY (order_id);
+
+    -- Gold, step 4: the last fact table and four dimension tables, all counted from gold.fact_message.
+    --   fact_compid_day  one row per CompID per day, counting each kind of message
+    --   dim_compid       one row per CompID: first and last message, days active, totals, Logon protocol versions
+    --   dim_date         one row per calendar day from the first to the last message
+    --   dim_security     one row per security_id (JSE numeric instrument ID)
+    --   dim_reject_code  the meaning of every reject_code in the messages, from JSE Volume 10, and the message types it
+    --                    was seen on
+
+    SET LANGUAGE us_english;   -- day and month names in English
+
+    -- ---- fact_compid_day ----
+    DROP TABLE IF EXISTS gold.fact_compid_day;
+    SELECT comp_id, [date],
+           MIN([timestamp]) AS first_message_at,
+           MAX([timestamp]) AS last_message_at,
+           COUNT(*) AS messages,
+           SUM(CASE WHEN message_type = N'A' THEN 1 ELSE 0 END) AS logons,
+           SUM(CASE WHEN message_type = N'B' THEN 1 ELSE 0 END) AS logon_responses,
+           SUM(CASE WHEN message_type = N'B' AND reject_code NOT IN (N'0', N'3') THEN 1 ELSE 0 END) AS logon_rejects,
+           SUM(CASE WHEN message_type = N'5' THEN 1 ELSE 0 END) AS logouts,
+           SUM(CASE WHEN message_type = N'D' THEN 1 ELSE 0 END) AS new_orders,
+           SUM(CASE WHEN message_type = N'G' THEN 1 ELSE 0 END) AS amend_requests,
+           SUM(CASE WHEN message_type = N'F' THEN 1 ELSE 0 END) AS cancel_requests,
+           SUM(CASE WHEN message_type = N'q' THEN 1 ELSE 0 END) AS mass_cancel_requests,
+           SUM(CASE WHEN message_type = N'8' THEN 1 ELSE 0 END) AS execution_reports,
+           SUM(CASE WHEN message_type = N'8' AND executed_quantity > 0 THEN 1 ELSE 0 END) AS trades,
+           SUM(CASE WHEN message_type = N'8' AND (execution_type = N'8' OR order_status = N'8') THEN 1 ELSE 0 END) AS order_rejects,
+           SUM(CASE WHEN message_type = N'9' THEN 1 ELSE 0 END) AS cancel_rejects,
+           SUM(CASE WHEN message_type = N'r' THEN 1 ELSE 0 END) AS mass_cancel_reports,
+           SUM(CASE WHEN message_type = N'3' THEN 1 ELSE 0 END) AS gateway_rejects
+    INTO gold.fact_compid_day
+    FROM gold.fact_message
+    WHERE comp_id IS NOT NULL
+    GROUP BY comp_id, [date];
+
+    -- ---- dim_compid ----
+    DROP TABLE IF EXISTS gold.dim_compid;
+    WITH versions AS (
+        SELECT comp_id, STRING_AGG(protocol_version, N', ') WITHIN GROUP (ORDER BY protocol_version) AS logon_protocol_versions
+        FROM (SELECT DISTINCT comp_id, protocol_version FROM gold.fact_message
+              WHERE comp_id IS NOT NULL AND protocol_version IS NOT NULL) v
+        GROUP BY comp_id
+    )
+    SELECT f.comp_id,
+           MIN(f.[timestamp]) AS first_message_at,
+           MAX(f.[timestamp]) AS last_message_at,
+           COUNT(DISTINCT f.[date]) AS active_days,
+           COUNT(*) AS messages,
+           SUM(CASE WHEN f.message_type = N'D' THEN 1 ELSE 0 END) AS new_orders,
+           MAX(v.logon_protocol_versions) AS logon_protocol_versions
+    INTO gold.dim_compid
+    FROM gold.fact_message f
+    LEFT JOIN versions v ON v.comp_id = f.comp_id
+    WHERE f.comp_id IS NOT NULL
+    GROUP BY f.comp_id;
+
+    -- ---- dim_date ----
+    -- GENERATE_SERIES gives the numbers 0, 1, 2, ... up to the number of days between the first and last message.
+    DROP TABLE IF EXISTS gold.dim_date;
+    DECLARE @first date = (SELECT MIN([date]) FROM gold.fact_message);
+    DECLARE @last date = (SELECT MAX([date]) FROM gold.fact_message);
+    SELECT d.[date],
+           DATENAME(weekday, d.[date]) AS day_name,
+           DATENAME(month, d.[date]) + N'_' + DATENAME(year, d.[date]) AS [month],
+           CAST(CASE WHEN DATENAME(weekday, d.[date]) IN (N'Saturday', N'Sunday') THEN 1 ELSE 0 END AS bit) AS is_weekend
+    INTO gold.dim_date
+    FROM (SELECT DATEADD(day, value, @first) AS [date] FROM GENERATE_SERIES(0, DATEDIFF(day, @first, @last))) d;
+
+    -- ---- dim_security ----
+    DROP TABLE IF EXISTS gold.dim_security;
+    SELECT security_id,
+           MIN([timestamp]) AS first_message_at,
+           MAX([timestamp]) AS last_message_at,
+           COUNT(DISTINCT comp_id) AS compids,
+           COUNT(*) AS messages
+    INTO gold.dim_security
+    FROM gold.fact_message
+    WHERE security_id IS NOT NULL
+    GROUP BY security_id;
+
+    -- ---- dim_reject_code ----
+    -- A code's meaning is its Volume 10 entries joined with " | ", each written as "reason (system)". The exports come
+    -- from the Native Trading Gateway, the Matching Engine, the AuthServer and the Exchange Manager, so when a code has
+    -- entries for one of these systems only those entries are used; otherwise all its entries are. Volume 10 writes
+    -- codes without leading zeros, so leading zeros are removed before the look-up. Code 0 and, on a Logon Response,
+    -- code 3 are not rejections, and their meanings say so.
+    DROP TABLE IF EXISTS gold.dim_reject_code;
+    WITH seen AS (
+        SELECT reject_code,
+               STRING_AGG(message_name, N', ') WITHIN GROUP (ORDER BY message_name) AS seen_on,
+               CASE WHEN reject_code NOT LIKE N'%[^0]%' THEN N'0'
+                    ELSE SUBSTRING(reject_code, PATINDEX(N'%[^0]%', reject_code), 255) END AS volume10_code
+        FROM (SELECT DISTINCT f.reject_code, t.message_name
+              FROM gold.fact_message f
+              JOIN gold.dim_message_type t ON t.message_type = f.message_type
+              WHERE f.reject_code IS NOT NULL) d
+        GROUP BY reject_code
+    ),
+    entries AS (
+        SELECT s.reject_code, v.entry_no, v.reason, v.[system],
+               CASE WHEN REPLACE(v.[system], N' ', N'') LIKE N'%Native%'
+                      OR REPLACE(v.[system], N' ', N'') LIKE N'%MatchingEngine%'
+                      OR REPLACE(v.[system], N' ', N'') LIKE N'%AuthServer%'
+                      OR REPLACE(v.[system], N' ', N'') LIKE N'%ExchangeManager%' THEN 1 ELSE 0 END AS is_export_system
+        FROM seen s
+        JOIN gold.volume10_reject_reason v ON v.code = s.volume10_code
+    ),
+    meanings AS (
+        SELECT reject_code,
+               STRING_AGG(CAST(reason + N' (' + [system] + N')' AS nvarchar(max)), N' | ') WITHIN GROUP (ORDER BY entry_no) AS meaning
+        FROM (SELECT *, MAX(is_export_system) OVER (PARTITION BY reject_code) AS code_has_export_system FROM entries) e
+        WHERE is_export_system = 1 OR code_has_export_system = 0
+        GROUP BY reject_code
+    )
+    SELECT s.reject_code,
+           CASE WHEN s.reject_code = N'0' THEN N'Logon Response: logged in (no rejection)'
+                WHEN s.reject_code = N'3' AND s.seen_on LIKE N'%Logon Response%'
+                     THEN N'Logon Response: logged in, but the new password does not meet the password policy | '
+                          + COALESCE(m.meaning, N'Not in Volume 10')
+                ELSE COALESCE(m.meaning, N'Not in Volume 10') END AS meaning,
+           s.seen_on
+    INTO gold.dim_reject_code
+    FROM seen s
+    LEFT JOIN meanings m ON m.reject_code = s.reject_code;
+END;
+GO

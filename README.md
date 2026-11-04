@@ -10,9 +10,9 @@ A web chat page where a JSE Trading Operations analyst asks questions about the 
 | `web/` | The page's code: `app.js` (chat screen and keys form), `retrieve.js` (facts and reference found before the model is asked), `agent.js` (language model and its tools), `data.js` (loads the data into the browser), `style.css`, `icon.svg` (the agent's icon, also the browser tab icon) |
 | `web/knowledge/` | The JSE conformance reference the agent reads (see below) |
 | `code/` | Python scripts that build the bronze, silver and gold layers in Supabase |
-| `docs/academy/html/` | The diagram pages: `system_architecture.html`, `agent_methodology.html`, `data_architecture.html`, `bronze_data_diagram.html` (bronze layer), `silver_layer.html` (silver layer), `gold_star_schema.html` (gold layer) |
-| `docs/academy/pdf/` | Academy project brief, Group 6 problem statement, and `agent_methodology.pdf` |
-| `docs/academy/sql/` | SQL Server scripts that build the same bronze, silver and gold tables from the Excel files (see `docs/academy/sql/README.md`) |
+| `academy/html/` | The diagram pages: `system_architecture.html`, `agent_methodology.html`, `data_architecture.html`, `bronze_data_diagram.html` (bronze layer), `silver_layer.html` (silver layer), `gold_star_schema.html` (gold layer) |
+| `academy/docs/` | Academy project brief, Group 6 problem statement, `agent_methodology.pdf`, and `raw_data_dictionary.pdf`: every field of the 11 raw datasets, its format in the export, its meaning, the months it appears in and how often it is filled |
+| `academy/sql/` | SQL Server stored procedures, one per layer, that build the same bronze, silver and gold tables from the Excel files (see `academy/sql/README.md`) |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are; must stay in the root |
 
 ## Use the page
@@ -43,7 +43,7 @@ Every question is sent to the model `nvidia/nemotron-3.5-lightning:free`, set as
 
 ## Reference files: `web/knowledge/`
 
-Taken from JSE Volumes 00E, 01E, 10, 201 and 202 (the versions are listed at the top of `core.md`) and the documents in `docs/academy/pdf/`. Only `core.md` is sent with every question. `web/retrieve.js` adds up to 2 others to a question whose words match them, and the model can read any other with `read_reference`, so a question costs only the reference it uses.
+Taken from JSE Volumes 00E, 01E, 10, 201 and 202 (the versions are listed at the top of `core.md`) and the documents in `academy/docs/`. Only `core.md` is sent with every question. `web/retrieve.js` adds up to 2 others to a question whose words match them, and the model can read any other with `read_reference`, so a question costs only the reference it uses.
 
 | File | Contents |
 |---|---|
