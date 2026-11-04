@@ -87,12 +87,12 @@
 
   <h2>Components</h2>
   <div class="figure">
-    <svg viewBox="0 0 1200 550" role="img" aria-label="Component diagram: chat page, agent, reference files, data loader and in-browser database in the browser tab, connected to cloud storage">
+    <svg viewBox="0 0 1200 730" role="img" aria-label="Component diagram: chat page, report checker, agent, reference files, in-browser database and data loader in the browser tab, connected to the language model and cloud storage">
       <defs>
         <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z"/></marker>
       </defs>
 
-      <rect class="zone" x="20" y="40" width="720" height="490" rx="12"/>
+      <rect class="zone" x="20" y="40" width="720" height="670" rx="12"/>
       <text class="zl" x="34" y="64">ANALYST'S BROWSER TAB</text>
 
       <!-- browser row 1 -->
@@ -100,25 +100,26 @@
       <text class="t" x="54" y="106">Chat page</text>
       <text class="p" x="54" y="125">index.html, web/app.js</text>
       <text class="d" x="54" y="152">Enter keys form: database</text>
-      <text class="d" x="54" y="170">key and AI API key.</text>
-      <text class="d" x="54" y="194">Shows each answer's text.</text>
-      <text class="d" x="54" y="212">Keys are not saved.</text></a>
+      <text class="d" x="54" y="170">key and AI API key, not saved.</text>
+      <text class="d" x="54" y="194">Attach a client report.</text>
+      <text class="d" x="54" y="212">Shows answers and results.</text></a>
 
       <rect class="b ai" x="290" y="80" width="220" height="150" rx="10"/>
       <text class="t" x="304" y="106">Agent</text>
       <text class="p" x="304" y="125">web/agent.js, retrieve.js</text>
       <text class="d" x="304" y="152">Retrieves facts first, then</text>
-      <text class="d" x="304" y="170">sends the request, 4 tools.</text>
-      <text class="d" x="304" y="194">Runs each tool call in the</text>
-      <text class="d" x="304" y="212">reply, up to 12 rounds.</text>
+      <text class="d" x="304" y="170">sends the request: 4 tools,</text>
+      <text class="d" x="304" y="194">6 with a report. Runs each</text>
+      <text class="d" x="304" y="212">tool call, up to 12 rounds.</text>
 
       <!-- browser row 2 -->
-      <rect class="b data" x="40" y="330" width="200" height="130" rx="10"/>
-      <text class="t" x="54" y="356">Data loader</text>
-      <text class="p" x="54" y="375">web/data.js</text>
-      <text class="d" x="54" y="402">Downloads gold/ from</text>
-      <text class="d" x="54" y="420">cloud storage and creates</text>
-      <text class="d" x="54" y="438">the 9 tables.</text>
+      <rect class="b web" x="40" y="330" width="200" height="130" rx="10"/>
+      <text class="t" x="54" y="356">Report checker</text>
+      <text class="p" x="54" y="375">web/attachments.js</text>
+      <text class="p" x="54" y="391">conformance.js</text>
+      <text class="p" x="54" y="407">client_report.js</text>
+      <text class="d" x="54" y="430">Checks each test step;</text>
+      <text class="d" x="54" y="448">writes the client report.</text>
 
       <rect class="b data" x="290" y="330" width="220" height="130" rx="10"/>
       <text class="t" x="304" y="356">In-browser database</text>
@@ -134,16 +135,37 @@
       <text class="d" x="554" y="420">question; 8 topic files and</text>
       <text class="d" x="554" y="438">reject_codes.json on request</text>
 
-      <rect class="b data" x="800" y="410" width="360" height="100" rx="10"/>
-      <text class="t" x="814" y="436">Cloud storage</text>
-      <text class="p" x="814" y="455">private folder gold/</text>
-      <text class="d" x="814" y="480">9 Parquet files and manifest.json</text>
+      <!-- browser row 3 -->
+      <rect class="b data" x="290" y="560" width="220" height="110" rx="10"/>
+      <text class="t" x="304" y="586">Data loader</text>
+      <text class="p" x="304" y="605">web/data.js</text>
+      <text class="d" x="304" y="632">Downloads gold/ from cloud</text>
+      <text class="d" x="304" y="650">storage, creates the 9 tables.</text>
+
+      <rect class="b data" x="800" y="570" width="360" height="100" rx="10"/>
+      <text class="t" x="814" y="596">Cloud storage</text>
+      <text class="p" x="814" y="615">private folder gold/</text>
+      <text class="d" x="814" y="640">9 Parquet files and manifest.json</text>
 
       <!-- arrows: chat and agent -->
       <path class="arrow" d="M240,130 H286"/>
       <path class="arrow ret" d="M286,180 H244"/>
       <text class="al" x="244" y="122">question</text>
       <text class="al" x="248" y="198">answer</text>
+
+      <!-- chat and report checker -->
+      <path class="arrow" d="M100,230 V326"/>
+      <path class="arrow ret" d="M180,326 V234"/>
+      <text class="al" x="108" y="274">report</text>
+      <text class="al" x="108" y="290">file</text>
+      <text class="al" x="188" y="274">results,</text>
+      <text class="al" x="188" y="290">files</text>
+
+      <!-- report checker and database -->
+      <path class="arrow" d="M240,375 H286"/>
+      <path class="arrow ret" d="M286,425 H244"/>
+      <text class="alm" x="244" y="368">IDs</text>
+      <text class="al" x="250" y="443">rows</text>
 
       <!-- language model -->
       <rect class="b ai" x="800" y="80" width="360" height="110" rx="10"/>
@@ -160,7 +182,7 @@
       <!-- agent and database -->
       <path class="arrow" d="M380,230 V326"/>
       <path class="arrow ret" d="M430,326 V234"/>
-      <text class="alm" x="300" y="282">SELECT</text>
+      <text class="alm" x="324" y="282">SELECT</text>
       <text class="al" x="438" y="282">at most 200 rows</text>
 
       <!-- reference to agent -->
@@ -168,12 +190,13 @@
       <text class="al" x="638" y="268">reference text</text>
 
       <!-- loader -->
-      <path class="arrow" d="M240,395 H286"/>
-      <path class="arrow" d="M800,490 H140 V464"/>
-      <text class="al" x="160" y="482">gold/ files, downloaded with the cloud storage publishable key</text>
+      <path class="arrow" d="M400,560 V464"/>
+      <path class="arrow" d="M800,620 H514"/>
+      <text class="al" x="530" y="612">gold/ files, downloaded with the</text>
+      <text class="al" x="530" y="640">cloud storage publishable key</text>
     </svg>
     <div class="legend">
-      <span class="l-web">Chat page</span>
+      <span class="l-web">Chat page and report checker</span>
       <span class="l-ai">Agent, language model and reference</span>
       <span class="l-data">Message data</span>
       <span>Dashed arrow: a reply</span>

@@ -93,7 +93,7 @@
   <p class="pdf"><a href="../docs/agent_methodology.pdf">PDF version</a></p>
 
   <div class="figure">
-    <svg viewBox="0 0 1000 1760" role="img" aria-label="Flowchart of how the chat agent loads the data once, then for each question retrieves facts and reference topics, answers in rounds of model requests and tool calls, and checks the answer for table and column names">
+    <svg viewBox="0 0 1000 1760" role="img" aria-label="Flowchart of how the chat agent loads the data once, checks an attached client report against the messages, then for each question retrieves facts, reference topics and the report results, answers in rounds of model requests and tool calls, and checks the answer for table and column names">
       <defs>
         <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z"/></marker>
       </defs>
@@ -121,6 +121,31 @@
       <path class="arrow" d="M300,225 V251"/>
       <path class="arrow" d="M300,335 V386" style="stroke-dasharray:5 4"/>
 
+      <text class="ph" x="610" y="30">WHEN A CLIENT REPORT IS ATTACHED</text>
+
+      <rect class="b web" x="610" y="45" width="370" height="70" rx="10"/>
+      <text class="t" x="795" y="75">Analyst attaches the client's report</text>
+      <text class="s" x="795" y="97">Volume 202, Excel or PDF, read in the browser</text>
+      <g class="badge"><circle cx="610" cy="45" r="13"/><text x="610" y="45">R1</text></g>
+
+      <rect class="b data" x="610" y="145" width="370" height="80" rx="10"/>
+      <text class="t" x="795" y="171">Check each test step against the messages</text>
+      <text class="s" x="795" y="192">the client's IDs looked up in the tables;</text>
+      <text class="s" x="795" y="209">one result per step by a fixed rule, not the model</text>
+      <g class="badge"><circle cx="610" cy="145" r="13"/><text x="610" y="145">R2</text></g>
+
+      <rect class="b web" x="610" y="255" width="370" height="80" rx="10"/>
+      <text class="t" x="795" y="283">Page shows the result of each step</text>
+      <text class="s" x="795" y="304">Pass, Fail, Needs review, Not checkable,</text>
+      <text class="s" x="795" y="321">Not attempted · Excel and PDF report buttons</text>
+      <g class="badge"><circle cx="610" cy="255" r="13"/><text x="610" y="255">R3</text></g>
+
+      <path class="arrow" d="M795,115 V141"/>
+      <path class="arrow" d="M795,225 V251"/>
+      <path class="arrow" d="M795,335 V451" style="stroke-dasharray:5 4"/>
+      <text class="s" x="803" y="398" style="text-anchor:start">results kept until the</text>
+      <text class="s" x="803" y="415" style="text-anchor:start">report is removed</text>
+
       <text class="ph" x="130" y="375">FOR EVERY QUESTION</text>
 
       <rect class="b web" x="130" y="390" width="340" height="70" rx="10"/>
@@ -139,7 +164,7 @@
       <text class="t" x="300" y="646">Agent builds the request</text>
       <text class="s" x="300" y="668">same instructions, example queries, core</text>
       <text class="s" x="300" y="685">reference and table columns every time</text>
-      <text class="s" x="300" y="702">+ the conversation · 4 tool definitions</text>
+      <text class="s" x="300" y="702">+ the conversation · 4 tools (6 with a report)</text>
       <g class="badge"><circle cx="130" cy="620" r="13"/><text x="130" y="620">3</text></g>
 
       <rect class="b ai" x="130" y="750" width="340" height="70" rx="10"/>
@@ -220,7 +245,7 @@
       <text class="yn" x="450" y="1465">No</text>
 
       <!-- what step 2 retrieves -->
-      <rect class="b data" x="610" y="455" width="370" height="200" rx="10"/>
+      <rect class="b data" x="610" y="455" width="370" height="225" rx="10"/>
       <text class="tl" x="626" y="481" style="font-weight:700">What step 2 adds to the question</text>
       <text class="tl" x="626" y="507">A CompID named in it, or in an earlier question:</text>
       <text class="tl" x="640" y="527">activity per month, messages per type,</text>
@@ -229,15 +254,19 @@
       <text class="tl" x="626" y="593">A month: the same facts for that month only</text>
       <text class="tl" x="626" y="613">A reject code: its meaning</text>
       <text class="tl" x="626" y="639">Words such as test, session or logon: up to 2 topics</text>
+      <text class="tl" x="626" y="665">An attached report: the result of every test step</text>
       <path class="arrow" d="M606,540 H474" style="stroke-dasharray:5 4"/>
 
       <!-- tools -->
-      <rect class="b data" x="610" y="930" width="370" height="165" rx="10"/>
-      <text class="tl" x="626" y="956" style="font-weight:700">The 4 tools the model can call</text>
+      <rect class="b data" x="610" y="930" width="370" height="240" rx="10"/>
+      <text class="tl" x="626" y="956" style="font-weight:700">The tools the model can call</text>
       <text class="tlm" x="626" y="984">run_sql</text><text class="tl" x="730" y="984">runs one SELECT query on the tables</text>
       <text class="tlm" x="626" y="1010">describe_table</text><text class="tl" x="738" y="1010">common values of each column</text>
       <text class="tlm" x="626" y="1036">read_reference</text><text class="tl" x="740" y="1036">one JSE reference topic</text>
       <text class="tlm" x="626" y="1062">lookup_reject_codes</text><text class="tl" x="776" y="1062">reject code meanings</text>
+      <text class="tl" x="626" y="1092" style="font-weight:700">Added when a report is attached:</text>
+      <text class="tlm" x="626" y="1118">get_test_evidence</text><text class="tl" x="762" y="1118">messages of one test step</text>
+      <text class="tlm" x="626" y="1144">create_client_report</text><text class="tl" x="786" y="1144">Excel or PDF file</text>
       <path class="arrow" d="M606,1015 H474" style="stroke-dasharray:5 4"/>
     </svg>
     <div class="legend">
