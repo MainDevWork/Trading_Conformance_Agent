@@ -12,6 +12,7 @@
   --pass-bg: #d1fadf;
   --fail-bg: #fee4e2;
   --review-bg: #fef0c7;
+  --warn: #b54708;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -28,6 +29,7 @@
     --pass-bg: #0f3d24;
     --fail-bg: #4a1714;
     --review-bg: #4a3a0c;
+    --warn: #f5a524;
   }
 }
 
@@ -63,6 +65,17 @@ body {
 .hint { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
 .hint a { color: var(--accent); }
 #open-keys { width: 100%; padding: 8px; font: inherit; font-weight: 600; color: var(--accent-text); background: var(--accent); border: none; border-radius: 6px; cursor: pointer; }
+/* The saved conversations and memory notes (web/memory.js). */
+.memory-list { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.memory-list li { display: flex; align-items: flex-start; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.memory-list li.hint { border-bottom: none; }
+.memory-list li > span:first-child { flex: 1; overflow-wrap: anywhere; }
+.memory-list li.current .conv-open { font-weight: 700; color: var(--accent); }
+.conv-open { flex: 1; min-width: 0; padding: 0; font: inherit; text-align: left; color: var(--text); background: none; border: none; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conv-open:hover { text-decoration: underline; }
+.conv-date { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.item-delete { padding: 0 4px; font: inherit; line-height: 1.2; color: var(--muted); background: none; border: none; cursor: pointer; }
+.item-delete:hover { color: var(--error); }
 #clear { margin-top: 20px; width: 100%; padding: 8px; background: none; color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
 
 /* The keys form, opened by the Enter keys button. */
@@ -118,6 +131,18 @@ main.dropping { outline: 3px dashed var(--accent); outline-offset: -8px; }
 .report-buttons button:disabled { opacity: .5; }
 .downloads { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
 .downloads a { color: var(--accent); font-weight: 600; }
+/* The context bar above the question box. */
+#context { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; width: min(1400px, calc(0.9 * (100% - 48px))); margin: 0 auto; padding-top: 8px; font-size: 12px; color: var(--muted); }
+#context[hidden] { display: none; }
+#context-meter { width: 140px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+#context-fill { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+#context.context-warn #context-fill { background: var(--warn); }
+#context.context-full #context-fill { background: var(--error); }
+#context.context-full #context-text { color: var(--error); }
+#continue-new { padding: 2px 10px; font: inherit; font-weight: 600; color: var(--accent-text); background: var(--accent); border: none; border-radius: 6px; cursor: pointer; }
+#continue-new[hidden] { display: none; }
+#continue-new:disabled { opacity: .6; cursor: default; }
+.msg.summary .body { border-left: 4px solid var(--muted); }
 #attached { display: flex; align-items: center; gap: 10px; width: min(1400px, calc(0.9 * (100% - 48px))); margin: 0 auto; padding-top: 8px; font-size: 13px; color: var(--muted); }
 #attached[hidden] { display: none; }
 #detach { padding: 2px 10px; font: inherit; color: var(--text); background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
@@ -135,7 +160,7 @@ main.dropping { outline: 3px dashed var(--accent); outline-offset: -8px; }
   body.sidebar-hidden #sidebar { display: none; margin-left: 0; }
   main { min-height: 0; }
   #toggle-sidebar { position: fixed; }
-  #attached { width: calc(100% - 32px); }
+  #attached, #context { width: calc(100% - 32px); }
   #messages { padding: 16px 16px 16px 56px; }
   .msg { width: 100%; }
   #composer { width: calc(100% - 32px); padding: 12px 0 16px; }

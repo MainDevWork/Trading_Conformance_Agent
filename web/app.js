@@ -1,8 +1,9 @@
-import { chat } from "./agent.js?v=11";
-import { loadStore } from "./data.js?v=11";
-import { readAttachment } from "./attachments.js?v=11";
-import { checkReport } from "./conformance.js?v=11";
-import { makeClientReport } from "./client_report.js?v=11";
+import { chat, summarise, startingChars, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "./agent.js?v=12";
+import { loadStore } from "./data.js?v=12";
+import { readAttachment } from "./attachments.js?v=12";
+import { checkReport } from "./conformance.js?v=12";
+import { makeClientReport } from "./client_report.js?v=12";
+import * as memoryStore from "./memory.js?v=12";
 
 window.appStarted = true;
 
@@ -58,7 +59,10 @@ keysDialog.addEventListener("close", () => {
 // A model name saved by earlier versions of this page is deleted: the model is fixed in agent.js.
 localStorage.removeItem("model");
 
-// The visible conversation, sent in full to the model with every question.
+// The open conversation (memory.js newConversation) and its questions and answers, which are sent in full to the
+// model with every question. Every change is saved to the browser's database, so the conversation is opened again
+// after a reload.
+let conv = memoryStore.newConversation();
 let history = [];
 let store = null;
 
@@ -73,10 +77,11 @@ function renderMarkdown(text) {
 function addMessage(role, text, steps) {
   const wrap = document.createElement("div");
   wrap.className = `msg ${role}`;
-  const who = { user: "You", assistant: "Agent", error: "Error", attachment: "Attached report" }[role] || role;
+  const who = { user: "You", assistant: "Agent", error: "Error", attachment: "Attached report",
+                summary: "Summary of the earlier conversation, sent with every question" }[role] || role;
   wrap.innerHTML = `<div class="who">${who}</div><div class="body"></div>`;
   const body = wrap.querySelector(".body");
-  if (role === "assistant") body.innerHTML = renderMarkdown(text);
+  if (role === "assistant" || role === "summary") body.innerHTML = renderMarkdown(text);
   else body.textContent = text;
 
   if (steps && steps.length) {
@@ -138,11 +143,15 @@ async function send(text) {
         return { created: report.files.map((f) => f.name), overall: report.overall, results: report.counts, changes_applied: report.applied };
       },
     } : null;
-    const data = await chat(store, apiKey, history, (text) => { step = text; showStep(); }, context);
+    const data = await chat(store, apiKey, history, (text) => { step = text; showStep(); }, context, await memoryFor(text));
     pending.remove();
     history.push({ role: "assistant", content: data.answer });
     const answerEl = addMessage("assistant", data.answer);
     if (made.length) answerEl.querySelector(".body").append(downloadLinks(made));
+    conv.items.push({ role: "user", content: text }, { role: "assistant", content: data.answer, steps: data.steps });
+    if (data.tokens.firstPrompt) setTokensPerChar(data.tokens.firstPrompt / data.tokens.firstChars);
+    conv.largestPrompt = data.tokens.largestPrompt || null;
+    await saveConv();
   } catch (err) {
     pending.remove();
     history.pop(); // drop the unanswered question so it can be asked again
@@ -151,6 +160,7 @@ async function send(text) {
     clearInterval(ticker);
     busy = false;
     sendBtn.disabled = false;
+    updateContext();
   }
 }
 
@@ -158,7 +168,185 @@ form.addEventListener("submit", (e) => { e.preventDefault(); send(input.value); 
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input.value); }
 });
-document.getElementById("clear").addEventListener("click", () => { history = []; messagesEl.innerHTML = ""; detach(); });
+document.getElementById("clear").addEventListener("click", () => { if (!busy) openConversation(memoryStore.newConversation()); });
+
+// ---- Memory: saved conversations and notes (web/memory.js) ----
+const conversationsEl = document.getElementById("conversations");
+const notesEl = document.getElementById("notes");
+const memoryState = document.getElementById("memory-state");
+
+// The memory passed to the agent for one question. question is used as the conversation's name for a note saved
+// during the conversation's first question, before the conversation has a title.
+async function memoryFor(question) {
+  return {
+    notes: await memoryStore.listNotes(),
+    carried: conv.carried,
+    save: async (text) => { const r = await memoryStore.addNote(text, conv.title || question.slice(0, 70)); renderNotes(); return r; },
+    forget: async (number) => { const r = await memoryStore.deleteNote(number); renderNotes(); return r; },
+    search: (query) => memoryStore.searchConversations(query, conv.id),
+  };
+}
+
+async function saveConv() {
+  try {
+    await memoryStore.saveConversation(conv);
+    localStorage.setItem("conversationId", conv.id);
+  } catch (err) {
+    addMessage("error", `The conversation could not be saved in this browser: ${err.message || err}`);
+  }
+  renderConversations();
+}
+
+// Shows a saved or new conversation: its summary of an earlier conversation, its attached reports, questions and
+// answers. Download links of reports written earlier are not saved; the Excel and PDF buttons write them again.
+function openConversation(next) {
+  conv = next;
+  history = conv.items.filter((i) => i.role === "user" || i.role === "assistant").map((i) => ({ role: i.role, content: i.content }));
+  messagesEl.innerHTML = "";
+  if (conv.carried) addMessage("summary", conv.carried);
+  for (const item of conv.items) {
+    if (item.role === "attachment") showChecked(addMessage("attachment", ""), item.checked);
+    else addMessage(item.role, item.content, item.steps);
+  }
+  if (conv.attachment) setAttached(conv.attachment);
+  else detach(false);
+  try { localStorage.setItem("conversationId", conv.id); } catch {}
+  renderConversations();
+  updateContext();
+}
+
+function formatDate(iso) {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+}
+
+async function renderConversations() {
+  const list = await memoryStore.listConversations().catch(() => []);
+  conversationsEl.innerHTML = "";
+  if (!list.length) { conversationsEl.innerHTML = `<li class="hint">No saved conversations yet.</li>`; return; }
+  for (const c of list) {
+    const li = document.createElement("li");
+    if (c.id === conv.id) li.className = "current";
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "conv-open";
+    open.textContent = c.title || "(no title)";
+    open.title = `${c.title}\nLast changed ${formatDate(c.updated)}`;
+    open.addEventListener("click", async () => {
+      if (busy || c.id === conv.id) return;
+      const saved = await memoryStore.getConversation(c.id);
+      if (saved) openConversation(saved);
+    });
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "item-delete";
+    del.textContent = "×";
+    del.title = "Delete this conversation";
+    del.setAttribute("aria-label", `Delete the conversation ${c.title}`);
+    del.addEventListener("click", async () => {
+      if (busy || !confirm(`Delete the conversation "${c.title}"? This cannot be undone.`)) return;
+      await memoryStore.deleteConversation(c.id);
+      if (c.id === conv.id) openConversation(memoryStore.newConversation());
+      else renderConversations();
+    });
+    const date = document.createElement("span");
+    date.className = "conv-date";
+    date.textContent = formatDate(c.updated);
+    li.append(open, date, del);
+    conversationsEl.append(li);
+  }
+}
+
+async function renderNotes() {
+  const notes = await memoryStore.listNotes().catch(() => []);
+  notesEl.innerHTML = "";
+  if (!notes.length) notesEl.innerHTML = `<li class="hint">No notes yet. Ask the agent to remember something, or it saves findings itself.</li>`;
+  for (const n of notes) {
+    const li = document.createElement("li");
+    const text = document.createElement("span");
+    text.textContent = `[${n.id}] ${n.text}`;
+    text.title = `Saved ${formatDate(n.saved)}${n.conversation ? ` in "${n.conversation}"` : ""}`;
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "item-delete";
+    del.textContent = "×";
+    del.title = "Delete this note";
+    del.setAttribute("aria-label", `Delete note ${n.id}`);
+    del.addEventListener("click", async () => { await memoryStore.deleteNote(n.id); renderNotes(); updateContext(); });
+    li.append(text, del);
+    notesEl.append(li);
+  }
+  updateContext();
+}
+
+// ---- The context bar ----
+// Shows how many tokens the request of the next question starts with, measured against CONTEXT_LIMIT_TOKENS.
+// Characters are turned into tokens with the tokens per character of the last first request, as OpenRouter counted
+// them; until a question has been answered in this browser, 1 token per 4 characters is used.
+const contextEl = document.getElementById("context");
+const contextFill = document.getElementById("context-fill");
+const contextText = document.getElementById("context-text");
+const continueBtn = document.getElementById("continue-new");
+let tokensPerChar = 0.25;
+let measured = false;
+try {
+  const savedRatio = Number(localStorage.getItem("tokensPerChar"));
+  if (savedRatio > 0.05 && savedRatio < 1) { tokensPerChar = savedRatio; measured = true; }
+} catch {}
+function setTokensPerChar(ratio) {
+  if (!(ratio > 0.05 && ratio < 1)) return;
+  tokensPerChar = ratio;
+  measured = true;
+  try { localStorage.setItem("tokensPerChar", String(ratio)); } catch {}
+}
+
+const fmtNum = (x) => Math.round(x).toLocaleString("en-ZA");
+async function updateContext() {
+  if (!store) { contextEl.hidden = true; return; }
+  const notes = await memoryStore.listNotes().catch(() => []);
+  const chars = await startingChars(store, history, attached ? { checked: attached.checked } : null, { notes, carried: conv.carried });
+  const tokens = chars * tokensPerChar;
+  const level = tokens >= CONTEXT_LIMIT_TOKENS ? "full" : tokens >= CONTEXT_WARN_TOKENS ? "warn" : "ok";
+  contextEl.hidden = false;
+  contextEl.className = `context-${level}`;
+  contextFill.style.width = `${Math.min(100, (100 * tokens) / CONTEXT_LIMIT_TOKENS)}%`;
+  const advice = {
+    ok: "",
+    warn: " Answers become less accurate as a conversation grows: start a new conversation soon.",
+    full: " Start a new conversation: answers in a conversation this long are more likely to contain mistakes.",
+  }[level];
+  contextText.textContent = `Context: ${measured ? "" : "about "}${fmtNum(tokens)} of ${fmtNum(CONTEXT_LIMIT_TOKENS)} tokens ` +
+    `(${Math.round((100 * tokens) / CONTEXT_LIMIT_TOKENS)}%).${advice}`;
+  contextEl.title = `Tokens the next question's request starts with, before the facts retrieved for it and its tool results.` +
+    (conv.largestPrompt ? `\nThe largest request of the last answer held ${fmtNum(conv.largestPrompt)} tokens.` : "") +
+    `\nThe model accepts up to ${fmtNum(MODEL_CONTEXT_TOKENS)} tokens, but its answers become less accurate long before that.`;
+  continueBtn.hidden = level === "ok" || !history.length;
+}
+
+// Continue in a new conversation: the model summarises this conversation, and a new conversation starts with the
+// summary and the attached report. The summary is sent with every question of the new conversation.
+continueBtn.addEventListener("click", async () => {
+  const apiKey = keyInput.value.trim();
+  if (busy) return;
+  if (!apiKey) { addMessage("error", "Enter the AI API key first: click Enter keys in the sidebar."); return; }
+  busy = true;
+  sendBtn.disabled = continueBtn.disabled = true;
+  const label = continueBtn.textContent;
+  continueBtn.textContent = "Writing a summary of this conversation…";
+  try {
+    const summary = await summarise(apiKey, history, conv.carried);
+    const next = memoryStore.newConversation(summary, conv.attachment);
+    if (conv.attachment) next.items.push({ role: "attachment", checked: conv.attachment });
+    openConversation(next);
+    await saveConv();
+  } catch (err) {
+    addMessage("error", `The summary could not be written: ${err.message || err}`);
+  } finally {
+    busy = false;
+    sendBtn.disabled = continueBtn.disabled = false;
+    continueBtn.textContent = label;
+  }
+});
 
 // ---- Attached client reports ----
 // One report is attached at a time. It is read and checked in this browser; the results are sent to the model with
@@ -180,10 +368,22 @@ function downloadLinks(files) {
   return box;
 }
 
-function detach() {
+function setAttached(checked) {
+  attached = { checked };
+  attachedChip.hidden = false;
+  attachedChip.querySelector("span").textContent = `Attached: ${checked.file}`;
+}
+
+// save = false when a conversation is being opened, so opening it does not change it.
+function detach(save = true) {
   attached = null;
   attachedChip.hidden = true;
   attachedChip.querySelector("span").textContent = "";
+  if (save && conv.attachment) {
+    conv.attachment = null;
+    if (conv.items.length) saveConv();
+    updateContext();
+  }
 }
 
 function escapeHtml(text) {
@@ -237,10 +437,12 @@ async function attach(file) {
     if (!store) throw new Error("The data did not load, so the report could not be checked. See the message in the sidebar.");
     const checked = await checkReport(store, report, (text) => { cardBody.textContent = `${text}…`; });
     cardBody.classList.remove("thinking");
-    attached = { checked };
-    attachedChip.hidden = false;
-    attachedChip.querySelector("span").textContent = `Attached: ${file.name}`;
+    setAttached(checked);
     showChecked(card, checked);
+    conv.attachment = checked;
+    conv.items.push({ role: "attachment", checked });
+    await saveConv();
+    updateContext();
   } catch (err) {
     card.remove();
     addMessage("error", err.message || String(err));
@@ -250,7 +452,7 @@ async function attach(file) {
 
 document.getElementById("attach").addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => { attach(fileInput.files[0]); fileInput.value = ""; });
-document.getElementById("detach").addEventListener("click", detach);
+document.getElementById("detach").addEventListener("click", () => detach());
 // A file dropped anywhere on the chat area is attached.
 const mainEl = document.querySelector("main");
 mainEl.addEventListener("dragover", (e) => { e.preventDefault(); mainEl.classList.add("dropping"); });
@@ -284,5 +486,19 @@ async function load(supabaseKey) {
   bar.style.width = "100%";
   const rows = Object.entries(store.manifest.tables).map(([name, t]) => `<tr><td>${name}</td><td>${t.rows.toLocaleString()}</td></tr>`);
   document.getElementById("tables").innerHTML = rows.join("");
+  updateContext();
 }
+
+// The conversation open when the page was last closed is opened again.
+async function restore() {
+  if (!(await memoryStore.available())) {
+    memoryState.textContent = "This browser refused to keep the memory, so conversations and notes are lost when the page is closed.";
+  }
+  let savedId = null;
+  try { savedId = localStorage.getItem("conversationId"); } catch {}
+  const saved = savedId ? await memoryStore.getConversation(savedId).catch(() => null) : null;
+  openConversation(saved || memoryStore.newConversation());
+  renderNotes();
+}
+restore();
 start();

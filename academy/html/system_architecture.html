@@ -87,7 +87,7 @@
 
   <h2>Components</h2>
   <div class="figure">
-    <svg viewBox="0 0 1200 730" role="img" aria-label="Component diagram: chat page, report checker, agent, reference files, in-browser database and data loader in the browser tab, connected to the language model and cloud storage">
+    <svg viewBox="0 0 1200 730" role="img" aria-label="Component diagram: chat page, report checker, agent, reference files, memory, in-browser database and data loader in the browser tab, connected to the language model and cloud storage">
       <defs>
         <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z"/></marker>
       </defs>
@@ -108,8 +108,8 @@
       <text class="t" x="304" y="106">Agent</text>
       <text class="p" x="304" y="125">web/agent.js, retrieve.js</text>
       <text class="d" x="304" y="152">Retrieves facts first, then</text>
-      <text class="d" x="304" y="170">sends the request: 4 tools,</text>
-      <text class="d" x="304" y="194">6 with a report. Runs each</text>
+      <text class="d" x="304" y="170">sends the request: 7 tools,</text>
+      <text class="d" x="304" y="194">9 with a report. Runs each</text>
       <text class="d" x="304" y="212">tool call, up to 12 rounds.</text>
 
       <!-- browser row 2 -->
@@ -136,6 +136,14 @@
       <text class="d" x="554" y="438">reject_codes.json on request</text>
 
       <!-- browser row 3 -->
+      <rect class="b cfg" x="40" y="540" width="200" height="150" rx="10"/>
+      <text class="t" x="54" y="566">Memory</text>
+      <text class="p" x="54" y="585">web/memory.js, IndexedDB</text>
+      <text class="d" x="54" y="612">Saved conversations and</text>
+      <text class="d" x="54" y="630">memory notes, in this</text>
+      <text class="d" x="54" y="648">browser only. Notes are</text>
+      <text class="d" x="54" y="666">sent with every question.</text>
+
       <rect class="b data" x="290" y="560" width="220" height="110" rx="10"/>
       <text class="t" x="304" y="586">Data loader</text>
       <text class="p" x="304" y="605">web/data.js</text>
@@ -189,6 +197,11 @@
       <path class="arrow ret" d="M630,326 V205 H514"/>
       <text class="al" x="638" y="268">reference text</text>
 
+      <!-- memory and agent: notes and earlier conversations sent with each question; notes saved by the model -->
+      <path class="arrow" d="M240,600 H273 V216 H286"/>
+      <path class="arrow ret" d="M283,222 V640 H244"/>
+      <text class="al" transform="translate(267,520) rotate(-90)" style="text-anchor:middle">notes, conversations</text>
+
       <!-- loader -->
       <path class="arrow" d="M400,560 V464"/>
       <path class="arrow" d="M800,620 H514"/>
@@ -199,6 +212,7 @@
       <span class="l-web">Chat page and report checker</span>
       <span class="l-ai">Agent, language model and reference</span>
       <span class="l-data">Message data</span>
+      <span class="l-cfg">Memory in this browser</span>
       <span>Dashed arrow: a reply</span>
     </div>
   </div>

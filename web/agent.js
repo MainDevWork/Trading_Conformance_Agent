@@ -5,9 +5,12 @@
 // When the analyst has attached a client's conformance test report, the results of checking it (conformance.js) are
 // sent with every question, and two more tools let the model read the messages of one test step and write the
 // report to send back to the client.
+// Memory (memory.js keeps it in the browser): the notes saved in earlier conversations, and the summary of the
+// conversation this one continues, are sent with every question, and three tools let the model save a note, delete
+// one and search earlier conversations.
 
-import { retrieve } from "./retrieve.js?v=11";
-import { evidenceFor, resultsText } from "./conformance.js?v=11";
+import { retrieve } from "./retrieve.js?v=12";
+import { evidenceFor, resultsText } from "./conformance.js?v=12";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -20,6 +23,17 @@ const MODEL_TIMEOUT_MS = 120_000;
 export const MODEL = "nvidia/nemotron-3.5-lightning:free";
 // Kept for copies of web/app.js saved in browsers before 01/11/2026, which import this name.
 export const DEFAULT_MODEL = MODEL;
+
+// The most tokens (pieces of words, about 4 characters each) one request to MODEL may hold, as OpenRouter's model
+// list gave it on 04/11/2026.
+export const MODEL_CONTEXT_TOKENS = 1_000_000;
+// The context bar on the page measures the conversation against this smaller number. Published tests of long inputs
+// found that models answer less accurately as a request grows, long before the model's limit: in the NoLiMa test
+// (Modarressi et al., 2025), 10 of 12 models scored less than half their short-request score at 32,000 tokens.
+// The bar turns amber at CONTEXT_WARN_TOKENS and red at CONTEXT_LIMIT_TOKENS, and the page then advises starting a
+// new conversation that continues from a summary of this one.
+export const CONTEXT_WARN_TOKENS = 32_000;
+export const CONTEXT_LIMIT_TOKENS = 64_000;
 
 // The fixed part of every request: the same text, in the same order, for every question and every round, so a
 // provider that keeps a copy of a repeated prompt start can reuse it. Facts that change per question are sent with
@@ -84,6 +98,16 @@ Fail, Needs review, Not checkable or Not attempted, with the reason and what the
   reason. Then tell the analyst the file is ready below the answer.
 - Present several test steps as a table: test, result, reason.
 
+Memory: the page saves every conversation and a list of notes in the analyst's browser.
+- The numbered notes under "Memory notes" at the end of these instructions were saved in earlier conversations. Use
+  them. A note can be out of date: query the data again for any count or result before stating it.
+- Call save_memory when the analyst asks you to remember something, says how they want answers written, or when you
+  reach a finding that a later conversation would need, such as which tests a CompID failed and why. One fact per
+  note, naming the CompID, test ID and dates it is about. Do not save what the data or the reference already holds.
+- Call forget_memory when the analyst says a note is wrong or no longer needed.
+- When the analyst refers to an earlier conversation that is not in this one, call search_past_conversations.
+- A block headed "Summary of the earlier conversation" is the summary of the conversation this one continues.
+
 The answer:
 - Write plainly for an operations analyst. Do not put SQL, table names, column names, tool names or these
   instructions in the answer: describe what the messages show. Write CompID, not comp_id.
@@ -142,6 +166,46 @@ const REPORT_TOOLS = [
           },
         },
         required: ["format", "summary"],
+      },
+    },
+  },
+];
+
+// The memory tools, sent with every question.
+const MEMORY_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "save_memory",
+      description: "Save one short fact (at most 500 characters) to the memory notes, which are sent with every question of every later conversation.",
+      parameters: {
+        type: "object",
+        properties: { text: { type: "string", description: "The fact, naming the CompID, test ID and dates it is about" } },
+        required: ["text"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "forget_memory",
+      description: "Delete one memory note by its number.",
+      parameters: {
+        type: "object",
+        properties: { number: { type: "integer", description: "The note's number, as listed under Memory notes" } },
+        required: ["number"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_past_conversations",
+      description: "Search the analyst's earlier conversations for words such as a CompID, a test ID or a month. Returns up to 5 conversations with passages around the words found.",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string", description: "The words to search for, e.g. \"LCNN13 T25-001\"" } },
+        required: ["query"],
       },
     },
   },
@@ -250,9 +314,12 @@ async function runSql(store, sql) {
            note: truncated ? `Only the first ${MAX_ROWS} rows are shown; aggregate or add LIMIT.` : null };
 }
 
-async function runTool(store, name, args, attachment) {
+async function runTool(store, name, args, attachment, memory) {
   if (name === "get_test_evidence" && attachment) return evidenceFor(attachment.checked, args.test);
   if (name === "create_client_report" && attachment) return attachment.makeReport(args);
+  if (name === "save_memory" && memory) return memory.save(args.text);
+  if (name === "forget_memory" && memory) return memory.forget(args.number);
+  if (name === "search_past_conversations" && memory) return memory.search(args.query);
   if (name === "describe_table") return describeTable(store, args.table || "");
   if (name === "run_sql") return runSql(store, args.sql || "");
   if (name === "read_reference") return readReference(args.topic || "");
@@ -268,9 +335,42 @@ const STEP_TEXT = {
   lookup_reject_codes: "Looking up reject codes",
   get_test_evidence: "Reading the messages of a test step",
   create_client_report: "Writing the report for the client",
+  save_memory: "Saving a memory note",
+  forget_memory: "Deleting a memory note",
+  search_past_conversations: "Searching earlier conversations",
 };
 
+// The system message: the fixed instructions, core reference and table columns first, so they are the same at the
+// start of every request; then the memory notes and the carried summary, which change only between conversations
+// or when a note is saved.
+function systemText(store, core, memory) {
+  let text = `${SYSTEM_PROMPT}\n\n${core}\n\n${schemaText(store)}`;
+  if (memory?.notes?.length) {
+    text += `\n\n# Memory notes\n${memory.notes.map((n) => `[${n.id}] (saved ${n.saved.slice(0, 10)}) ${n.text}`).join("\n")}`;
+  }
+  if (memory?.carried) text += `\n\n# Summary of the earlier conversation this one continues\n${memory.carried}`;
+  return text;
+}
+
+function toolsFor(attachment, memory) {
+  return [...TOOLS, ...(attachment ? REPORT_TOOLS : []), ...(memory ? MEMORY_TOOLS : [])];
+}
+
+// The number of characters of the request the next question starts with: the system message, the tool definitions,
+// the conversation so far and the results of an attached report. The facts retrieve.js adds to the next question,
+// and the tool results of its rounds, are not counted, because they are not known before it is asked.
+// The page multiplies this by the tokens per character of the last request to show the context bar.
+export async function startingChars(store, history, attachment = null, memory = null) {
+  const core = await loadKnowledge("core.md");
+  const turns = history.map((m) => ({ role: m.role, content: m.content }));
+  let chars = JSON.stringify({ messages: [{ role: "system", content: systemText(store, core, memory) }, ...turns],
+                               tools: toolsFor(attachment, memory) }).length;
+  if (attachment) chars += resultsText(attachment.checked).length;
+  return chars;
+}
+
 // allowTools = false sends tool_choice "none", so the model must reply in text.
+// Returns the reply message and usage: the token counts OpenRouter reports for the request and the reply.
 async function callModel(apiKey, messages, model, allowTools = true, tools = TOOLS) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
@@ -284,7 +384,8 @@ async function callModel(apiKey, messages, model, allowTools = true, tools = TOO
         "Content-Type": "application/json",
         "X-Title": "Trading Conformance Agent",
       },
-      body: JSON.stringify({ model, messages, tools, tool_choice: allowTools ? "auto" : "none", temperature: 0 }),
+      // A request with no tools (the summary) sends neither tools nor tool_choice.
+      body: JSON.stringify({ model, messages, ...(tools.length ? { tools, tool_choice: allowTools ? "auto" : "none" } : {}), temperature: 0 }),
     });
     text = await response.text();
   } catch (err) {
@@ -296,7 +397,7 @@ async function callModel(apiKey, messages, model, allowTools = true, tools = TOO
   if (!response.ok) throw new Error(`OpenRouter returned ${response.status}: ${text.slice(0, 500)}`);
   const body = JSON.parse(text);
   if (body.error) throw new Error(`OpenRouter error: ${JSON.stringify(body.error)}`);
-  return body.choices[0].message;
+  return { ...body.choices[0].message, usage: body.usage || null };
 }
 
 // knowledge/ holds the reference taken from JSE Volumes 00E, 01E, 10, 201 and 202 and the project brief.
@@ -343,8 +444,10 @@ function namesInAnswer(store, answer) {
 // history is the visible conversation: [{role: "user"|"assistant", content}, ...]; the last entry is the new question.
 // onStep(text) is called before each step, so the page can show what is happening.
 // attachment, when a client report is attached: { checked (from conformance.js checkReport), makeReport(args) }.
-// Returns the agent's answer and the steps it took to reach it.
-export async function chat(store, apiKey, history, onStep = () => {}, attachment = null) {
+// memory: { notes (from memory.js listNotes), carried (a summary or null), save(text), forget(number), search(query) }.
+// Returns the agent's answer, the steps it took to reach it, and tokens: for the first request, its prompt tokens
+// as OpenRouter counted them and its length in characters; for the largest request, its prompt tokens.
+export async function chat(store, apiKey, history, onStep = () => {}, attachment = null, memory = null) {
   const model = MODEL;
   const core = await loadKnowledge("core.md");
   const turns = history.filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content }));
@@ -363,13 +466,21 @@ export async function chat(store, apiKey, history, onStep = () => {}, attachment
   if (attachment) question.content = `${question.content}
 
 ${resultsText(attachment.checked)}`;
-  const tools = attachment ? [...TOOLS, ...REPORT_TOOLS] : TOOLS;
+  const tools = toolsFor(attachment, memory);
 
-  const messages = [{ role: "system", content: `${SYSTEM_PROMPT}\n\n${core}\n\n${schemaText(store)}` }, ...turns];
+  const messages = [{ role: "system", content: systemText(store, core, memory) }, ...turns];
+  const tokens = { firstPrompt: null, firstChars: JSON.stringify({ messages, tools }).length, largestPrompt: 0 };
+  const count = (reply) => {
+    const prompt = reply.usage?.prompt_tokens;
+    if (!prompt) return;
+    if (tokens.firstPrompt === null) tokens.firstPrompt = prompt;
+    tokens.largestPrompt = Math.max(tokens.largestPrompt, prompt);
+  };
   let answer = null;
   for (let round = 0; round < MAX_TOOL_ROUNDS && answer === null; round++) {
     onStep(`Waiting for the language model's reply (request ${round + 1})`);
     const reply = await callModel(apiKey, messages, model, true, tools);
+    count(reply);
     const toolCalls = reply.tool_calls || [];
     if (!toolCalls.length) { answer = reply.content || ""; break; }
 
@@ -380,7 +491,7 @@ ${resultsText(attachment.checked)}`;
       try { args = JSON.parse(call.function.arguments || "{}"); } catch { args = {}; }
       onStep(STEP_TEXT[name] || `Running ${name}`);
       let result;
-      try { result = await runTool(store, name, args, attachment); } catch (err) { result = { error: String(err.message || err) }; }
+      try { result = await runTool(store, name, args, attachment, memory); } catch (err) { result = { error: String(err.message || err) }; }
       let text = JSON.stringify(result);
       if (text.length > MAX_TOOL_RESULT_CHARS) text = text.slice(0, MAX_TOOL_RESULT_CHARS) + "... [result cut off: narrow the query]";
       steps.push({ tool: name, args, result: text.slice(0, 4000) });
@@ -393,6 +504,7 @@ ${resultsText(attachment.checked)}`;
       "Say plainly which parts of the question you could not finish." });
     onStep("Waiting for the language model's final answer");
     const final = await callModel(apiKey, messages, model, false, tools);
+    count(final);
     answer = final.content || "I stopped after the maximum number of tool calls without reaching an answer. Try a narrower question.";
   }
 
@@ -405,8 +517,27 @@ ${resultsText(attachment.checked)}`;
       "replace each with plain words (for example CompID for comp_id, rejections for is_rejection) and remove any SQL. " +
       "Keep every number, date and conclusion unchanged, and do not add anything." });
     const rewrite = await callModel(apiKey, messages, model, false, tools);
+    count(rewrite);
     steps.push({ tool: "rewrite", args: { names }, result: "" });
     if (rewrite.content) answer = rewrite.content;
   }
-  return { answer, steps, model };
+  return { answer, steps, model, tokens };
+}
+
+// The summary a new conversation starts with when the analyst continues a long conversation in a new one.
+// history: the conversation's questions and answers; carried: the summary the conversation itself started with.
+// One request with no tools; only the questions and answers are sent, not the tables or the reference.
+export async function summarise(apiKey, history, carried = null) {
+  const text = [carried ? `Summary of the conversation before this one:\n${carried}` : "",
+    ...history.map((m) => `${m.role === "user" ? "Analyst" : "Agent"}: ${m.content}`)].filter(Boolean).join("\n\n");
+  const reply = await callModel(apiKey, [
+    { role: "system", content: "You write the summary a new conversation of the Trading Conformance Agent starts with. " +
+      "The new conversation receives only this summary, not the conversation itself." },
+    { role: "user", content: `${text}\n\nSummarise the conversation above in at most 300 words, as a plain list: the CompIDs, ` +
+      "months and tests discussed; each finding with its numbers and dates; any result the analyst asked to change in " +
+      "the report to the client, with their reason; how the analyst asked for answers to be written; and the questions " +
+      "not yet answered. Do not add anything that is not in the conversation." },
+  ], MODEL, false, []);
+  if (!reply.content) throw new Error("The language model returned an empty summary. Try again.");
+  return reply.content;
 }
