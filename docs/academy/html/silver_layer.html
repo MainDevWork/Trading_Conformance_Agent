@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silver layer</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5f6b7a; --border: #cfd6de;
+    --client: #0b5cad; --jse: #1d7a4b; --both: #6a3fc1;
+    --bz: #fbefe2; --bz-edge: #a65f12; --sv: #eceff3; --sv-edge: #4b5563; --ex: #e5f4ec; --ex-edge: #1d7a4b; --line: #1c2430;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c; --panel: #1a2029; --text: #e4e8ee; --muted: #98a3b1; --border: #2c3542;
+      --client: #6cb0f0; --jse: #4fbf86; --both: #a785ea;
+      --bz: #2f2214; --bz-edge: #e0a05a; --sv: #232a34; --sv-edge: #a9b4c2; --ex: #13291f; --ex-edge: #4fbf86; --line: #c9d1dc;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1240px; margin: 0 auto; padding: 32px 16px 48px; }
+  nav { font-size: 13px; margin-bottom: 18px; color: var(--muted); }
+  nav a { color: inherit; margin-right: 14px; }
+  a { color: var(--muted); }
+  h1 { font-size: 24px; margin: 0 0 18px; }
+  code { font: 13px ui-monospace, Consolas, monospace; }
+  .figure { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; overflow-x: auto; margin-bottom: 24px; }
+  svg { display: block; width: 100%; height: auto; }
+  svg text { fill: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .box { fill: var(--panel); stroke-width: 1.5; }
+  .bz { stroke: var(--bz-edge); } .bz-h { fill: var(--bz); stroke: var(--bz-edge); stroke-width: 1.5; }
+  .sv { stroke: var(--sv-edge); } .sv-h { fill: var(--sv); stroke: var(--sv-edge); stroke-width: 1.5; }
+  .ex { stroke: var(--ex-edge); } .ex-h { fill: var(--ex); stroke: var(--ex-edge); stroke-width: 1.5; }
+  .pkg { fill: none; stroke: var(--muted); stroke-width: 1.2; }
+  svg .pk { font-weight: 700; font-size: 14px; }
+  svg .st { font-size: 11px; fill: var(--muted); }
+  svg .tn { font: 700 14px ui-monospace, Consolas, monospace; }
+  svg .it { font-style: italic; }
+  svg .ts { font-size: 11.5px; fill: var(--muted); }
+  svg .f { font: 12px ui-monospace, Consolas, monospace; }
+  svg .k { font-weight: 700; }
+  svg .m { font: 700 12px ui-monospace, Consolas, monospace; }
+  svg .lb { font-size: 12px; font-style: italic; fill: var(--muted); }
+  .ln { fill: none; stroke: var(--line); stroke-width: 1.4; }
+  .tri { fill: var(--panel); stroke: var(--line); stroke-width: 1.4; }
+  table { border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); font-size: 14px; width: 100%; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  thead th { font-size: 12px; color: var(--muted); }
+  td.r { text-align: right; white-space: nowrap; }
+  td.c { text-align: center; font: 600 14px ui-monospace, Consolas, monospace; }
+  td.n { white-space: nowrap; }
+  .client { color: var(--client); font-weight: 600; }
+  .jse { color: var(--jse); font-weight: 600; }
+  .both { color: var(--both); font-weight: 600; }
+  svg { min-width: 900px; }
+</style>
+</head>
+<body>
+<main>
+  <nav><a href="../../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold layer</a><a href="silver_layer.html">Silver layer</a><a href="bronze_data_diagram.html">Bronze layer</a></nav>
+
+  <h1>Silver layer</h1>
+
+  <div class="figure">
+    <svg viewBox="0 0 1110 589" role="img" aria-label="UML class diagram of the silver layer: the one table message, with its columns and types, linked to itself by order_id">
+      <path class="pkg" d="M16,42 V573 H1094 V42 H186 V16 H16 Z"/>
+      <text class="pk" x="26" y="34">silver</text>
+      <rect class="box sv" x="150" y="56" width="900" height="493" rx="2"/>
+      <rect class="sv-h" x="150" y="56" width="900" height="50" rx="2"/>
+      <text class="st" x="600" y="71" text-anchor="middle">«table»</text>
+      <text class="tn" x="600" y="87" text-anchor="middle">message</text>
+      <text class="ts" x="600" y="101" text-anchor="middle">silver/message.parquet · 2,169,820 rows · one row per message, all 11 types</text>
+      <text class="f k" x="160" y="128">message_id : integer {key}</text>
+      <text class="f" x="160" y="145">timestamp : timestamp</text>
+      <text class="f k" x="160" y="162">date : date</text>
+      <text class="f" x="160" y="179">comp_id : text</text>
+      <text class="f k" x="160" y="196">comp_id_filled : boolean</text>
+      <text class="f" x="160" y="213">message_type : text</text>
+      <text class="f" x="160" y="230">ref_message_type : text</text>
+      <text class="f" x="160" y="247">client_order_id : text</text>
+      <text class="f" x="160" y="264">orig_client_order_id : text</text>
+      <text class="f" x="160" y="281">order_id : text</text>
+      <text class="f k" x="160" y="298">order_id_linked : boolean</text>
+      <text class="f" x="160" y="315">execution_id : text</text>
+      <text class="f" x="160" y="332">public_order_id : text</text>
+      <text class="f" x="160" y="349">security_id : text</text>
+      <text class="f" x="160" y="366">side : text</text>
+      <text class="f" x="160" y="383">order_type : text</text>
+      <text class="f" x="160" y="400">order_sub_type : text</text>
+      <text class="f" x="160" y="417">time_in_force : text</text>
+      <text class="f" x="160" y="434">order_quantity : integer</text>
+      <text class="f" x="160" y="451">display_quantity : integer</text>
+      <text class="f" x="160" y="468">minimum_quantity : integer</text>
+      <text class="f" x="160" y="485">limit_price : decimal</text>
+      <text class="f" x="160" y="502">stop_price : decimal</text>
+      <text class="f" x="160" y="519">account : text</text>
+      <text class="f" x="160" y="536">capacity : text</text>
+      <text class="f" x="610" y="128">cancel_on_disconnect : text</text>
+      <text class="f" x="610" y="145">execution_instruction : text</text>
+      <text class="f" x="610" y="162">order_book : text</text>
+      <text class="f" x="610" y="179">self_trade_prevention_key : text</text>
+      <text class="f" x="610" y="196">execution_type : text</text>
+      <text class="f" x="610" y="213">order_status : text</text>
+      <text class="f" x="610" y="230">working_indicator : text</text>
+      <text class="f" x="610" y="247">liquidity_indicator : text</text>
+      <text class="f" x="610" y="264">type_of_trade : text</text>
+      <text class="f" x="610" y="281">indicator_flags : text</text>
+      <text class="f" x="610" y="298">leaves_quantity : integer</text>
+      <text class="f" x="610" y="315">executed_quantity : integer</text>
+      <text class="f" x="610" y="332">executed_price : decimal</text>
+      <text class="f" x="610" y="349">transact_time : timestamp</text>
+      <text class="f" x="610" y="366">reject_code : text</text>
+      <text class="f" x="610" y="383">reject_reason : text</text>
+      <text class="f" x="610" y="400">partition_id : text</text>
+      <text class="f" x="610" y="417">mass_cancel_request_type : text</text>
+      <text class="f" x="610" y="434">mass_cancel_status : text</text>
+      <text class="f" x="610" y="451">logon_compid : text</text>
+      <text class="f" x="610" y="468">protocol_version : text</text>
+      <text class="f" x="610" y="485">password_expiry : integer</text>
+      <text class="f" x="610" y="502">logout_reason : text</text>
+      <text class="f k" x="610" y="519">copies : integer</text>
+      <text class="f" x="610" y="536">source_file : text</text>
+      <path class="ln" d="M150,206 H106 V286 H150"/>
+      <text class="m" x="144" y="200" text-anchor="end">0..*</text>
+      <text class="m" x="144" y="302" text-anchor="end">0..1</text>
+      <text class="lb" x="100" y="242" text-anchor="end">order</text>
+      <text class="lb" x="100" y="256" text-anchor="end">link</text>
+    </svg>
+  </div>
+</main>
+</body>
+</html>

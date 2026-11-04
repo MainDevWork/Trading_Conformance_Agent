@@ -81,7 +81,7 @@
 </head>
 <body>
 <main>
-  <nav><a href="../../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold star schema</a><a href="bronze_data_diagram.html">Bronze layer</a><a href="bronze_silver_uml.html">Bronze and silver UML</a></nav>
+  <nav><a href="../../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold layer</a><a href="silver_layer.html">Silver layer</a><a href="bronze_data_diagram.html">Bronze layer</a></nav>
 
   <h1>Trading Conformance Agent: system architecture</h1>
 
@@ -99,16 +99,16 @@
       <a href="../../../index.html" aria-label="Open the chat"><rect class="b web" x="40" y="80" width="200" height="150" rx="10"/>
       <text class="t" x="54" y="106">Chat page</text>
       <text class="p" x="54" y="125">index.html, web/app.js</text>
-      <text class="d" x="54" y="152">Sidebar: storage key and</text>
-      <text class="d" x="54" y="170">language model key.</text>
+      <text class="d" x="54" y="152">Enter keys form: database</text>
+      <text class="d" x="54" y="170">key and AI API key.</text>
       <text class="d" x="54" y="194">Shows each answer's text.</text>
       <text class="d" x="54" y="212">Keys are not saved.</text></a>
 
       <rect class="b ai" x="290" y="80" width="220" height="150" rx="10"/>
       <text class="t" x="304" y="106">Agent</text>
-      <text class="p" x="304" y="125">web/agent.js</text>
-      <text class="d" x="304" y="152">Builds the request: system</text>
-      <text class="d" x="304" y="170">prompt, conversation, 5 tools.</text>
+      <text class="p" x="304" y="125">web/agent.js, retrieve.js</text>
+      <text class="d" x="304" y="152">Retrieves facts first, then</text>
+      <text class="d" x="304" y="170">sends the request, 4 tools.</text>
       <text class="d" x="304" y="194">Runs each tool call in the</text>
       <text class="d" x="304" y="212">reply, up to 12 rounds.</text>
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How the chat agent answers a question</title>
+<title>Agent methodology: agentic RAG</title>
 <style>
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5f6b7a; --border: #cfd6de; --line: #44505e;
@@ -78,7 +78,8 @@
     nav, .pdf { display: none; }
     .figure { border: none; padding: 0; }
     .legend { margin-top: 2mm; font-size: 9pt; }
-    svg { width: auto; max-width: none; height: 180mm; }
+    h1 { font-size: 15pt; margin: 0 0 4mm; }
+    svg { width: auto; max-width: none; height: 235mm; }
     h2 { break-after: avoid; }
     table, li { break-inside: avoid; }
   }
@@ -86,20 +87,21 @@
 </head>
 <body>
 <main>
-  <nav><a href="../../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold star schema</a><a href="bronze_data_diagram.html">Bronze layer</a><a href="bronze_silver_uml.html">Bronze and silver UML</a></nav>
+  <nav><a href="../../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold layer</a><a href="silver_layer.html">Silver layer</a><a href="bronze_data_diagram.html">Bronze layer</a></nav>
 
+  <h1>Agent methodology: agentic RAG (retrieval-augmented generation with a tool-calling loop)</h1>
   <p class="pdf"><a href="../pdf/agent_methodology.pdf">PDF version</a></p>
 
   <div class="figure">
-    <svg viewBox="0 0 1000 1400" role="img" aria-label="Flowchart of how the chat agent loads the data once and then answers each question in rounds of model requests and tool calls">
+    <svg viewBox="0 0 1000 1760" role="img" aria-label="Flowchart of how the chat agent loads the data once, then for each question retrieves facts and reference topics, answers in rounds of model requests and tool calls, and checks the answer for table and column names">
       <defs>
         <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z"/></marker>
       </defs>
 
-      <text class="ph" x="130" y="30">ONCE, WHEN THE STORAGE KEY IS ENTERED</text>
+      <text class="ph" x="130" y="30">ONCE, WHEN THE DATABASE KEY IS ENTERED</text>
 
       <rect class="b web" x="130" y="45" width="340" height="70" rx="10"/>
-      <text class="t" x="300" y="75">Analyst enters the storage key</text>
+      <text class="t" x="300" y="75">Analyst enters the database key</text>
       <text class="sm" x="300" y="97">web/app.js</text>
       <g class="badge"><circle cx="130" cy="45" r="13"/><text x="130" y="45">A</text></g>
 
@@ -126,81 +128,117 @@
       <text class="s" x="300" y="442">added to the conversation</text>
       <g class="badge"><circle cx="130" cy="390" r="13"/><text x="130" y="390">1</text></g>
 
-      <rect class="b ai" x="130" y="490" width="340" height="100" rx="10"/>
-      <text class="t" x="300" y="516">Agent builds the request</text>
-      <text class="s" x="300" y="538">instructions and core reference</text>
-      <text class="s" x="300" y="555">every table's columns and their meanings</text>
-      <text class="s" x="300" y="572">the whole conversation · 5 tool definitions</text>
+      <rect class="b data" x="130" y="490" width="340" height="100" rx="10"/>
+      <text class="t" x="300" y="518">Agent retrieves before asking the model</text>
+      <text class="s" x="300" y="541">summary queries on the in-browser tables</text>
+      <text class="s" x="300" y="558">and reference topics, added to the question</text>
+      <text class="sm" x="300" y="577">web/retrieve.js</text>
       <g class="badge"><circle cx="130" cy="490" r="13"/><text x="130" y="490">2</text></g>
 
-      <rect class="b ai" x="130" y="620" width="340" height="70" rx="10"/>
-      <text class="t" x="300" y="648">Send the request to the language model</text>
-      <text class="sm" x="300" y="670">nvidia/nemotron-3.5-lightning:free</text>
+      <rect class="b ai" x="130" y="620" width="340" height="100" rx="10"/>
+      <text class="t" x="300" y="646">Agent builds the request</text>
+      <text class="s" x="300" y="668">same instructions, example queries, core</text>
+      <text class="s" x="300" y="685">reference and table columns every time</text>
+      <text class="s" x="300" y="702">+ the conversation · 4 tool definitions</text>
       <g class="badge"><circle cx="130" cy="620" r="13"/><text x="130" y="620">3</text></g>
 
-      <polygon class="b dec" points="300,715 440,765 300,815 160,765"/>
-      <text class="dt" x="300" y="760">Does the reply</text>
-      <text class="dt" x="300" y="778">call any tools?</text>
-      <g class="badge"><circle cx="160" cy="765" r="13"/><text x="160" y="765">4</text></g>
+      <rect class="b ai" x="130" y="750" width="340" height="70" rx="10"/>
+      <text class="t" x="300" y="778">Send the request to the language model</text>
+      <text class="sm" x="300" y="800">nvidia/nemotron-3.5-lightning:free</text>
+      <g class="badge"><circle cx="130" cy="750" r="13"/><text x="130" y="750">4</text></g>
 
-      <rect class="b data" x="130" y="845" width="340" height="80" rx="10"/>
-      <text class="t" x="300" y="873">Agent runs each tool call</text>
-      <text class="s" x="300" y="894">on the in-browser tables or</text>
-      <text class="s" x="300" y="911">the reference files</text>
-      <g class="badge"><circle cx="130" cy="845" r="13"/><text x="130" y="845">5</text></g>
+      <polygon class="b dec" points="300,845 440,895 300,945 160,895"/>
+      <text class="dt" x="300" y="890">Does the reply</text>
+      <text class="dt" x="300" y="908">call any tools?</text>
+      <g class="badge"><circle cx="160" cy="895" r="13"/><text x="160" y="895">5</text></g>
 
-      <rect class="b ai" x="130" y="955" width="340" height="80" rx="10"/>
-      <text class="t" x="300" y="983">Add the results to the conversation</text>
-      <text class="s" x="300" y="1004">each result cut to at most 200 rows</text>
-      <text class="s" x="300" y="1021">and 30,000 characters</text>
-      <g class="badge"><circle cx="130" cy="955" r="13"/><text x="130" y="955">6</text></g>
+      <rect class="b data" x="130" y="975" width="340" height="80" rx="10"/>
+      <text class="t" x="300" y="1003">Agent runs each tool call</text>
+      <text class="s" x="300" y="1024">on the in-browser tables or</text>
+      <text class="s" x="300" y="1041">the reference files</text>
+      <g class="badge"><circle cx="130" cy="975" r="13"/><text x="130" y="975">6</text></g>
 
-      <polygon class="b dec" points="300,1060 440,1110 300,1160 160,1110"/>
-      <text class="dt" x="300" y="1106">12 requests to the</text>
-      <text class="dt" x="300" y="1124">model used?</text>
-      <g class="badge"><circle cx="160" cy="1110" r="13"/><text x="160" y="1110">7</text></g>
+      <rect class="b ai" x="130" y="1085" width="340" height="80" rx="10"/>
+      <text class="t" x="300" y="1113">Add the results to the conversation</text>
+      <text class="s" x="300" y="1134">each result cut to at most 200 rows</text>
+      <text class="s" x="300" y="1151">and 30,000 characters</text>
+      <g class="badge"><circle cx="130" cy="1085" r="13"/><text x="130" y="1085">7</text></g>
 
-      <rect class="b ai" x="130" y="1190" width="340" height="80" rx="10"/>
-      <text class="t" x="300" y="1218">One last request, tools switched off</text>
-      <text class="s" x="300" y="1239">the model must answer from the</text>
-      <text class="s" x="300" y="1256">results it already has</text>
+      <polygon class="b dec" points="300,1190 440,1240 300,1290 160,1240"/>
+      <text class="dt" x="300" y="1236">12 requests to the</text>
+      <text class="dt" x="300" y="1254">model used?</text>
+      <g class="badge"><circle cx="160" cy="1240" r="13"/><text x="160" y="1240">8</text></g>
 
-      <rect class="b web" x="130" y="1310" width="340" height="70" rx="10"/>
-      <text class="t" x="300" y="1340">Page shows the answer text</text>
-      <text class="s" x="300" y="1362">the queries are not shown</text>
-      <g class="badge"><circle cx="130" cy="1310" r="13"/><text x="130" y="1310">8</text></g>
+      <rect class="b ai" x="130" y="1320" width="340" height="80" rx="10"/>
+      <text class="t" x="300" y="1348">One last request, tools switched off</text>
+      <text class="s" x="300" y="1369">the model must answer from the</text>
+      <text class="s" x="300" y="1386">results it already has</text>
+
+      <polygon class="b dec" points="300,1425 440,1475 300,1525 160,1475"/>
+      <text class="dt" x="300" y="1470">Does the answer name</text>
+      <text class="dt" x="300" y="1488">tables, columns or SQL?</text>
+      <g class="badge"><circle cx="160" cy="1475" r="13"/><text x="160" y="1475">9</text></g>
+
+      <rect class="b ai" x="130" y="1555" width="340" height="80" rx="10"/>
+      <text class="t" x="300" y="1583">One rewrite request, tools off</text>
+      <text class="s" x="300" y="1604">the same numbers and conclusions,</text>
+      <text class="s" x="300" y="1621">in plain words</text>
+
+      <rect class="b web" x="130" y="1665" width="340" height="70" rx="10"/>
+      <text class="t" x="300" y="1695">Page shows the answer text</text>
+      <text class="s" x="300" y="1717">the queries are not shown</text>
+      <g class="badge"><circle cx="130" cy="1665" r="13"/><text x="130" y="1665">10</text></g>
 
       <!-- main arrows -->
       <path class="arrow" d="M300,460 V486"/>
       <path class="arrow" d="M300,590 V616"/>
-      <path class="arrow" d="M300,690 V711"/>
-      <path class="arrow" d="M300,815 V841"/>
-      <text class="yn" x="308" y="836">Yes</text>
-      <path class="arrow" d="M300,925 V951"/>
-      <path class="arrow" d="M300,1035 V1056"/>
-      <path class="arrow" d="M300,1160 V1186"/>
-      <text class="yn" x="308" y="1180">Yes</text>
-      <path class="arrow" d="M300,1270 V1306"/>
+      <path class="arrow" d="M300,720 V746"/>
+      <path class="arrow" d="M300,820 V841"/>
+      <path class="arrow" d="M300,945 V971"/>
+      <text class="yn" x="308" y="966">Yes</text>
+      <path class="arrow" d="M300,1055 V1081"/>
+      <path class="arrow" d="M300,1165 V1186"/>
+      <path class="arrow" d="M300,1290 V1316"/>
+      <text class="yn" x="308" y="1310">Yes</text>
+      <path class="arrow" d="M300,1400 V1421"/>
+      <path class="arrow" d="M300,1525 V1551"/>
+      <text class="yn" x="308" y="1545">Yes</text>
+      <path class="arrow" d="M300,1635 V1661"/>
 
-      <!-- No from decision 4: straight to the answer -->
-      <path class="arrow" d="M160,765 H60 V1345 H126"/>
-      <text class="yn" x="100" y="757">No</text>
-      <text class="yn" transform="translate(52,1060) rotate(-90)" style="text-anchor:middle">No tool call: the reply is the answer</text>
+      <!-- No from decision 5: the reply is the answer, checked at decision 9 -->
+      <path class="arrow" d="M160,895 H60 V1475 H156"/>
+      <text class="yn" x="100" y="887">No</text>
+      <text class="yn" transform="translate(52,1185) rotate(-90)" style="text-anchor:middle">No tool call: the reply is the answer</text>
 
-      <!-- No from decision 7: next round -->
-      <path class="arrow" d="M440,1110 H560 V655 H474"/>
-      <text class="yn" x="450" y="1100">No</text>
-      <text class="s" x="568" y="720" style="text-anchor:start">next round</text>
+      <!-- No from decision 8: next round -->
+      <path class="arrow" d="M440,1240 H560 V785 H474"/>
+      <text class="yn" x="450" y="1230">No</text>
+      <text class="s" x="568" y="850" style="text-anchor:start">next round</text>
+
+      <!-- No from decision 9: show the answer -->
+      <path class="arrow" d="M440,1475 H520 V1700 H474"/>
+      <text class="yn" x="450" y="1465">No</text>
+
+      <!-- what step 2 retrieves -->
+      <rect class="b data" x="610" y="455" width="370" height="200" rx="10"/>
+      <text class="tl" x="626" y="481" style="font-weight:700">What step 2 adds to the question</text>
+      <text class="tl" x="626" y="507">A CompID named in it, or in an earlier question:</text>
+      <text class="tl" x="640" y="527">activity per month, messages per type,</text>
+      <text class="tl" x="640" y="547">rejections per reject code with meanings,</text>
+      <text class="tl" x="640" y="567">and how its orders ended</text>
+      <text class="tl" x="626" y="593">A month: the same facts for that month only</text>
+      <text class="tl" x="626" y="613">A reject code: its meaning</text>
+      <text class="tl" x="626" y="639">Words such as test, session or logon: up to 2 topics</text>
+      <path class="arrow" d="M606,540 H474" style="stroke-dasharray:5 4"/>
 
       <!-- tools -->
-      <rect class="b data" x="610" y="790" width="370" height="190" rx="10"/>
-      <text class="tl" x="626" y="816" style="font-weight:700">The 5 tools the model can call</text>
-      <text class="tlm" x="626" y="844">run_sql</text><text class="tl" x="730" y="844">runs one SELECT query on the tables</text>
-      <text class="tlm" x="626" y="870">describe_table</text><text class="tl" x="738" y="870">common values of each column</text>
-      <text class="tlm" x="626" y="896">list_tables</text><text class="tl" x="718" y="896">every table and column</text>
-      <text class="tlm" x="626" y="922">read_reference</text><text class="tl" x="740" y="922">one JSE reference topic</text>
-      <text class="tlm" x="626" y="948">lookup_reject_codes</text><text class="tl" x="776" y="948">reject code meanings</text>
-      <path class="arrow" d="M606,885 H474" style="stroke-dasharray:5 4"/>
+      <rect class="b data" x="610" y="930" width="370" height="165" rx="10"/>
+      <text class="tl" x="626" y="956" style="font-weight:700">The 4 tools the model can call</text>
+      <text class="tlm" x="626" y="984">run_sql</text><text class="tl" x="730" y="984">runs one SELECT query on the tables</text>
+      <text class="tlm" x="626" y="1010">describe_table</text><text class="tl" x="738" y="1010">common values of each column</text>
+      <text class="tlm" x="626" y="1036">read_reference</text><text class="tl" x="740" y="1036">one JSE reference topic</text>
+      <text class="tlm" x="626" y="1062">lookup_reject_codes</text><text class="tl" x="776" y="1062">reject code meanings</text>
+      <path class="arrow" d="M606,1015 H474" style="stroke-dasharray:5 4"/>
     </svg>
     <div class="legend">
       <span class="l-web">Chat page and analyst</span>

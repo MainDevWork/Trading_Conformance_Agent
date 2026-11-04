@@ -2,7 +2,7 @@
 -- they do not come from the Excel files.
 --   dim_message_type        the name of each message type code (FIX tag 35, MsgType)
 --   dim_code                the meaning of each code value, per column, from JSE Volume 01E (Native Trading Gateway)
---   volume10_reject_reason  every reject code in JSE Volume 10 (docs/jse/volume-10---reject-codes-and-reasons.xlsx),
+--   volume10_reject_reason  every reject code in JSE Volume 10 (Reject Codes and Reasons), copied from web/knowledge/reject_codes.json,
 --                           with its reason and the JSE system that sends it; a code can have several entries
 
 USE TradingConformance;

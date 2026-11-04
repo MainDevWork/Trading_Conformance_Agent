@@ -7,11 +7,10 @@ A web chat page where a JSE Trading Operations analyst asks questions about the 
 | Path | Contents |
 |---|---|
 | `index.html` | The page. Stays in the root so GitHub Pages serves it as the site's home page. |
-| `web/` | The page's code: `app.js` (chat screen and keys form), `agent.js` (language model and its tools), `data.js` (loads the data into the browser), `style.css`, `icon.svg` (the agent's icon, also the browser tab icon) |
+| `web/` | The page's code: `app.js` (chat screen and keys form), `retrieve.js` (facts and reference found before the model is asked), `agent.js` (language model and its tools), `data.js` (loads the data into the browser), `style.css`, `icon.svg` (the agent's icon, also the browser tab icon) |
 | `web/knowledge/` | The JSE conformance reference the agent reads (see below) |
 | `code/` | Python scripts that build the bronze, silver and gold layers in Supabase |
-| `docs/jse/` | The JSE specification documents the reference was taken from: Volumes 00E, 01E, 10, 201, 202 |
-| `docs/academy/html/` | The diagram pages: `system_architecture.html`, `agent_methodology.html`, `data_architecture.html`, `gold_star_schema.html`, `bronze_data_diagram.html`, `bronze_silver_uml.html` |
+| `docs/academy/html/` | The diagram pages: `system_architecture.html`, `agent_methodology.html`, `data_architecture.html`, `bronze_data_diagram.html` (bronze layer), `silver_layer.html` (silver layer), `gold_star_schema.html` (gold layer) |
 | `docs/academy/pdf/` | Academy project brief, Group 6 problem statement, and `agent_methodology.pdf` |
 | `docs/academy/sql/` | SQL Server scripts that build the same bronze, silver and gold tables from the Excel files (see `docs/academy/sql/README.md`) |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are; must stay in the root |
@@ -32,18 +31,19 @@ Every question is sent to the model `nvidia/nemotron-3.5-lightning:free`, set as
 ## How a question is answered
 
 1. When the database key is entered, `web/data.js` downloads `gold/manifest.json` and the gold Parquet tables from Supabase (Parquet is a compressed file format for tables), and loads them into DuckDB-WASM, the version of the DuckDB SQL database that runs in the browser.
-2. `web/agent.js` sends the conversation to OpenRouter with a system prompt describing conformance testing and the tables, followed by `web/knowledge/core.md`, plus five tools the model may call:
-   - `list_tables`: every table, its description, row count and columns with their meanings.
-   - `describe_table`: for one table, each column's meaning, distinct-value count, empty-value count and most common values, plus 5 sample rows.
+2. `web/retrieve.js` searches the question for the CompIDs, months, reject codes and test IDs it names. A follow-up question that names no CompID uses the CompID of the latest earlier question that did. For each CompID (at most 2) it runs four summary queries on the in-browser tables: activity per month, messages per type, rejections per reject code with their meanings, and how the CompID's orders ended, limited to the months named. It adds the meaning of each reject code named and up to 2 topic files from `web/knowledge/`, chosen by words in the question. The results, with the SQL that produced them, are added to the question. No language model is involved in this step.
+3. `web/agent.js` sends the conversation to OpenRouter. The system prompt is the same text in every request: instructions with four example queries, `web/knowledge/core.md`, and every table's columns with their meanings. The model may call four tools:
    - `run_sql`: one SELECT statement, returning at most 200 rows.
+   - `describe_table`: for one table, each column's meaning, distinct-value count, empty-value count and most common values, plus 5 sample rows.
    - `read_reference`: one topic file from `web/knowledge/`.
    - `lookup_reject_codes`: the Volume 10 meaning of the given reject codes, from `web/knowledge/reject_codes.json`.
-3. `web/agent.js` runs each tool call the model makes and returns the result to the model, up to 12 rounds, until the model replies with text.
-4. The page shows the answer text only; the tool calls and their SQL are not shown.
+   `web/agent.js` runs each tool call the model makes and returns the result to the model, up to 12 rounds, until the model replies with text.
+4. If the answer contains a table name, a column name with an underscore or an SQL query, `web/agent.js` asks the model once to rewrite it in plain words, with tools switched off.
+5. The page shows the answer text only; the tool calls and their SQL are not shown.
 
 ## Reference files: `web/knowledge/`
 
-Taken from the documents in `docs/jse/` and `docs/academy/`. Only `core.md` is sent with every question; the model reads the others when a question needs them, so a question costs only the reference it uses.
+Taken from JSE Volumes 00E, 01E, 10, 201 and 202 (the versions are listed at the top of `core.md`) and the documents in `docs/academy/pdf/`. Only `core.md` is sent with every question. `web/retrieve.js` adds up to 2 others to a question whose words match them, and the model can read any other with `read_reference`, so a question costs only the reference it uses.
 
 | File | Contents |
 |---|---|
@@ -58,7 +58,7 @@ Taken from the documents in `docs/jse/` and `docs/academy/`. Only `core.md` is s
 | `gateway_rules.md` | Logon, heartbeats, rate limit, cancel on disconnect, recovery, circuit breakers, self-match prevention |
 | `conformance_process.md` | Conformance rules, the Volume 202 report, exemptions |
 
-To add a topic, add the file and an entry in `REFERENCE_TOPICS` in `web/agent.js`. When the JSE publishes a new version of a volume, replace it in `docs/jse/` and update the matching file here.
+To add a topic, add the file, an entry in `REFERENCE_TOPICS` in `web/agent.js`, and the words that select it in `TOPIC_WORDS` in `web/retrieve.js`. When the JSE publishes a new version of a volume, update the matching file here.
 
 ## Rebuild the Supabase data
 

@@ -1,5 +1,9 @@
 // The conformance agent: a chat model on OpenRouter that answers questions by calling tools
 // that query the FIX message tables in DuckDB-WASM (the version of DuckDB that runs in the browser).
+// Before the first model request, retrieve.js queries the tables and reads reference topics for what the question
+// names, and sends the results with the question, so the model needs fewer rounds of tool calls.
+
+import { retrieve } from "./retrieve.js?v=10";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -13,58 +17,60 @@ export const MODEL = "nvidia/nemotron-3.5-lightning:free";
 // Kept for copies of web/app.js saved in browsers before 01/11/2026, which import this name.
 export const DEFAULT_MODEL = MODEL;
 
+// The fixed part of every request: the same text, in the same order, for every question and every round, so a
+// provider that keeps a copy of a repeated prompt start can reuse it. Facts that change per question are sent with
+// the question instead (see retrieve.js).
 const SYSTEM_PROMPT = `You are the Trading Conformance Agent for JSE Trading Operations.
 
 Background: before a client may trade on the JSE production market or consume production market data, it must pass
-conformance testing. The client sends FIX messages from its test system using a CompID (the identifier of the
-client's trading session). Every message is recorded in Vonnegut, the JSE message-capture platform. Trading
-Operations exports those messages to Excel and checks whether the client completed each required test scenario
-correctly. Analysts currently investigate by hand when the conformance report is below a 100% pass rate, or when
-the report says a scenario failed but the messages show the client did it correctly. Your job is to answer
-questions about these messages accurately, so analysts can find out what a client actually did and why a test failed.
+conformance testing. The client sends messages from its test system using a CompID (the identifier of the client's
+trading session). Every message is recorded in Vonnegut, the JSE message-capture platform. Trading Operations exports
+those messages to Excel and checks whether the client completed each required test scenario correctly. Analysts
+investigate by hand when the conformance report is below a 100% pass rate, or when the report says a scenario failed
+but the messages show the client did it correctly. Your job is to answer questions about these messages accurately,
+so analysts can find out what a client actually did and why a test failed.
 
-The data: Vonnegut Excel exports for July, August and September 2026, arranged as a star schema in DuckDB:
-- fact_message: one row per distinct message of every type (repeated export rows already merged; copies counts
-  them), with comp_id, timestamp, date, message_type and every message field. Filter on message_type:
-  A Logon | B Logon Response | 5 Logout | D New Order | F Order Cancel Request | G Order Cancel/Replace Request |
-  q Order Mass Cancel Request | 8 Execution Report | 9 Order Cancel Reject | r Order Mass Cancel Report |
-  3 Reject (gateway validation; ref_message_type is the type of the rejected message).
-  order_id is filled on requests linked to their JSE reply, so WHERE order_id = '...' returns an order's
-  New Order, amends, cancels and execution reports together.
-  is_rejection is true for every message that rejects something the client sent. Use WHERE is_rejection to find or
-  count rejections and their reject codes: reject_code is also filled on Logon Responses that are not rejections
-  (0 means logged in; 3 means logged in, with a password policy warning).
-  Every code column has a column beside it ending in _name with the code's meaning (side_name, order_type_name,
-  time_in_force_name, order_status_name, message_type_name, ...). report_event says what happened to the order in
-  an execution report (New (accepted), Amended, Cancelled, Expired, Rejected, Trade, ...) in every month; use it
-  instead of execution_type, which is empty in July, or order_status, which is empty in August.
-- fact_order: one row per order (order_id) with comp_id, how it was entered, outcome (Filled, Cancelled, Expired,
-  Rejected, ...), reject_code, counts of execution reports, trades, amend and cancel requests.
-- fact_compid_day: one row per comp_id per date with counts of each kind of message. Use it first for any
-  question about what a CompID did or when it tested.
-- dim_compid, dim_date, dim_security: one row per CompID, day and instrument.
-- dim_message_type, dim_code (column_name, code, meaning) and dim_reject_code (reject_code, meaning, seen_on).
-  Join dim_reject_code to put the meaning of a reject code in the same query; other codes already have
-  their meaning in the _name columns.
-Every table's columns and their meanings are listed at the end of these instructions, so do not call
-list_tables before writing a query.
+The data: the Vonnegut exports of July, August and September 2026 as a star schema in DuckDB. The core JSE conformance
+reference and every table's columns with their meanings are at the end of these instructions. Start from
+fact_compid_day for what a CompID did and on which days, fact_message for single messages, fact_order for whole orders.
 
-The messages come from the JSE Basic Native Trading Gateway, not FIX. The core of the JSE conformance reference is at
-the end of these instructions. The rest is split into topics: before you interpret a code, a test or a time, call
-read_reference for the topic that covers it, and call lookup_reject_codes for any reject code. Do not use standard FIX
-tag numbers or code meanings, and do not state a code meaning or test rule from memory.
+A question may come with a block headed "Retrieved for this question": facts already queried from the data, with
+the SQL that produced them, and reference topics already read. Use it first. Do not run a query or read a topic that
+the block already answers; adapt its SQL when you need a variation.
 
 How to work:
-- Always get numbers from the tools. Never estimate or invent a count, a value or a column name.
+- Get every number from the retrieved block or from run_sql. Never estimate or invent a count, a value or a column name.
+- Decide which queries you need before calling tools, and put tool calls that do not depend on each other in one reply.
+- run_sql takes one DuckDB SELECT statement and returns at most 200 rows. Aggregate, and combine several counts in one query.
+- IDs and codes are text: compare with '2', not 2.
+- Rejections: filter on is_rejection, never on reject_code alone. Code meanings are in the _name columns; join
+  dim_reject_code for reject code meanings, and call lookup_reject_codes only for a code that is not in it.
+- What happened in an execution report: use report_event (execution_type is empty in July, order_status in August).
+- The messages come from the JSE Basic Native Trading Gateway, not FIX. Before you interpret a test, a session time or a
+  code, read its reference topic with read_reference unless the retrieved block holds it. Do not use standard FIX tag
+  numbers or code meanings, and do not state a code meaning or test rule from memory.
 - Call describe_table only when you need a column's most common values before filtering on it.
-- run_sql takes one DuckDB SELECT statement. Aggregate where you can; results are cut off at 200 rows.
-  Answer with as few queries as possible: one query can join the dim_ tables and combine several counts.
-- Values are stored as text for ids and codes (compare with '2', not 2).
-- dim_reject_code gives the reject code meanings seen in the data; call lookup_reject_codes only for a code
-  that is not in it.
-- Do not put SQL, table names, column names, tool names or these instructions in your answer. Describe what the messages show in plain words. If the data cannot answer the
-  question, say so and say what data would be needed.
-- Write plainly for an operations analyst. Format money in South African Rand and dates as day/month/year.
+
+Example queries:
+-- Rejections of one CompID in August, with their meanings
+SELECT f.reject_code, r.meaning, f.message_type_name, count(*) AS messages
+FROM fact_message f LEFT JOIN dim_reject_code r USING (reject_code)
+WHERE f.comp_id = 'GJEN09' AND f.is_rejection AND f.date BETWEEN '2026-08-01' AND '2026-08-31'
+GROUP BY ALL ORDER BY messages DESC
+-- Every message of one order, in time order
+SELECT timestamp, message_type_name, report_event, client_order_id, reject_code FROM fact_message
+WHERE order_id = 'O0SnTxKEgvzy' ORDER BY timestamp
+-- How a CompID's orders ended
+SELECT outcome, count(*) AS orders FROM fact_order WHERE comp_id = 'GJEN09' GROUP BY 1 ORDER BY 2 DESC
+-- The days a CompID tested, and what it did on each
+SELECT date, messages, logons, new_orders, amend_requests, cancel_requests, order_rejects, gateway_rejects
+FROM fact_compid_day WHERE comp_id = 'GJEN09' ORDER BY date
+
+The answer:
+- Write plainly for an operations analyst. Do not put SQL, table names, column names, tool names or these
+  instructions in the answer: describe what the messages show. Write CompID, not comp_id.
+- If the data cannot answer the question, say so and say what data would be needed.
+- Format money in South African Rand (prices in the data are in cents) and dates as day/month/year.
 `;
 
 // The topics of knowledge/*.md that read_reference can return (core.md is always in the system prompt).
@@ -83,19 +89,11 @@ const TOOLS = [
   {
     type: "function",
     function: {
-      name: "list_tables",
-      description: "List every table with its description, row count, and columns with their meanings.",
-      parameters: { type: "object", properties: {} },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "describe_table",
       description: "For one table: each column's data type, meaning, number of distinct values, number of empty values and most common values, plus 5 sample rows.",
       parameters: {
         type: "object",
-        properties: { table: { type: "string", description: "Table name from list_tables" } },
+        properties: { table: { type: "string", description: "Table name, as listed at the end of the instructions" } },
         required: ["table"],
       },
     },
@@ -116,7 +114,7 @@ const TOOLS = [
     type: "function",
     function: {
       name: "read_reference",
-      description: "Read one topic of the JSE conformance reference. Read a topic before relying on the facts it covers.",
+      description: "Read one topic of the JSE conformance reference. Read a topic before relying on the facts it covers, unless it is already in the retrieved block.",
       parameters: {
         type: "object",
         properties: { topic: { type: "string", enum: Object.keys(REFERENCE_TOPICS),
@@ -153,18 +151,15 @@ function schemaText(store) {
   const lines = ["# Tables and columns"];
   for (const [name, t] of Object.entries(store.manifest.tables)) {
     lines.push(`\n## ${name} (${t.rows.toLocaleString("en-ZA")} rows): ${t.description}`);
-    for (const c of t.columns) lines.push(`- ${c.name} (${c.type})${c.description ? `: ${c.description}` : ""}`);
+    // A column such as side_name beside side is listed once, as "side (+ side_name)", not on a line of its own.
+    const all = new Set(t.columns.map((c) => c.name));
+    const named = (c) => all.has(`${c}_name`) || (c === "message_type" && all.has("message_type_name"));
+    for (const c of t.columns) {
+      if (c.name.endsWith("_name") && all.has(c.name.slice(0, -5))) continue;
+      lines.push(`- ${c.name}${named(c.name) ? ` (+ ${c.name}_name, its meaning)` : ""} ${c.type}${c.description ? `: ${c.description}` : ""}`);
+    }
   }
   return lines.join("\n");
-}
-
-function listTables(store) {
-  const tables = {};
-  for (const [name, t] of Object.entries(store.manifest.tables)) {
-    tables[name] = { description: t.description, rows: t.rows,
-                     columns: Object.fromEntries(t.columns.map((c) => [c.name, c.description])) };
-  }
-  return { tables };
 }
 
 // Column statistics are computed by code/gold.py and stored in manifest.json, so no query is needed here.
@@ -194,7 +189,6 @@ async function runSql(store, sql) {
 }
 
 async function runTool(store, name, args) {
-  if (name === "list_tables") return listTables(store);
   if (name === "describe_table") return describeTable(store, args.table || "");
   if (name === "run_sql") return runSql(store, args.sql || "");
   if (name === "read_reference") return readReference(args.topic || "");
@@ -204,7 +198,6 @@ async function runTool(store, name, args) {
 
 // What the page shows while each tool runs.
 const STEP_TEXT = {
-  list_tables: "Reading the list of tables",
   describe_table: "Reading a table's columns",
   run_sql: "Running a database query",
   read_reference: "Reading the JSE conformance reference",
@@ -271,20 +264,43 @@ async function lookupRejectCodes(codes) {
            note: "A code can have several entries; use the one whose messages and system match where the code was seen (Native Trading Gateway, Matching Engine or AuthServer for these exports)." };
 }
 
-// history is the visible conversation: [{role: "user"|"assistant", content}, ...].
-// onStep(text) is called before each model request and each tool call, so the page can show what is happening.
-// Returns the agent's answer and the tool calls it made to reach it.
+// Table names, and column names that contain an underscore, that appear in an answer; "SQL" when it contains a query.
+// The instructions forbid them, and smaller models sometimes include them anyway.
+function namesInAnswer(store, answer) {
+  const names = new Set(Object.keys(store.manifest.tables));
+  for (const t of Object.values(store.manifest.tables)) for (const c of t.columns) if (c.name.includes("_")) names.add(c.name);
+  const found = [...new Set((answer.match(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g) || []).filter((w) => names.has(w)))];
+  if (/\bSELECT\b[\s\S]{1,400}?\bFROM\b/.test(answer)) found.push("SQL");
+  return found;
+}
+
+// history is the visible conversation: [{role: "user"|"assistant", content}, ...]; the last entry is the new question.
+// onStep(text) is called before each step, so the page can show what is happening.
+// Returns the agent's answer and the steps it took to reach it.
 export async function chat(store, apiKey, history, onStep = () => {}) {
   const model = MODEL;
   const core = await loadKnowledge("core.md");
-  const messages = [{ role: "system", content: `${SYSTEM_PROMPT}\n\n${core}\n\n${schemaText(store)}` },
-    ...history.filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content }))];
+  const turns = history.filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content }));
   const steps = [];
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+
+  // Retrieval: the facts and reference topics for what the question names are added to the question.
+  onStep("Finding the data and reference for the question");
+  const question = turns[turns.length - 1];
+  const earlier = turns.slice(0, -1).filter((m) => m.role === "user").map((m) => m.content);
+  const found = await retrieve(store, question.content, earlier, async (topic) => (await readReference(topic)).text);
+  if (found.text) {
+    question.content = `${question.content}\n\n${found.text}`;
+    steps.push({ tool: "retrieve", args: { compids: found.compids, months: found.months, codes: found.codes, topics: found.topics },
+                 result: found.text.slice(0, 4000) });
+  }
+
+  const messages = [{ role: "system", content: `${SYSTEM_PROMPT}\n\n${core}\n\n${schemaText(store)}` }, ...turns];
+  let answer = null;
+  for (let round = 0; round < MAX_TOOL_ROUNDS && answer === null; round++) {
     onStep(`Waiting for the language model's reply (request ${round + 1})`);
     const reply = await callModel(apiKey, messages, model);
     const toolCalls = reply.tool_calls || [];
-    if (!toolCalls.length) return { answer: reply.content || "", steps, model };
+    if (!toolCalls.length) { answer = reply.content || ""; break; }
 
     messages.push({ role: "assistant", content: reply.content ?? null, tool_calls: toolCalls });
     for (const call of toolCalls) {
@@ -300,11 +316,26 @@ export async function chat(store, apiKey, history, onStep = () => {}) {
       messages.push({ role: "tool", tool_call_id: call.id, content: text });
     }
   }
-  // Out of tool rounds: ask for an answer from the results already gathered instead of discarding them.
-  messages.push({ role: "user", content: "You have used all your tool calls. Answer now from the tool results above. " +
-    "Say plainly which parts of the question you could not finish." });
-  onStep("Waiting for the language model's final answer");
-  const final = await callModel(apiKey, messages, model, false);
-  const answer = final.content || "I stopped after the maximum number of tool calls without reaching an answer. Try a narrower question.";
+  if (answer === null) {
+    // Out of tool rounds: ask for an answer from the results already gathered instead of discarding them.
+    messages.push({ role: "user", content: "You have used all your tool calls. Answer now from the tool results above. " +
+      "Say plainly which parts of the question you could not finish." });
+    onStep("Waiting for the language model's final answer");
+    const final = await callModel(apiKey, messages, model, false);
+    answer = final.content || "I stopped after the maximum number of tool calls without reaching an answer. Try a narrower question.";
+  }
+
+  // Plain-words check: an answer that names tables, columns or SQL is rewritten once, with tools switched off.
+  const names = namesInAnswer(store, answer);
+  if (names.length) {
+    onStep("Rewriting the answer in plain words");
+    messages.push({ role: "assistant", content: answer });
+    messages.push({ role: "user", content: `Rewrite your answer above for the analyst. It contains ${names.join(", ")}: ` +
+      "replace each with plain words (for example CompID for comp_id, rejections for is_rejection) and remove any SQL. " +
+      "Keep every number, date and conclusion unchanged, and do not add anything." });
+    const rewrite = await callModel(apiKey, messages, model, false);
+    steps.push({ tool: "rewrite", args: { names }, result: "" });
+    if (rewrite.content) answer = rewrite.content;
+  }
   return { answer, steps, model };
 }
