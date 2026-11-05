@@ -2,8 +2,8 @@
 // an Excel workbook (ExcelJS) or a PDF (jsPDF with its table plug-in). Both files use the same layout, defined once
 // below: a summary, then one row per test step, then (Excel only) every message found for each test step.
 
-import { loadScript } from "./attachments.js?v=14";
-import { RESULTS, fmtClock, fmtDate } from "./conformance.js?v=14";
+import { loadScript } from "./attachments.js?v=15";
+import { RESULTS, fmtClock, fmtDate } from "./conformance.js?v=15";
 
 const EXCELJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
 const JSPDF_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
@@ -87,8 +87,8 @@ function summaryRows(c, summary) {
 
 const fileStem = (c) => `Conformance results - ${c.compids.join(" ") || "client"} - ${fmtDate(c.checkedAt).replace(/\//g, "-")}`;
 
-// Builds the workbook. ExcelJS is passed in, so the same layout can be written outside the browser (the blank
-// template in academy/docs/ is written this way).
+// Builds the workbook. ExcelJS is passed in, so the same layout can be written outside the browser. The layout is
+// described in knowledge/client_report_template.md; change that file when the layout changes.
 export function buildWorkbook(ExcelJS, c, summary = "") {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Trading Conformance Agent";

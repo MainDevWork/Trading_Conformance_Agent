@@ -13,7 +13,6 @@ A web chat page where a JSE Trading Operations analyst asks questions about the 
 | `web/knowledge/` | The JSE conformance reference the agent reads (see below)                                                                                                                                                                                                                                             |
 | `code/`          | Python scripts that build the bronze, silver and gold layers in Supabase                                                                                                                                                                                                                              |
 | `academy/html/`  | The diagram pages: `system_architecture.html`, `agent_methodology.html`, `data_architecture.html`, `bronze_data_diagram.html` (bronze layer), `silver_layer.html` (silver layer), `gold_star_schema.html` (gold layer)                                                                    |
-| `academy/docs/`  | Academy project brief, Group 6 problem statement, `agent_methodology.pdf`, `raw_data_dictionary.pdf`: every field of the 11 raw datasets, its format in the export, its meaning, the months it appears in and how often it is filled, and `client_report_template.xlsx`: the layout of the report to the client, with each cell saying what goes in it |
 | `academy/sql/`   | SQL Server stored procedures, one per layer, that build the same bronze, silver and gold tables from the Excel files (see `academy/sql/README.md`)                                                                                                                                                  |
 | `Clients_Conformance_Tests/` | Clients' Volume 202 reports with real CompIDs. Excluded from git. `Fictitious_CompIDs/` in it holds copies with the fictitious CompIDs, as Excel and PDF, made by `code/anonymise_reports.py`; use only these with the page |
 | `.nojekyll`      | Tells GitHub Pages to serve the files as they are; must stay in the root                                                                                                                                                                                                                              |
@@ -48,7 +47,7 @@ A client sends its Volume 202 conformance test report: one row per test step, wi
    | Not attempted | The client gave no response. |
 
 4. The results are sent to the model with that prompt and every later question, and the model is told to do only what the prompt asks. The model has two more tools: `get_test_evidence` (every message of one step) and `create_client_report`. A closed section under the first answer, opened by a click, holds the result of each step.
-5. The **Excel report** and **PDF report** buttons in that section, or asking the agent for a report, write the file for the client: a summary, then one row per test step with its result and reason, then (Excel only) every message found. The analyst can ask the agent to change a result; the report then says the analyst changed it and keeps the automatic reason. The layout is in `academy/docs/client_report_template.xlsx`.
+5. The **Excel report** and **PDF report** buttons in that section, or asking the agent for a report, write the file for the client: a summary, then one row per test step with its result and reason, then (Excel only) every message found. The analyst can ask the agent to change a result; the report then says the analyst changed it and keeps the automatic reason. The layout is in `web/knowledge/client_report_template.md`.
 
 The September 2026 export has no time in force or order quantity on new orders and no liquidity indicator on execution reports, so tests that need those (for example T21-001) get Needs review, with what the timing of the messages shows.
 
@@ -83,7 +82,7 @@ The button at the top left of the chat area (a rectangle with a line down its le
 
 ## Reference files: `web/knowledge/`
 
-Taken from JSE Volumes 00E, 01E, 10, 201 and 202 (the versions are listed at the top of `core.md`) and the documents in `academy/docs/`. Only `core.md` is sent with every question. `web/retrieve.js` adds up to 2 others to a question whose words match them, and the model can read any other with `read_reference`, so a question costs only the reference it uses.
+Taken from JSE Volumes 00E, 01E, 10, 201 and 202 (the versions are listed at the top of `core.md`). Only `core.md` is sent with every question. `web/retrieve.js` adds up to 2 others to a question whose words match them, and the model can read any other with `read_reference`, so a question costs only the reference it uses.
 
 | File                       | Contents                                                                                                                                             |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -97,6 +96,11 @@ Taken from JSE Volumes 00E, 01E, 10, 201 and 202 (the versions are listed at the
 | `identifiers.md`         | How the ID columns link messages                                                                                                                     |
 | `gateway_rules.md`       | Logon, heartbeats, rate limit, cancel on disconnect, recovery, circuit breakers, self-match prevention                                               |
 | `conformance_process.md` | Conformance rules, the Volume 202 report, exemptions                                                                                                 |
+| `raw_data_dictionary.md` | Every field of the 11 raw datasets: its format in the export, its meaning, the months it appears in and how often it is filled |
+| `client_report_template.md` | The layout of the report to the client: each sheet and column, and what goes in it. `web/client_report.js` writes the report; this file describes it |
+| `agent_methodology.md` | How the agent answers a question and handles an attached report, in the same steps as `academy/html/agent_methodology.html` |
+| `problem_statement.md` | Group 6 problem statement |
+| `project_brief.md` | JSE Academy final project brief |
 
 To add a topic, add the file, an entry in `REFERENCE_TOPICS` in `web/agent.js`, and the words that select it in `TOPIC_WORDS` in `web/retrieve.js`. When the JSE publishes a new version of a volume, update the matching file here.
 

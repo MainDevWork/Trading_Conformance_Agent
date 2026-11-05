@@ -13,6 +13,11 @@ const TOPIC_WORDS = {
   identifiers: /client order id|clordid|order id|execution id|public order|\blink/i,
   gateway_rules: /log ?on|log ?out|heartbeat|message rate|throttl|disconnect|recover|password|self.?match|circuit/i,
   field_codes: /time in force|\b(IOC|FOK|GTC|GTD|GTT|GFA|ATC|OPG)\b|order status|liquidity|working indicator|protocol version|\bmeaning/i,
+  raw_data_dictionary: /data dictionary|raw (data|export|field|dataset)|export (field|column|format)/i,
+  client_report_template: /report (template|layout)|template/i,
+  agent_methodology: /methodolog|agentic|\bRAG\b|how (do|does) (you|the agent|this agent|this system) work/i,
+  problem_statement: /problem statement|group 6|key challenge|key.person/i,
+  project_brief: /project brief|final project|academy|assessment criteri|deliverable|due date/i,
 };
 const MAX_TOPICS = 2;
 const MAX_COMPIDS = 2;

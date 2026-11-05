@@ -9,8 +9,8 @@
 // conversation this one continues, are sent with every question, and three tools let the model save a note, delete
 // one and search earlier conversations.
 
-import { retrieve } from "./retrieve.js?v=14";
-import { evidenceFor, resultsText } from "./conformance.js?v=14";
+import { retrieve } from "./retrieve.js?v=15";
+import { evidenceFor, resultsText } from "./conformance.js?v=15";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -128,6 +128,11 @@ const REFERENCE_TOPICS = {
   identifiers: "how client_order_id, order_id, execution_id and public_order_id link messages; firm, trader and partition structure",
   gateway_rules: "logon timing, heartbeats, message rate limit, cancel on disconnect, recovery, circuit breakers, self-match prevention",
   conformance_process: "JSE conformance rules (slots, retests, CTA role), the Volume 202 report layout, exemptions, who must conform",
+  raw_data_dictionary: "every field of the 11 raw Vonnegut export datasets: its format in the export, meaning, the months it appears in and how often it is filled",
+  client_report_template: "the layout of the report to the client: each sheet, column and what goes in it, and the meaning of each result",
+  agent_methodology: "how this agent answers a question and handles an attached report, step by step, with its tools and memory",
+  problem_statement: "Group 6 problem statement: the Trading Operations conformance problem, key challenges, why it was chosen and how success is measured",
+  project_brief: "the JSE Academy final project brief: deliverables, due dates, assessment criteria, presentation and ground rules",
 };
 
 // The tools added when a client report is attached.
