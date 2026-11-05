@@ -1,9 +1,9 @@
-import { chat, summarise, startingChars, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=17";
-import { loadStore } from "../agent/data.js?v=17";
-import { readAttachment } from "../reports/attachments.js?v=17";
-import { checkReport } from "../reports/conformance.js?v=17";
-import { makeClientReport } from "../reports/client_report.js?v=17";
-import * as memoryStore from "../agent/memory.js?v=17";
+import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=18";
+import { loadStore } from "../agent/data.js?v=18";
+import { readAttachment } from "../reports/attachments.js?v=18";
+import { checkReport } from "../reports/conformance.js?v=18";
+import { makeClientReport } from "../reports/client_report.js?v=18";
+import * as memoryStore from "../agent/memory.js?v=18";
 
 window.appStarted = true;
 
@@ -25,6 +25,7 @@ const messagesEl = document.getElementById("messages");
 const form = document.getElementById("composer");
 const input = document.getElementById("input");
 const sendBtn = document.getElementById("send");
+const stopBtn = document.getElementById("stop");
 const keyInput = document.getElementById("api-key");
 const supabaseKeyInput = document.getElementById("supabase-key");
 
@@ -117,6 +118,14 @@ function timingLine(totalMs, timing) {
 
 // True while a question is being answered, so a second question waits for the first.
 let busy = false;
+// Cancels the answer being written (an AbortController), or null when no answer is being written. The Stop button
+// takes the place of the Send button until the answer ends.
+let stopper = null;
+stopBtn.addEventListener("click", () => {
+  if (!stopper) return;
+  stopBtn.disabled = true;
+  stopper.abort();
+});
 
 async function send(text) {
   text = text.trim();
@@ -133,6 +142,10 @@ async function send(text) {
   input.value = "";
   busy = true;
   sendBtn.disabled = true;
+  const stop = stopper = new AbortController();
+  sendBtn.hidden = true;
+  stopBtn.hidden = false;
+  stopBtn.disabled = false;
   // The waiting message shows the current step and the seconds since the question was sent.
   const pending = addMessage("assistant", "");
   const pendingBody = pending.querySelector(".body");
@@ -142,10 +155,13 @@ async function send(text) {
   // True while the model's text is being shown in the waiting message, in place of the step.
   let writing = false;
   let drawnAt = 0;
+  // The text of the reply being written, kept if the analyst presses Stop.
+  let partial = "";
   const showStep = () => { if (!writing) pendingBody.textContent = `${step}… ${Math.round((Date.now() - sentAt) / 1000)} s`; };
-  const onStep = (text) => { writing = false; pendingBody.classList.add("thinking"); step = text; showStep(); };
+  const onStep = (text) => { writing = false; partial = ""; pendingBody.classList.add("thinking"); step = text; showStep(); };
   // At most 8 redraws a second; the finished answer replaces this text.
   const onText = (text) => {
+    partial = text;
     if (!writing) { writing = true; pendingBody.classList.remove("thinking"); drawnAt = 0; }
     if (Date.now() - drawnAt < 120) return;
     drawnAt = Date.now();
@@ -155,10 +171,18 @@ async function send(text) {
   };
   showStep();
   const ticker = setInterval(showStep, 1000);
+  // The results of a report checked for this question are added under its answer, in a closed section.
+  const showResultsOnce = () => {
+    if (!attached?.checked || attached.shown) return;
+    attached.shown = true;
+    showChecked(addMessage("attachment", ""), attached.checked);
+    conv.items.push({ role: "attachment", checked: attached.checked });
+  };
 
   try {
-    // A question sent while the data is still loading is answered once loading ends.
-    await loadingDone;
+    // A question sent while the data is still loading is answered once loading ends, unless Stop is pressed first.
+    await Promise.race([loadingDone, new Promise((resolve) => stop.signal.addEventListener("abort", resolve))]);
+    if (stop.signal.aborted) throw new Error("Stopped");
     if (!store) throw new Error("The data did not load, so the question could not be answered. See the message in the sidebar.");
     // A report is checked against the messages when the first question is sent with it, not when it is attached.
     if (attached && !attached.checked) {
@@ -167,6 +191,7 @@ async function send(text) {
       attached.checked = await checkReport(store, attached.report, (text) => { step = text; showStep(); });
       conv.attachment = attached.checked;
       renderAttached();
+      if (stop.signal.aborted) throw new Error("Stopped");
     }
     const made = [];
     const context = attached ? {
@@ -178,30 +203,46 @@ async function send(text) {
         return { created: report.files.map((f) => f.name), overall: report.overall, results: report.counts, changes_applied: report.applied };
       },
     } : null;
-    const data = await chat(store, apiKey, history, onStep, context, await memoryFor(text), onText);
+    const data = await chat(store, apiKey, history, onStep, context, await memoryFor(text), onText, stop.signal);
     pending.remove();
     history.push({ role: "assistant", content: data.answer });
     const answerEl = addMessage("assistant", data.answer);
     answerEl.append(timingLine(Date.now() - sentAt, data.timing));
     if (made.length) answerEl.querySelector(".body").append(downloadLinks(made));
     conv.items.push({ role: "user", content: text, ...(newFile ? { file: newFile } : {}) }, { role: "assistant", content: data.answer, steps: data.steps });
-    // The results of a report checked for this question are added under its answer, in a closed section.
-    if (attached && !attached.shown) {
-      attached.shown = true;
-      showChecked(addMessage("attachment", ""), attached.checked);
-      conv.items.push({ role: "attachment", checked: attached.checked });
-    }
+    showResultsOnce();
     if (data.tokens.firstPrompt) setTokensPerChar(data.tokens.firstPrompt / data.tokens.firstChars);
     if (data.tokens.largestPrompt) conv.largestPrompt = data.tokens.largestPrompt;
     await saveConv();
   } catch (err) {
     pending.remove();
-    history.pop(); // drop the unanswered question so it can be asked again
-    addMessage("error", err.message);
+    if (stop.signal.aborted && partial) {
+      // Stopped while the model was writing: the text so far stays in the conversation, with a note, so the model can
+      // read what it wrote when the analyst sends the next prompt.
+      const kept = `${store ? plainNames(store, partial) : partial}\n\n*Stopped by the analyst before this answer was finished.*`;
+      history.push({ role: "assistant", content: kept });
+      addMessage("assistant", kept);
+      conv.items.push({ role: "user", content: text, ...(newFile ? { file: newFile } : {}) }, { role: "assistant", content: kept, steps: [] });
+      showResultsOnce();
+      await saveConv();
+    } else if (stop.signal.aborted) {
+      // Stopped before the model wrote anything: the question stays on screen but is not part of the conversation.
+      history.pop();
+      const note = document.createElement("div");
+      note.className = "steps";
+      note.textContent = "Stopped before the model wrote anything. This prompt is not part of the conversation.";
+      questionEl.append(note);
+    } else {
+      history.pop(); // drop the unanswered question so it can be asked again
+      addMessage("error", err.message);
+    }
   } finally {
     clearInterval(ticker);
     busy = false;
+    stopper = null;
     sendBtn.disabled = false;
+    sendBtn.hidden = false;
+    stopBtn.hidden = true;
     updateContext();
   }
 }

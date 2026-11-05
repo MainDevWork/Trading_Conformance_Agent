@@ -12,9 +12,9 @@
 // an attached report already answer gets no request at all (direct_answer.js). Replies are streamed, so the page shows
 // the answer as the model writes it.
 
-import { retrieve } from "./retrieve.js?v=17";
-import { evidenceFor, resultsText } from "../reports/conformance.js?v=17";
-import { directAnswer } from "../reports/direct_answer.js?v=17";
+import { retrieve } from "./retrieve.js?v=18";
+import { evidenceFor, resultsText } from "../reports/conformance.js?v=18";
+import { directAnswer } from "../reports/direct_answer.js?v=18";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -433,10 +433,14 @@ async function readStream(response, onPiece, onText) {
 }
 
 // allowTools = false sends tool_choice "none", so the model must reply in text.
-// onText(textSoFar) is called as the reply's text is received.
+// onText(textSoFar) is called as the reply's text is received. stopSignal (an AbortSignal), when it fires, cancels the
+// request: the analyst pressed Stop.
 // Returns the reply message and usage: the token counts OpenRouter reports for the request and the reply.
-async function callModel(apiKey, messages, model, allowTools = true, tools = TOOLS, onText = () => {}) {
+async function callModel(apiKey, messages, model, allowTools = true, tools = TOOLS, onText = () => {}, stopSignal = null) {
   const controller = new AbortController();
+  const cancel = () => controller.abort();
+  if (stopSignal?.aborted) cancel();
+  stopSignal?.addEventListener("abort", cancel);
   let timer;
   const restartTimer = () => { clearTimeout(timer); timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS); };
   restartTimer();
@@ -471,6 +475,7 @@ async function callModel(apiKey, messages, model, allowTools = true, tools = TOO
     throw new Error(`Could not reach OpenRouter: ${err.message || err}`);
   } finally {
     clearTimeout(timer);
+    stopSignal?.removeEventListener("abort", cancel);
   }
 }
 
@@ -505,13 +510,16 @@ async function lookupRejectCodes(codes) {
            note: "A code can have several entries; use the one whose messages and system match where the code was seen (Native Trading Gateway, Matching Engine or AuthServer for these exports)." };
 }
 
+// The error that ends an answer when the analyst presses Stop. The page keeps the text written so far.
+const STOPPED = "Stopped by the analyst.";
+
 // Plain words for the names that appear most often in answers; any other name has its underscores replaced by spaces.
 const PLAIN_NAMES = { comp_id: "CompID", is_rejection: "rejection", reject_code: "reject code", fact_message: "the messages",
                       fact_order: "the orders", fact_compid_day: "the daily activity of each CompID" };
 
 // Table names, and column names that contain an underscore, are replaced in an answer with plain words, with no
 // request to the model. The instructions forbid them, and smaller models sometimes include them anyway.
-function plainNames(store, answer) {
+export function plainNames(store, answer) {
   const names = new Set(Object.keys(store.manifest.tables));
   for (const t of Object.values(store.manifest.tables)) for (const c of t.columns) if (c.name.includes("_")) names.add(c.name);
   return answer.replace(/`?\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b`?/g, (text) => {
@@ -537,8 +545,10 @@ const FILE_READY = "The report for the client is ready to download below.";
 // Returns the agent's answer, the steps it took to reach it, tokens: for the first request, its prompt tokens
 // as OpenRouter counted them and its length in characters; for the largest request, its prompt tokens; and timing:
 // the number of requests to the model and the milliseconds spent waiting for them.
-export async function chat(store, apiKey, history, onStep = () => {}, attachment = null, memory = null, onText = () => {}) {
+// stopSignal (an AbortSignal), when it fires, ends the answer with an error at the next step.
+export async function chat(store, apiKey, history, onStep = () => {}, attachment = null, memory = null, onText = () => {}, stopSignal = null) {
   const model = MODEL;
+  const checkStop = () => { if (stopSignal?.aborted) throw new Error(STOPPED); };
   const startedAt = Date.now();
   const core = await loadKnowledge("core.md");
   const turns = history.filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content }));
@@ -564,6 +574,7 @@ export async function chat(store, apiKey, history, onStep = () => {}, attachment
   const question = turns[turns.length - 1];
   const earlier = turns.slice(0, -1).filter((m) => m.role === "user").map((m) => m.content);
   const found = await retrieve(store, question.content, earlier, async (topic) => (await readReference(topic)).text, Boolean(attachment));
+  checkStop();
   if (found.text) {
     question.content = `${question.content}\n\n${found.text}`;
     steps.push({ tool: "retrieve", args: { compids: found.compids, months: found.months, codes: found.codes, topics: found.topics },
@@ -584,7 +595,7 @@ ${resultsText(attachment.checked, asked)}`;
   };
   const ask = async (allowTools) => {
     const sentAt = Date.now();
-    const reply = await callModel(apiKey, messages, model, allowTools, tools, onText);
+    const reply = await callModel(apiKey, messages, model, allowTools, tools, onText, stopSignal);
     timing.requests++;
     timing.modelMs += Date.now() - sentAt;
     count(reply);
@@ -601,6 +612,7 @@ ${resultsText(attachment.checked, asked)}`;
     messages.push({ role: "assistant", content: reply.content || null, tool_calls: toolCalls });
     let failed = false;
     for (const call of toolCalls) {
+      checkStop();
       const name = call.function.name;
       let args;
       try { args = JSON.parse(call.function.arguments || "{}"); } catch { args = {}; }

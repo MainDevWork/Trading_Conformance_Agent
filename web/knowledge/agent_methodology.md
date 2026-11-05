@@ -17,7 +17,7 @@
 1. The analyst asks a question, which is added to the conversation. If a report is attached and every word of the question is on a fixed list, such as "give me the results", "what failed" or "give me the excel report", the page writes the table or the report file from the fixed-rule results with no request to the model: go to step 10.
 2. The agent retrieves before asking the model (`web/agent/retrieve.js`): summary queries on the in-browser tables and reference topics, added to the question.
 3. The agent builds the request: the same instructions, example queries, core reference and table columns every time, plus the memory notes and the conversation. It offers 7 tools, or 9 with a report.
-4. The agent sends the request to the language model, `nvidia/nemotron-3.5-lightning:free`, with its reasoning step switched off. The reply is streamed, so the page shows the answer as the model writes it.
+4. The agent sends the request to the language model, `nvidia/nemotron-3.5-lightning:free`, with its reasoning step switched off. The reply is streamed, so the page shows the answer as the model writes it. While the agent answers, a Stop button replaces the Send button: it cancels the request and keeps the text written so far in the conversation, marked as stopped, so the analyst can send a different prompt.
 5. Does the reply call any tools? If not, the reply is the answer: go to step 9.
 6. The agent runs each tool call on the in-browser tables or the reference files.
 7. The agent adds the results to the conversation, each cut to at most 200 rows and 30,000 characters. No further request is sent after a report file is written, or after a note is saved in a reply that holds the full answer: go to step 9.
