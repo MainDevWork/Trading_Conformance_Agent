@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Trading Conformance Agent</title>
-  <link rel="icon" href="web/icon.svg?v=12" type="image/svg+xml">
-  <link rel="stylesheet" href="web/style.css?v=12">
+  <link rel="icon" href="web/icon.svg?v=13" type="image/svg+xml">
+  <link rel="stylesheet" href="web/style.css?v=13">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="modulepreload" href="web/agent.js?v=12">
-  <link rel="modulepreload" href="web/data.js?v=12">
-  <link rel="modulepreload" href="web/retrieve.js?v=12">
-  <link rel="modulepreload" href="web/attachments.js?v=12">
-  <link rel="modulepreload" href="web/conformance.js?v=12">
-  <link rel="modulepreload" href="web/client_report.js?v=12">
-  <link rel="modulepreload" href="web/memory.js?v=12">
+  <link rel="modulepreload" href="web/agent.js?v=13">
+  <link rel="modulepreload" href="web/data.js?v=13">
+  <link rel="modulepreload" href="web/retrieve.js?v=13">
+  <link rel="modulepreload" href="web/attachments.js?v=13">
+  <link rel="modulepreload" href="web/conformance.js?v=13">
+  <link rel="modulepreload" href="web/client_report.js?v=13">
+  <link rel="modulepreload" href="web/memory.js?v=13">
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 </head>
@@ -75,7 +75,7 @@
     <div id="messages"></div>
     <!-- Shown in the middle of the chat area while there are no messages (see #messages:empty in style.css). -->
     <div id="welcome" aria-hidden="true">
-      <img src="web/icon.svg?v=12" width="112" height="112" alt="">
+      <img src="web/icon.svg?v=13" width="112" height="112" alt="">
       <div class="welcome-title">Trading Conformance Agent</div>
       <div class="welcome-text">Ask about the conformance test messages of July to September 2026, or attach a client's conformance test report (Excel or PDF) to check it.</div>
     </div>
@@ -96,9 +96,9 @@
     </form>
   </main>
 
-  <!-- ?v=12 is changed whenever a script changes, so the browser downloads all the new scripts together
+  <!-- ?v=13 is changed whenever a script changes, so the browser downloads all the new scripts together
        instead of mixing a saved old copy of one with a new copy of another. -->
-  <script type="module" src="web/app.js?v=12"></script>
+  <script type="module" src="web/app.js?v=13"></script>
   <script>
     // web/app.js sets window.appStarted. If it did not run, the page says so and shows the browser's error.
     const startErrors = [];

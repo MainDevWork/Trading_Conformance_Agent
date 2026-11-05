@@ -9,8 +9,8 @@
 // conversation this one continues, are sent with every question, and three tools let the model save a note, delete
 // one and search earlier conversations.
 
-import { retrieve } from "./retrieve.js?v=12";
-import { evidenceFor, resultsText } from "./conformance.js?v=12";
+import { retrieve } from "./retrieve.js?v=13";
+import { evidenceFor, resultsText } from "./conformance.js?v=13";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;

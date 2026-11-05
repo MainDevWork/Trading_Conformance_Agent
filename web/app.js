@@ -1,9 +1,9 @@
-import { chat, summarise, startingChars, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "./agent.js?v=12";
-import { loadStore } from "./data.js?v=12";
-import { readAttachment } from "./attachments.js?v=12";
-import { checkReport } from "./conformance.js?v=12";
-import { makeClientReport } from "./client_report.js?v=12";
-import * as memoryStore from "./memory.js?v=12";
+import { chat, summarise, startingChars, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "./agent.js?v=13";
+import { loadStore } from "./data.js?v=13";
+import { readAttachment } from "./attachments.js?v=13";
+import { checkReport } from "./conformance.js?v=13";
+import { makeClientReport } from "./client_report.js?v=13";
+import * as memoryStore from "./memory.js?v=13";
 
 window.appStarted = true;
 
@@ -206,7 +206,7 @@ function openConversation(next) {
   if (conv.carried) addMessage("summary", conv.carried);
   for (const item of conv.items) {
     if (item.role === "attachment") showChecked(addMessage("attachment", ""), item.checked);
-    else addMessage(item.role, item.content, item.steps);
+    else addMessage(item.role, item.content);
   }
   if (conv.attachment) setAttached(conv.attachment);
   else detach(false);
