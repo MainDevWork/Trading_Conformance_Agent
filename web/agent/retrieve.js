@@ -19,6 +19,13 @@ const TOPIC_WORDS = {
   problem_statement: /problem statement|group 6|key challenge|key.person/i,
   project_brief: /project brief|final project|academy|assessment criteri|deliverable|due date/i,
 };
+// With a report attached, its results are already sent with the question, so words such as "test" and "pass" do not
+// select these two topics; only a question about a step's rule does.
+const TOPIC_WORDS_WITH_REPORT = {
+  ...TOPIC_WORDS,
+  tests: /\b(T\d{1,2}|G1|OT1)\b|\bwhy\b|\brules?\b|requirement/i,
+  conformance_process: /retest|\bslot|exempt|\bCTA\b/i,
+};
 const MAX_TOPICS = 2;
 const MAX_COMPIDS = 2;
 
@@ -53,16 +60,17 @@ function findCompids(text, compids) {
 
 // question: the analyst's new question. earlier: their earlier questions in this conversation, oldest first; a
 // follow-up such as "and in September?" uses the CompIDs of the latest earlier question that named one.
-// readTopic(topic) returns the text of a reference topic.
+// readTopic(topic) returns the text of a reference topic. reportAttached: a client report's results go with the question.
 // Returns { text, topics, compids, months, codes }: text is the block sent with the question ("" when nothing matched).
-export async function retrieve(store, question, earlier, readTopic) {
+export async function retrieve(store, question, earlier, readTopic, reportAttached = false) {
   const { compids: known, rejectCodes } = await lookups(store);
   let compids = findCompids(question, known);
-  for (let i = earlier.length - 1; !compids.length && i >= 0; i--) compids = findCompids(earlier[i], known);
+  // With a report attached, a question that names no CompID is about the report, not an earlier question's CompID.
+  for (let i = earlier.length - 1; !reportAttached && !compids.length && i >= 0; i--) compids = findCompids(earlier[i], known);
   compids = compids.slice(0, MAX_COMPIDS);
   const months = Object.keys(MONTHS).filter((m) => MONTHS[m].test(question)).map(Number);
   const codes = [...new Set(question.match(/\b\d{1,6}\b/g) || [])].filter((c) => rejectCodes.has(c) && /code|reject/i.test(question));
-  const topics = Object.entries(TOPIC_WORDS)
+  const topics = Object.entries(reportAttached ? TOPIC_WORDS_WITH_REPORT : TOPIC_WORDS)
     .map(([topic, pattern]) => [topic, (question.match(new RegExp(pattern.source, "gi")) || []).length])
     .filter(([, hits]) => hits > 0).sort((a, b) => b[1] - a[1]).slice(0, MAX_TOPICS).map(([topic]) => topic);
 

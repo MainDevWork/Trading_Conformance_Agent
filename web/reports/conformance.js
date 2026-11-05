@@ -517,17 +517,22 @@ async function checkOne(conn, r, known) {
 }
 
 // The results as text for the language model: a summary, then one block per test step the client answered.
-export function resultsText(checked) {
+// "What the messages show" is the longest part, so it is included only for steps that Fail or Need review and for
+// steps named in the question; the model can read any other step with get_test_evidence.
+export function resultsText(checked, question = "") {
+  const asked = ` ${question.toUpperCase().replace(/[^A-Z0-9.-]+/g, " ").replace(/\.(\s)/g, "$1")} `;
+  const named = (r) => [r.id, r.ref].some((v) => v && asked.includes(` ${v.toUpperCase()} `));
+  const showsFor = (r) => r.shows && (r.result === RESULTS.FAIL || r.result === RESULTS.REVIEW || named(r));
   const c = checked.counts;
   const lines = [
     `# Attached client conformance test report: ${checked.file}`,
     `CompIDs in the report: ${checked.compids.join(", ") || "none"}. Test steps in the report: ${checked.results.length}.`,
     `Results from the automatic checks: ${Object.entries(c).map(([k, v]) => `${k} ${v}`).join(", ")}. Overall: ${checked.overall}.`,
-    "Each test step the client answered (reference | test ID | test | mandatory | CompID | test time in the report | result | reason | what the messages show):",
+    "Each test step the client answered (reference | test ID | test | mandatory | CompID | test time in the report | result | reason | what the messages show, when given):",
   ];
   for (const r of checked.results.filter((x) => x.answered)) {
     lines.push(`- ${r.ref} | ${r.id} | ${r.title.slice(0, 110)} | mandatory ${r.mandatory || "?"} | ${r.compid || "-"} | ${r.time || "-"} | ` +
-      `${r.result} | ${r.reason}${r.shows ? ` | ${r.shows.replace(/\n/g, " ")}` : ""}${r.clientComment ? ` | client comment: "${r.clientComment}"` : ""}` +
+      `${r.result} | ${r.reason}${showsFor(r) ? ` | ${r.shows.replace(/\n/g, " ")}` : ""}${r.clientComment ? ` | client comment: "${r.clientComment}"` : ""}` +
       `${r.jseComment ? ` | JSE comment: "${r.jseComment}"` : ""}`);
   }
   const notAttempted = checked.results.filter((x) => !x.answered);

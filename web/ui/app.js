@@ -1,9 +1,9 @@
-import { chat, summarise, startingChars, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=16";
-import { loadStore } from "../agent/data.js?v=16";
-import { readAttachment } from "../reports/attachments.js?v=16";
-import { checkReport } from "../reports/conformance.js?v=16";
-import { makeClientReport } from "../reports/client_report.js?v=16";
-import * as memoryStore from "../agent/memory.js?v=16";
+import { chat, summarise, startingChars, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=17";
+import { loadStore } from "../agent/data.js?v=17";
+import { readAttachment } from "../reports/attachments.js?v=17";
+import { checkReport } from "../reports/conformance.js?v=17";
+import { makeClientReport } from "../reports/client_report.js?v=17";
+import * as memoryStore from "../agent/memory.js?v=17";
 
 window.appStarted = true;
 
@@ -104,6 +104,17 @@ function addMessage(role, text, steps) {
   return wrap;
 }
 
+// The line under an answer that says how long it took and how many requests the language model received.
+function timingLine(totalMs, timing) {
+  const line = document.createElement("div");
+  line.className = "steps";
+  const seconds = (ms) => (ms < 10_000 ? (ms / 1000).toFixed(1) : Math.round(ms / 1000));
+  line.textContent = `Answered in ${seconds(totalMs)} s: ` + (timing.requests
+    ? `${seconds(timing.modelMs)} s waiting for the language model, ${timing.requests} request${timing.requests > 1 ? "s" : ""}.`
+    : "no request to the language model.");
+  return line;
+}
+
 // True while a question is being answered, so a second question waits for the first.
 let busy = false;
 
@@ -128,7 +139,20 @@ async function send(text) {
   pendingBody.classList.add("thinking");
   const sentAt = Date.now();
   let step = store ? "Starting" : "Waiting for the data to finish loading";
-  const showStep = () => { pendingBody.textContent = `${step}… ${Math.round((Date.now() - sentAt) / 1000)} s`; };
+  // True while the model's text is being shown in the waiting message, in place of the step.
+  let writing = false;
+  let drawnAt = 0;
+  const showStep = () => { if (!writing) pendingBody.textContent = `${step}… ${Math.round((Date.now() - sentAt) / 1000)} s`; };
+  const onStep = (text) => { writing = false; pendingBody.classList.add("thinking"); step = text; showStep(); };
+  // At most 8 redraws a second; the finished answer replaces this text.
+  const onText = (text) => {
+    if (!writing) { writing = true; pendingBody.classList.remove("thinking"); drawnAt = 0; }
+    if (Date.now() - drawnAt < 120) return;
+    drawnAt = Date.now();
+    const atEnd = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
+    pendingBody.innerHTML = renderMarkdown(text);
+    if (atEnd) messagesEl.scrollTop = messagesEl.scrollHeight;
+  };
   showStep();
   const ticker = setInterval(showStep, 1000);
 
@@ -154,10 +178,11 @@ async function send(text) {
         return { created: report.files.map((f) => f.name), overall: report.overall, results: report.counts, changes_applied: report.applied };
       },
     } : null;
-    const data = await chat(store, apiKey, history, (text) => { step = text; showStep(); }, context, await memoryFor(text));
+    const data = await chat(store, apiKey, history, onStep, context, await memoryFor(text), onText);
     pending.remove();
     history.push({ role: "assistant", content: data.answer });
     const answerEl = addMessage("assistant", data.answer);
+    answerEl.append(timingLine(Date.now() - sentAt, data.timing));
     if (made.length) answerEl.querySelector(".body").append(downloadLinks(made));
     conv.items.push({ role: "user", content: text, ...(newFile ? { file: newFile } : {}) }, { role: "assistant", content: data.answer, steps: data.steps });
     // The results of a report checked for this question are added under its answer, in a closed section.
@@ -167,7 +192,7 @@ async function send(text) {
       conv.items.push({ role: "attachment", checked: attached.checked });
     }
     if (data.tokens.firstPrompt) setTokensPerChar(data.tokens.firstPrompt / data.tokens.firstChars);
-    conv.largestPrompt = data.tokens.largestPrompt || null;
+    if (data.tokens.largestPrompt) conv.largestPrompt = data.tokens.largestPrompt;
     await saveConv();
   } catch (err) {
     pending.remove();

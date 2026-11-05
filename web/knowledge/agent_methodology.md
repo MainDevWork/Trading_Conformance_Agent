@@ -14,16 +14,16 @@
 
 ## For every question
 
-1. The analyst asks a question, which is added to the conversation.
+1. The analyst asks a question, which is added to the conversation. If a report is attached and every word of the question is on a fixed list, such as "give me the results", "what failed" or "give me the excel report", the page writes the table or the report file from the fixed-rule results with no request to the model: go to step 10.
 2. The agent retrieves before asking the model (`web/agent/retrieve.js`): summary queries on the in-browser tables and reference topics, added to the question.
 3. The agent builds the request: the same instructions, example queries, core reference and table columns every time, plus the memory notes and the conversation. It offers 7 tools, or 9 with a report.
-4. The agent sends the request to the language model, `nvidia/nemotron-3.5-lightning:free`.
+4. The agent sends the request to the language model, `nvidia/nemotron-3.5-lightning:free`, with its reasoning step switched off. The reply is streamed, so the page shows the answer as the model writes it.
 5. Does the reply call any tools? If not, the reply is the answer: go to step 9.
 6. The agent runs each tool call on the in-browser tables or the reference files.
-7. The agent adds the results to the conversation, each cut to at most 200 rows and 30,000 characters.
-8. Have 12 requests to the model been used? If not, the next round starts at step 4. If so, one last request is sent with tools switched off, and the model must answer from the results it already has.
-9. Does the answer name tables, columns or SQL? If so, one rewrite request is sent with tools off: the same numbers and conclusions, in plain words.
-10. The page shows the answer text. The queries are not shown.
+7. The agent adds the results to the conversation, each cut to at most 200 rows and 30,000 characters. No further request is sent after a report file is written, or after a note is saved in a reply that holds the full answer: go to step 9.
+8. Have 12 requests been used, or 60 seconds passed since the question? If not, the next round starts at step 4. If so, one last request is sent with tools switched off, and the model must answer from the results it already has.
+9. Does the answer contain SQL? If so, one rewrite request is sent with tools off: the same numbers and conclusions, in plain words. Table and column names are replaced with plain words with no request.
+10. The page shows the answer text, how long it took and how many requests the model received. The queries are not shown.
 11. The page saves the conversation in the browser and updates the context bar (`web/agent/memory.js`).
 
 ## What step 2 adds to the question
@@ -31,8 +31,8 @@
 - A CompID named in the question or in an earlier question: activity per month, messages per type, rejections per reject code with meanings, and how its orders ended.
 - A month: the same facts for that month only.
 - A reject code: its meaning.
-- Words such as test, session or logon: up to 2 topics.
-- An attached report: the result of every test step.
+- Words such as test, session or logon: up to 2 topics. With a report attached, the tests topic is added only for a question that names a test or asks why, or asks about a rule or requirement.
+- An attached report: the result of every test step, and what the messages show only for steps that Fail, Need review or are named in the question.
 
 ## The tools the model can call
 

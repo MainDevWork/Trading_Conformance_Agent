@@ -8,16 +8,23 @@
 // Memory (memory.js keeps it in the browser): the notes saved in earlier conversations, and the summary of the
 // conversation this one continues, are sent with every question, and three tools let the model save a note, delete
 // one and search earlier conversations.
+// Speed: a request to the model is the slow step, so the agent makes as few as it can. A question that the results of
+// an attached report already answer gets no request at all (direct_answer.js). Replies are streamed, so the page shows
+// the answer as the model writes it.
 
-import { retrieve } from "./retrieve.js?v=16";
-import { evidenceFor, resultsText } from "../reports/conformance.js?v=16";
+import { retrieve } from "./retrieve.js?v=17";
+import { evidenceFor, resultsText } from "../reports/conformance.js?v=17";
+import { directAnswer } from "../reports/direct_answer.js?v=17";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
 const MAX_TOOL_RESULT_CHARS = 30_000;
 const MAX_ROWS = 200;
-// A model request with no reply after this long is stopped, so the page never waits without a limit.
+// A model request that sends nothing for this long is stopped, so the page never waits without a limit.
 const MODEL_TIMEOUT_MS = 120_000;
+// After this long since the question was sent, no new tool round starts: the next request has tools switched off and
+// the model must answer from the results it already has.
+const TOOL_TIME_LIMIT_MS = 60_000;
 
 // The language model every question is sent to. Fixed here; the page has no setting to change it.
 export const MODEL = "nvidia/nemotron-3.5-lightning:free";
@@ -87,14 +94,14 @@ FROM fact_compid_day WHERE comp_id = 'GJEN09' ORDER BY date
 An attached client report: an analyst can attach a client's Volume 202 conformance test report (Excel or PDF). When
 the analyst sends a question with it, the page checks every test step the client answered against the messages, by
 fixed rules, and sends the results with each question in a block headed "Attached client conformance test report".
-Each test step has a result: Pass, Fail, Needs review, Not checkable or Not attempted, with the reason and what the
-messages show.
+Each test step has a result: Pass, Fail, Needs review, Not checkable or Not attempted, with the reason.
 - Do only what the analyst's message asks about the report. Do not list the results of all the test steps or give an
   overall verdict unless the message asks for them.
+- Answer from this block without calling a tool whenever it holds the answer. To state or explain a result you do not
+  need to read a reference topic. "What the messages show" is given for each Fail, each Needs review and each step
+  named in the message; call get_test_evidence only for another step or for details the block does not give.
 - Use these results. Do not change a result yourself; explain it. When the analyst disagrees with a result, they can
   ask for it to be changed in the report to the client.
-- Call get_test_evidence for the full list of messages of a test step when the analyst asks for details the block
-  does not give.
 - When the analyst asks for a report, file, Excel or PDF for the client, call create_client_report. Pass format
   "excel", "pdf" or "both"; summary: a short plain paragraph to the client stating the overall result, which steps
   failed and what they must redo; and changes only for results the analyst has asked to change, each with their
@@ -107,6 +114,7 @@ Memory: the page saves every conversation and a list of notes in the analyst's b
 - Call save_memory when the analyst asks you to remember something, says how they want answers written, or when you
   reach a finding that a later conversation would need, such as which tests a CompID failed and why. One fact per
   note, naming the CompID, test ID and dates it is about. Do not save what the data or the reference already holds.
+- Write the answer text in the same reply as a save_memory call, not in a later reply.
 - Call forget_memory when the analyst says a note is wrong or no longer needed.
 - When the analyst refers to an earlier conversation that is not in this one, call search_past_conversations.
 - A block headed "Summary of the earlier conversation" is the summary of the conversation this one continues.
@@ -377,35 +385,93 @@ export async function startingChars(store, history, attachment = null, memory = 
   return chars;
 }
 
+// Each request asks the model to skip its reasoning step, which it would otherwise write and wait for before the
+// answer. OpenRouter refuses this for a model whose reasoning cannot be switched off; the page then stops asking.
+let reasoningOff = true;
+
+// An error from OpenRouter itself, as opposed to a failed connection.
+class OpenRouterError extends Error {}
+
+// Reads a streamed reply: lines "data: {json}" with pieces of the text and of the tool calls, ending with "data: [DONE]".
+// Lines starting with ":" only keep the connection open. onPiece() is called for each piece received, and
+// onText(textSoFar) when the text grows.
+async function readStream(response, onPiece, onText) {
+  const reply = { content: "", usage: null };
+  const calls = [];
+  const decoder = new TextDecoder();
+  const reader = response.body.getReader();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop();
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (data === "[DONE]") continue;
+      const chunk = JSON.parse(data);
+      if (chunk.error) throw new OpenRouterError(`OpenRouter error: ${JSON.stringify(chunk.error)}`);
+      if (chunk.usage) reply.usage = chunk.usage;
+      const delta = chunk.choices?.[0]?.delta;
+      if (!delta) continue;
+      onPiece();
+      if (delta.content) { reply.content += delta.content; onText(reply.content); }
+      for (const piece of delta.tool_calls || []) {
+        const call = calls[piece.index ?? calls.length] ??= { id: "", type: "function", function: { name: "", arguments: "" } };
+        if (piece.id) call.id = piece.id;
+        if (piece.function?.name) call.function.name += piece.function.name;
+        if (piece.function?.arguments) call.function.arguments += piece.function.arguments;
+      }
+    }
+  }
+  const toolCalls = calls.filter(Boolean);
+  if (toolCalls.length) reply.tool_calls = toolCalls;
+  return reply;
+}
+
 // allowTools = false sends tool_choice "none", so the model must reply in text.
+// onText(textSoFar) is called as the reply's text is received.
 // Returns the reply message and usage: the token counts OpenRouter reports for the request and the reply.
-async function callModel(apiKey, messages, model, allowTools = true, tools = TOOLS) {
+async function callModel(apiKey, messages, model, allowTools = true, tools = TOOLS, onText = () => {}) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
-  let response, text;
+  let timer;
+  const restartTimer = () => { clearTimeout(timer); timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS); };
+  restartTimer();
+  const post = () => fetch(OPENROUTER_URL, {
+    method: "POST",
+    signal: controller.signal,
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "X-Title": "Trading Conformance Agent",
+    },
+    // A request with no tools (the summary) sends neither tools nor tool_choice.
+    body: JSON.stringify({ model, messages, stream: true, ...(reasoningOff ? { reasoning: { effort: "none" } } : {}),
+                           ...(tools.length ? { tools, tool_choice: allowTools ? "auto" : "none" } : {}), temperature: 0 }),
+  });
   try {
-    response = await fetch(OPENROUTER_URL, {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "X-Title": "Trading Conformance Agent",
-      },
-      // A request with no tools (the summary) sends neither tools nor tool_choice.
-      body: JSON.stringify({ model, messages, ...(tools.length ? { tools, tool_choice: allowTools ? "auto" : "none" } : {}), temperature: 0 }),
-    });
-    text = await response.text();
+    let response = await post();
+    if (response.status === 400 && reasoningOff) {
+      const text = await response.clone().text();
+      if (/reasoning/i.test(text)) { reasoningOff = false; response = await post(); }
+    }
+    if (!response.ok) throw new OpenRouterError(`OpenRouter returned ${response.status}: ${(await response.text()).slice(0, 500)}`);
+    if ((response.headers.get("content-type") || "").includes("text/event-stream")) return await readStream(response, restartTimer, onText);
+    // A reply sent whole, not streamed.
+    const body = JSON.parse(await response.text());
+    if (body.error) throw new OpenRouterError(`OpenRouter error: ${JSON.stringify(body.error)}`);
+    if (body.choices[0].message.content) onText(body.choices[0].message.content);
+    return { ...body.choices[0].message, usage: body.usage || null };
   } catch (err) {
-    if (err.name === "AbortError") throw new Error(`The language model did not reply within ${MODEL_TIMEOUT_MS / 1000} seconds. Send the question again.`);
+    if (err instanceof OpenRouterError) throw err;
+    if (err.name === "AbortError") throw new Error(`The language model sent nothing for ${MODEL_TIMEOUT_MS / 1000} seconds. Send the question again.`);
     throw new Error(`Could not reach OpenRouter: ${err.message || err}`);
   } finally {
     clearTimeout(timer);
   }
-  if (!response.ok) throw new Error(`OpenRouter returned ${response.status}: ${text.slice(0, 500)}`);
-  const body = JSON.parse(text);
-  if (body.error) throw new Error(`OpenRouter error: ${JSON.stringify(body.error)}`);
-  return { ...body.choices[0].message, usage: body.usage || null };
 }
 
 // knowledge/ holds the reference taken from JSE Volumes 00E, 01E, 10, 201 and 202 and the project brief.
@@ -439,33 +505,65 @@ async function lookupRejectCodes(codes) {
            note: "A code can have several entries; use the one whose messages and system match where the code was seen (Native Trading Gateway, Matching Engine or AuthServer for these exports)." };
 }
 
-// Table names, and column names that contain an underscore, that appear in an answer; "SQL" when it contains a query.
-// The instructions forbid them, and smaller models sometimes include them anyway.
-function namesInAnswer(store, answer) {
+// Plain words for the names that appear most often in answers; any other name has its underscores replaced by spaces.
+const PLAIN_NAMES = { comp_id: "CompID", is_rejection: "rejection", reject_code: "reject code", fact_message: "the messages",
+                      fact_order: "the orders", fact_compid_day: "the daily activity of each CompID" };
+
+// Table names, and column names that contain an underscore, are replaced in an answer with plain words, with no
+// request to the model. The instructions forbid them, and smaller models sometimes include them anyway.
+function plainNames(store, answer) {
   const names = new Set(Object.keys(store.manifest.tables));
   for (const t of Object.values(store.manifest.tables)) for (const c of t.columns) if (c.name.includes("_")) names.add(c.name);
-  const found = [...new Set((answer.match(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g) || []).filter((w) => names.has(w)))];
-  if (/\bSELECT\b[\s\S]{1,400}?\bFROM\b/.test(answer)) found.push("SQL");
-  return found;
+  return answer.replace(/`?\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b`?/g, (text) => {
+    const word = text.replace(/`/g, "");
+    if (!names.has(word)) return text;
+    return PLAIN_NAMES[word] || word.replace(/^(fact|dim)_/, "").replace(/_name$/, "").replace(/_/g, " ");
+  });
 }
+
+const hasSql = (answer) => /\bSELECT\b[\s\S]{1,400}?\bFROM\b/.test(answer);
+
+// Tools whose result needs no reply from the model: a report file was written, or a note saved or deleted in a reply
+// that already holds the answer. A reply shorter than MIN_ANSWER_CHARS is treated as an opening remark, not the answer.
+const FINAL_TOOLS = new Set(["create_client_report", "save_memory", "forget_memory"]);
+const MIN_ANSWER_CHARS = 200;
+const FILE_READY = "The report for the client is ready to download below.";
 
 // history is the visible conversation: [{role: "user"|"assistant", content}, ...]; the last entry is the new question.
 // onStep(text) is called before each step, so the page can show what is happening.
 // attachment, when a client report is attached: { checked (from conformance.js checkReport), makeReport(args) }.
 // memory: { notes (from memory.js listNotes), carried (a summary or null), save(text), forget(number), search(query) }.
-// Returns the agent's answer, the steps it took to reach it, and tokens: for the first request, its prompt tokens
-// as OpenRouter counted them and its length in characters; for the largest request, its prompt tokens.
-export async function chat(store, apiKey, history, onStep = () => {}, attachment = null, memory = null) {
+// onText(textSoFar) is called as the model writes a reply, so the page can show it.
+// Returns the agent's answer, the steps it took to reach it, tokens: for the first request, its prompt tokens
+// as OpenRouter counted them and its length in characters; for the largest request, its prompt tokens; and timing:
+// the number of requests to the model and the milliseconds spent waiting for them.
+export async function chat(store, apiKey, history, onStep = () => {}, attachment = null, memory = null, onText = () => {}) {
   const model = MODEL;
+  const startedAt = Date.now();
   const core = await loadKnowledge("core.md");
   const turns = history.filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content }));
   const steps = [];
+  const timing = { requests: 0, modelMs: 0 };
+
+  // A question the results of the attached report already answer gets no request to the model.
+  const asked = turns[turns.length - 1].content;
+  const direct = attachment ? directAnswer(attachment.checked, asked) : null;
+  if (direct) {
+    let answer = direct.text;
+    if (direct.format) {
+      onStep(STEP_TEXT.create_client_report);
+      await attachment.makeReport({ format: direct.format });
+      answer = FILE_READY;
+    }
+    return { answer, steps: [{ tool: "direct_answer", args: {}, result: "" }], model: null, timing,
+             tokens: { firstPrompt: null, firstChars: 0, largestPrompt: 0 } };
+  }
 
   // Retrieval: the facts and reference topics for what the question names are added to the question.
   onStep("Finding the data and reference for the question");
   const question = turns[turns.length - 1];
   const earlier = turns.slice(0, -1).filter((m) => m.role === "user").map((m) => m.content);
-  const found = await retrieve(store, question.content, earlier, async (topic) => (await readReference(topic)).text);
+  const found = await retrieve(store, question.content, earlier, async (topic) => (await readReference(topic)).text, Boolean(attachment));
   if (found.text) {
     question.content = `${question.content}\n\n${found.text}`;
     steps.push({ tool: "retrieve", args: { compids: found.compids, months: found.months, codes: found.codes, topics: found.topics },
@@ -473,7 +571,7 @@ export async function chat(store, apiKey, history, onStep = () => {}, attachment
   }
   if (attachment) question.content = `${question.content}
 
-${resultsText(attachment.checked)}`;
+${resultsText(attachment.checked, asked)}`;
   const tools = toolsFor(attachment, memory);
 
   const messages = [{ role: "system", content: systemText(store, core, memory) }, ...turns];
@@ -484,15 +582,24 @@ ${resultsText(attachment.checked)}`;
     if (tokens.firstPrompt === null) tokens.firstPrompt = prompt;
     tokens.largestPrompt = Math.max(tokens.largestPrompt, prompt);
   };
+  const ask = async (allowTools) => {
+    const sentAt = Date.now();
+    const reply = await callModel(apiKey, messages, model, allowTools, tools, onText);
+    timing.requests++;
+    timing.modelMs += Date.now() - sentAt;
+    count(reply);
+    return reply;
+  };
   let answer = null;
   for (let round = 0; round < MAX_TOOL_ROUNDS && answer === null; round++) {
+    if (round > 0 && Date.now() - startedAt > TOOL_TIME_LIMIT_MS) break;
     onStep(`Waiting for the language model's reply (request ${round + 1})`);
-    const reply = await callModel(apiKey, messages, model, true, tools);
-    count(reply);
+    const reply = await ask(true);
     const toolCalls = reply.tool_calls || [];
     if (!toolCalls.length) { answer = reply.content || ""; break; }
 
-    messages.push({ role: "assistant", content: reply.content ?? null, tool_calls: toolCalls });
+    messages.push({ role: "assistant", content: reply.content || null, tool_calls: toolCalls });
+    let failed = false;
     for (const call of toolCalls) {
       const name = call.function.name;
       let args;
@@ -500,10 +607,18 @@ ${resultsText(attachment.checked)}`;
       onStep(STEP_TEXT[name] || `Running ${name}`);
       let result;
       try { result = await runTool(store, name, args, attachment, memory); } catch (err) { result = { error: String(err.message || err) }; }
+      if (result?.error) failed = true;
       let text = JSON.stringify(result);
       if (text.length > MAX_TOOL_RESULT_CHARS) text = text.slice(0, MAX_TOOL_RESULT_CHARS) + "... [result cut off: narrow the query]";
       steps.push({ tool: name, args, result: text.slice(0, 4000) });
       messages.push({ role: "tool", tool_call_id: call.id, content: text });
+    }
+    // No further request when the tools called need no reply from the model.
+    if (!failed && toolCalls.every((c) => FINAL_TOOLS.has(c.function.name))) {
+      const wrote = (reply.content || "").trim();
+      const long = wrote.length >= MIN_ANSWER_CHARS;
+      if (toolCalls.some((c) => c.function.name === "create_client_report")) answer = long ? `${wrote}\n\n${FILE_READY}` : FILE_READY;
+      else if (long) answer = wrote;
     }
   }
   if (answer === null) {
@@ -511,25 +626,23 @@ ${resultsText(attachment.checked)}`;
     messages.push({ role: "user", content: "You have used all your tool calls. Answer now from the tool results above. " +
       "Say plainly which parts of the question you could not finish." });
     onStep("Waiting for the language model's final answer");
-    const final = await callModel(apiKey, messages, model, false, tools);
-    count(final);
+    const final = await ask(false);
     answer = final.content || "I stopped after the maximum number of tool calls without reaching an answer. Try a narrower question.";
   }
 
-  // Plain-words check: an answer that names tables, columns or SQL is rewritten once, with tools switched off.
-  const names = namesInAnswer(store, answer);
-  if (names.length) {
+  // Plain-words check: table and column names are replaced here; an answer that holds SQL is rewritten once, with
+  // tools switched off.
+  answer = plainNames(store, answer);
+  if (hasSql(answer)) {
     onStep("Rewriting the answer in plain words");
     messages.push({ role: "assistant", content: answer });
-    messages.push({ role: "user", content: `Rewrite your answer above for the analyst. It contains ${names.join(", ")}: ` +
-      "replace each with plain words (for example CompID for comp_id, rejections for is_rejection) and remove any SQL. " +
-      "Keep every number, date and conclusion unchanged, and do not add anything." });
-    const rewrite = await callModel(apiKey, messages, model, false, tools);
-    count(rewrite);
-    steps.push({ tool: "rewrite", args: { names }, result: "" });
-    if (rewrite.content) answer = rewrite.content;
+    messages.push({ role: "user", content: "Rewrite your answer above for the analyst. It contains SQL: remove it and describe in plain words " +
+      "what it does. Keep every number, date and conclusion unchanged, and do not add anything." });
+    const rewrite = await ask(false);
+    steps.push({ tool: "rewrite", args: {}, result: "" });
+    if (rewrite.content) answer = plainNames(store, rewrite.content);
   }
-  return { answer, steps, model, tokens };
+  return { answer, steps, model, tokens, timing };
 }
 
 // The summary a new conversation starts with when the analyst continues a long conversation in a new one.

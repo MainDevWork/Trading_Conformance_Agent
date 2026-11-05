@@ -11,7 +11,7 @@ A web chat page where a JSE Trading Operations analyst asks questions about the 
 | `index.html`     | The page. Stays in the root so GitHub Pages serves it as the site's home page.                                                                                                                                                                                                                        |
 | `web/ui/` | The chat screen: `app.js` (chat, keys form, attached reports, sidebar button), `style.css`, `icon.svg` (the agent's icon, also the browser tab icon) |
 | `web/agent/` | The agent: `agent.js` (language model and its tools), `retrieve.js` (facts and reference found before the model is asked), `data.js` (loads the data into the browser), `memory.js` (saved conversations and memory notes, in the browser) |
-| `web/reports/` | Client reports: `attachments.js` (reads an attached client report), `conformance.js` (checks it against the messages), `client_report.js` (writes the report to the client) |
+| `web/reports/` | Client reports: `attachments.js` (reads an attached client report), `conformance.js` (checks it against the messages), `direct_answer.js` (answers from the results with no request to the model), `client_report.js` (writes the report to the client) |
 | `web/knowledge/` | The JSE conformance reference the agent reads (see below)                                                                                                                                                                                                                                             |
 | `code/` | Not in this repository (excluded by `.gitignore`). The Python scripts that build the bronze, silver and gold layers in Supabase. Needed only to rebuild the tables, not to run the page |
 | `pages/`  | The diagram pages: `system_architecture.html`, `agent_methodology.html`, `data_architecture.html`, `bronze_data_diagram.html` (bronze layer), `silver_layer.html` (silver layer), `gold_star_schema.html` (gold layer)                                                                    |
@@ -48,7 +48,7 @@ A client sends its Volume 202 conformance test report: one row per test step, wi
    | Not checkable | The step uses a gateway or service whose messages are not exported (market data, Post Trade, Drop Copy, FIX, derivatives). |
    | Not attempted | The client gave no response. |
 
-4. The results are sent to the model with that prompt and every later question, and the model is told to do only what the prompt asks. The model has two more tools: `get_test_evidence` (every message of one step) and `create_client_report`. A closed section under the first answer, opened by a click, holds the result of each step.
+4. A prompt that the results alone answer, such as "give me the results", "what failed", "result of T3.6" or "give me the excel report", is answered by `web/reports/direct_answer.js` with no request to the model. It answers only when every word of the prompt is on its fixed lists; any other prompt goes to the model. The results are sent to the model with such a prompt and every later one, with what the messages show only for steps that Fail, Need review or are named in the prompt, and the model is told to do only what the prompt asks. The model has two more tools: `get_test_evidence` (every message of one step) and `create_client_report`. A closed section under the first answer, opened by a click, holds the result of each step.
 5. The **Excel report** and **PDF report** buttons in that section, or asking the agent for a report, write the file for the client: a summary, then one row per test step with its result and reason, then (Excel only) every message found. The analyst can ask the agent to change a result; the report then says the analyst changed it and keeps the automatic reason. The layout is in `web/knowledge/client_report_template.md`.
 
 The September 2026 export has no time in force or order quantity on new orders and no liquidity indicator on execution reports, so tests that need those (for example T21-001) get Needs review, with what the timing of the messages shows.
@@ -64,9 +64,9 @@ To make the fictitious copies of new client reports, put the reports in `Clients
    - `describe_table`: for one table, each column's meaning, distinct-value count, empty-value count and most common values, plus 5 sample rows.
    - `read_reference`: one topic file from `web/knowledge/`.
    - `lookup_reject_codes`: the Volume 10 meaning of the given reject codes, from `web/knowledge/reject_codes.json`.
-     `web/agent/agent.js` runs each tool call the model makes and returns the result to the model, up to 12 rounds, until the model replies with text.
-4. If the answer contains a table name, a column name with an underscore or an SQL query, `web/agent/agent.js` asks the model once to rewrite it in plain words, with tools switched off.
-5. The page shows the answer text only; the tool calls and their SQL are not shown.
+     `web/agent/agent.js` runs each tool call the model makes and returns the result to the model, until the model replies with text, for up to 12 rounds or 60 seconds. After that, one last request with tools switched off asks the model to answer from the results it has. The reply is streamed, so the page shows the answer as the model writes it, and the model's reasoning step is switched off.
+4. `web/agent/agent.js` replaces table names and column names with an underscore with plain words in the answer. If the answer contains an SQL query, it asks the model once to rewrite it in plain words, with tools switched off.
+5. The page shows the answer text and a line saying how long it took and how many requests the model received; the tool calls and their SQL are not shown.
 
 The button at the top left of the chat area (a rectangle with a line down its left side) hides and shows the sidebar. The choice is kept in the browser, so it stays after a reload.
 
