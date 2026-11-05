@@ -9,8 +9,8 @@
 // conversation this one continues, are sent with every question, and three tools let the model save a note, delete
 // one and search earlier conversations.
 
-import { retrieve } from "./retrieve.js?v=13";
-import { evidenceFor, resultsText } from "./conformance.js?v=13";
+import { retrieve } from "./retrieve.js?v=14";
+import { evidenceFor, resultsText } from "./conformance.js?v=14";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -84,10 +84,13 @@ SELECT outcome, count(*) AS orders FROM fact_order WHERE comp_id = 'GJEN09' GROU
 SELECT date, messages, logons, new_orders, amend_requests, cancel_requests, order_rejects, gateway_rejects
 FROM fact_compid_day WHERE comp_id = 'GJEN09' ORDER BY date
 
-An attached client report: an analyst can attach a client's Volume 202 conformance test report (Excel or PDF). The
-page then checks every test step the client answered against the messages, by fixed rules, and sends the results
-with each question in a block headed "Attached client conformance test report". Each test step has a result: Pass,
-Fail, Needs review, Not checkable or Not attempted, with the reason and what the messages show.
+An attached client report: an analyst can attach a client's Volume 202 conformance test report (Excel or PDF). When
+the analyst sends a question with it, the page checks every test step the client answered against the messages, by
+fixed rules, and sends the results with each question in a block headed "Attached client conformance test report".
+Each test step has a result: Pass, Fail, Needs review, Not checkable or Not attempted, with the reason and what the
+messages show.
+- Do only what the analyst's message asks about the report. Do not list the results of all the test steps or give an
+  overall verdict unless the message asks for them.
 - Use these results. Do not change a result yourself; explain it. When the analyst disagrees with a result, they can
   ask for it to be changed in the report to the client.
 - Call get_test_evidence for the full list of messages of a test step when the analyst asks for details the block

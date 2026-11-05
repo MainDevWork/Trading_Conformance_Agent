@@ -93,7 +93,7 @@
   <p class="pdf"><a href="../docs/agent_methodology.pdf">PDF version</a></p>
 
   <div class="figure">
-    <svg viewBox="0 0 1000 1870" role="img" aria-label="Flowchart of how the chat agent loads the data once, checks an attached client report against the messages, then for each question retrieves facts, reference topics and the report results, sends the memory notes with the conversation, answers in rounds of model requests and tool calls, checks the answer for table and column names, and saves the conversation in the browser">
+    <svg viewBox="0 0 1000 1870" role="img" aria-label="Flowchart of how the chat agent loads the data once, reads an attached client report and checks it against the messages when the first prompt is sent with it, then for each question retrieves facts, reference topics and the report results, sends the memory notes with the conversation, answers in rounds of model requests and tool calls, checks the answer for table and column names, and saves the conversation in the browser">
       <defs>
         <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z"/></marker>
       </defs>
@@ -125,23 +125,25 @@
 
       <rect class="b web" x="610" y="45" width="370" height="70" rx="10"/>
       <text class="t" x="795" y="75">Analyst attaches the client's report</text>
-      <text class="s" x="795" y="97">Volume 202, Excel or PDF, read in the browser</text>
+      <text class="s" x="795" y="97">read in the browser; only its name is shown</text>
       <g class="badge"><circle cx="610" cy="45" r="13"/><text x="610" y="45">R1</text></g>
 
       <rect class="b data" x="610" y="145" width="370" height="80" rx="10"/>
-      <text class="t" x="795" y="171">Check each test step against the messages</text>
+      <text class="t" x="795" y="171">First prompt: check each test step</text>
       <text class="s" x="795" y="192">the client's IDs looked up in the tables;</text>
       <text class="s" x="795" y="209">one result per step by a fixed rule, not the model</text>
       <g class="badge"><circle cx="610" cy="145" r="13"/><text x="610" y="145">R2</text></g>
 
       <rect class="b web" x="610" y="255" width="370" height="80" rx="10"/>
-      <text class="t" x="795" y="283">Page shows the result of each step</text>
-      <text class="s" x="795" y="304">Pass, Fail, Needs review, Not checkable,</text>
-      <text class="s" x="795" y="321">Not attempted · Excel and PDF report buttons</text>
+      <text class="t" x="795" y="283">Closed section under the first answer</text>
+      <text class="s" x="795" y="304">opened by a click: the result of each step,</text>
+      <text class="s" x="795" y="321">Excel and PDF report buttons</text>
       <g class="badge"><circle cx="610" cy="255" r="13"/><text x="610" y="255">R3</text></g>
 
-      <path class="arrow" d="M795,115 V141"/>
+      <path class="arrow" d="M795,115 V141" style="stroke-dasharray:5 4"/>
       <path class="arrow" d="M795,225 V251"/>
+      <path class="arrow" d="M470,410 H540 V185 H606" style="stroke-dasharray:5 4"/>
+      <text class="s" x="548" y="375" style="text-anchor:start">first prompt after attaching</text>
       <path class="arrow" d="M795,335 V451" style="stroke-dasharray:5 4"/>
       <text class="s" x="803" y="398" style="text-anchor:start">results kept until the</text>
       <text class="s" x="803" y="415" style="text-anchor:start">report is removed</text>

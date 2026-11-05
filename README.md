@@ -36,8 +36,8 @@ Every question is sent to the model `nvidia/nemotron-3.5-lightning:free`, set as
 A client sends its Volume 202 conformance test report: one row per test step, with the CompID, test time and IDs (order ID, client order ID, execution ID) the client recorded. To check it:
 
 1. Click the paperclip button beside the question box, or drop the file on the chat area. Excel (`.xlsx`, `.xls`) and PDF files are read, in the browser; the file is not uploaded anywhere.
-2. `web/attachments.js` finds each test step by the column headed "Test Case ID", and the other columns by their headings, so moved or extra columns do not matter. A PDF has no columns, so the table is rebuilt from where each piece of text is on the page.
-3. `web/conformance.js` looks up every ID the client wrote in `fact_message`, collects every message of those orders, and gives each step one result by a fixed rule for that test (from `web/knowledge/tests.md`):
+2. `web/attachments.js` finds each test step by the column headed "Test Case ID", and the other columns by their headings, so moved or extra columns do not matter. A PDF has no columns, so the table is rebuilt from where each piece of text is on the page. The page shows the file's name above the question box and does nothing else with the file until a prompt is sent. A file with no prompt sent yet is not saved, so it must be attached again after a reload.
+3. When the analyst sends a prompt, `web/conformance.js` looks up every ID the client wrote in `fact_message`, collects every message of those orders, and gives each step one result by a fixed rule for that test (from `web/knowledge/tests.md`):
 
    | Result | Meaning |
    | --- | --- |
@@ -47,8 +47,8 @@ A client sends its Volume 202 conformance test report: one row per test step, wi
    | Not checkable | The step uses a gateway or service whose messages are not exported (market data, Post Trade, Drop Copy, FIX, derivatives). |
    | Not attempted | The client gave no response. |
 
-4. The page shows the results in the chat. From then on, the results are sent to the model with every question, so the analyst can ask about any step. The model has two more tools: `get_test_evidence` (every message of one step) and `create_client_report`.
-5. The **Excel report** and **PDF report** buttons, or asking the agent for a report, write the file for the client: a summary, then one row per test step with its result and reason, then (Excel only) every message found. The analyst can ask the agent to change a result; the report then says the analyst changed it and keeps the automatic reason. The layout is in `academy/docs/client_report_template.xlsx`.
+4. The results are sent to the model with that prompt and every later question, and the model is told to do only what the prompt asks. The model has two more tools: `get_test_evidence` (every message of one step) and `create_client_report`. A closed section under the first answer, opened by a click, holds the result of each step.
+5. The **Excel report** and **PDF report** buttons in that section, or asking the agent for a report, write the file for the client: a summary, then one row per test step with its result and reason, then (Excel only) every message found. The analyst can ask the agent to change a result; the report then says the analyst changed it and keeps the automatic reason. The layout is in `academy/docs/client_report_template.xlsx`.
 
 The September 2026 export has no time in force or order quantity on new orders and no liquidity indicator on execution reports, so tests that need those (for example T21-001) get Needs review, with what the timing of the messages shows.
 

@@ -51,7 +51,8 @@ export async function available() {
 
 // ---- Conversations ----
 // A conversation: { id, title, created, updated, items, carried, attachment }
-// - items: what the page shows, in order: { role: "user" | "assistant", content, steps } and { role: "attachment", checked }
+// - items: what the page shows, in order: { role: "user" | "assistant", content, steps, file } and { role: "attachment", checked }.
+//   file is the name of a report first sent with that question.
 // - carried: the summary of an earlier conversation that this one continues, or null
 // - attachment: the checked results of the report attached now (conformance.js checkReport), or null
 

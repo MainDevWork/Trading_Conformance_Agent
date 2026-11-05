@@ -123,6 +123,8 @@ main.dropping { outline: 3px dashed var(--accent); outline-offset: -8px; }
 /* The card of an attached client report, and the download links of the reports written from it. */
 .msg.attachment .body { border-left: 4px solid var(--accent); }
 .msg.attachment td:first-child { white-space: nowrap; }
+.msg.attachment summary { cursor: pointer; font-weight: 600; }
+.msg-file { margin-top: 4px; font-size: 13px; color: var(--muted); }
 .result-pass { background: var(--pass-bg); font-weight: 600; }
 .result-fail { background: var(--fail-bg); font-weight: 600; }
 .result-needs-review { background: var(--review-bg); font-weight: 600; }

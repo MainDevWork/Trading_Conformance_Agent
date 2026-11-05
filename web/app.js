@@ -1,9 +1,9 @@
-import { chat, summarise, startingChars, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "./agent.js?v=13";
-import { loadStore } from "./data.js?v=13";
-import { readAttachment } from "./attachments.js?v=13";
-import { checkReport } from "./conformance.js?v=13";
-import { makeClientReport } from "./client_report.js?v=13";
-import * as memoryStore from "./memory.js?v=13";
+import { chat, summarise, startingChars, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "./agent.js?v=14";
+import { loadStore } from "./data.js?v=14";
+import { readAttachment } from "./attachments.js?v=14";
+import { checkReport } from "./conformance.js?v=14";
+import { makeClientReport } from "./client_report.js?v=14";
+import * as memoryStore from "./memory.js?v=14";
 
 window.appStarted = true;
 
@@ -115,7 +115,10 @@ async function send(text) {
   if (!store && !loading) start();
   if (!store && !loading) { addMessage("error", "Enter the database key first: click Enter keys in the sidebar."); return; }
   history.push({ role: "user", content: text });
-  addMessage("user", text);
+  // A report attached since the last answer: its name is shown on this question.
+  const newFile = attached && !attached.shown ? attached.name : null;
+  const questionEl = addMessage("user", text);
+  if (newFile) showFileName(questionEl, newFile);
   input.value = "";
   busy = true;
   sendBtn.disabled = true;
@@ -133,6 +136,14 @@ async function send(text) {
     // A question sent while the data is still loading is answered once loading ends.
     await loadingDone;
     if (!store) throw new Error("The data did not load, so the question could not be answered. See the message in the sidebar.");
+    // A report is checked against the messages when the first question is sent with it, not when it is attached.
+    if (attached && !attached.checked) {
+      step = `Checking ${attached.name} against the messages`;
+      showStep();
+      attached.checked = await checkReport(store, attached.report, (text) => { step = text; showStep(); });
+      conv.attachment = attached.checked;
+      renderAttached();
+    }
     const made = [];
     const context = attached ? {
       checked: attached.checked,
@@ -148,7 +159,13 @@ async function send(text) {
     history.push({ role: "assistant", content: data.answer });
     const answerEl = addMessage("assistant", data.answer);
     if (made.length) answerEl.querySelector(".body").append(downloadLinks(made));
-    conv.items.push({ role: "user", content: text }, { role: "assistant", content: data.answer, steps: data.steps });
+    conv.items.push({ role: "user", content: text, ...(newFile ? { file: newFile } : {}) }, { role: "assistant", content: data.answer, steps: data.steps });
+    // The results of a report checked for this question are added under its answer, in a closed section.
+    if (attached && !attached.shown) {
+      attached.shown = true;
+      showChecked(addMessage("attachment", ""), attached.checked);
+      conv.items.push({ role: "attachment", checked: attached.checked });
+    }
     if (data.tokens.firstPrompt) setTokensPerChar(data.tokens.firstPrompt / data.tokens.firstChars);
     conv.largestPrompt = data.tokens.largestPrompt || null;
     await saveConv();
@@ -206,7 +223,10 @@ function openConversation(next) {
   if (conv.carried) addMessage("summary", conv.carried);
   for (const item of conv.items) {
     if (item.role === "attachment") showChecked(addMessage("attachment", ""), item.checked);
-    else addMessage(item.role, item.content);
+    else {
+      const el = addMessage(item.role, item.content);
+      if (item.file) showFileName(el, item.file);
+    }
   }
   if (conv.attachment) setAttached(conv.attachment);
   else detach(false);
@@ -304,7 +324,7 @@ const fmtNum = (x) => Math.round(x).toLocaleString("en-ZA");
 async function updateContext() {
   if (!store) { contextEl.hidden = true; return; }
   const notes = await memoryStore.listNotes().catch(() => []);
-  const chars = await startingChars(store, history, attached ? { checked: attached.checked } : null, { notes, carried: conv.carried });
+  const chars = await startingChars(store, history, attached?.checked ? { checked: attached.checked } : null, { notes, carried: conv.carried });
   const tokens = chars * tokensPerChar;
   const level = tokens >= CONTEXT_LIMIT_TOKENS ? "full" : tokens >= CONTEXT_WARN_TOKENS ? "warn" : "ok";
   contextEl.hidden = false;
@@ -337,7 +357,10 @@ continueBtn.addEventListener("click", async () => {
     const summary = await summarise(apiKey, history, conv.carried);
     const next = memoryStore.newConversation(summary, conv.attachment);
     if (conv.attachment) next.items.push({ role: "attachment", checked: conv.attachment });
+    // A report attached but not yet sent with a question stays attached in the new conversation.
+    const unsent = attached && !attached.checked ? attached : null;
     openConversation(next);
+    if (unsent) { attached = unsent; renderAttached(); }
     await saveConv();
   } catch (err) {
     addMessage("error", `The summary could not be written: ${err.message || err}`);
@@ -349,8 +372,11 @@ continueBtn.addEventListener("click", async () => {
 });
 
 // ---- Attached client reports ----
-// One report is attached at a time. It is read and checked in this browser; the results are sent to the model with
-// each question until the report is removed or a new conversation is started.
+// One report is attached at a time. Attaching a file only reads it in this browser and shows its name. The first
+// question sent with it checks it against the messages; the results are then sent to the model with each question
+// until the report is removed or a new conversation is started.
+// attached: { name, report (from attachments.js readAttachment), checked (from conformance.js checkReport, null until
+// a question is sent), shown (true once the results section has been added to the chat) }.
 let attached = null;
 const fileInput = document.getElementById("file-input");
 const attachedChip = document.getElementById("attached");
@@ -368,17 +394,32 @@ function downloadLinks(files) {
   return box;
 }
 
+// The line above the question box that names the attached report.
+function renderAttached() {
+  attachedChip.hidden = !attached;
+  attachedChip.querySelector("span").textContent = !attached ? ""
+    : attached.checked ? `Attached: ${attached.name}`
+    : `Attached: ${attached.name}. It is not checked until you send a prompt.`;
+}
+
+// Opens a conversation's report, which was checked when the conversation was saved.
 function setAttached(checked) {
-  attached = { checked };
-  attachedChip.hidden = false;
-  attachedChip.querySelector("span").textContent = `Attached: ${checked.file}`;
+  attached = { name: checked.file, report: null, checked, shown: true };
+  renderAttached();
+}
+
+// The name of the report under the question it was first sent with.
+function showFileName(messageEl, name) {
+  const line = document.createElement("div");
+  line.className = "msg-file";
+  line.textContent = `Attached: ${name}`;
+  messageEl.append(line);
 }
 
 // save = false when a conversation is being opened, so opening it does not change it.
 function detach(save = true) {
   attached = null;
-  attachedChip.hidden = true;
-  attachedChip.querySelector("span").textContent = "";
+  renderAttached();
   if (save && conv.attachment) {
     conv.attachment = null;
     if (conv.items.length) saveConv();
@@ -392,19 +433,20 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// The card shown in the chat when a report is attached: the counts of each result, a table of the test steps the
-// client answered, and buttons that write the report for the client without asking the model.
+// The section shown closed under the first answer about a report. A click opens it: the counts of each result, a table
+// of the test steps the client answered, and buttons that write the report for the client without asking the model.
 function showChecked(card, checked) {
   const body = card.querySelector(".body");
   const answered = checked.results.filter((r) => r.answered);
   const cls = (r) => `result-${r.result.toLowerCase().replace(/\s+/g, "-")}`;
-  body.innerHTML = `<p><strong>${escapeHtml(checked.file)}</strong>: ${checked.results.length} test steps, ${answered.length} answered by the client` +
+  body.innerHTML = `<details><summary>Results of checking ${escapeHtml(checked.file)}</summary>` +
+    `<p><strong>${escapeHtml(checked.file)}</strong>: ${checked.results.length} test steps, ${answered.length} answered by the client` +
     ` (CompID ${escapeHtml(checked.compids.join(", ") || "none")}). Overall: <strong>${escapeHtml(checked.overall)}</strong>.</p>` +
     `<p>${Object.entries(checked.counts).map(([k, v]) => `${escapeHtml(k)}: ${v}`).join(" · ")}</p>` +
     (checked.mandatoryMissing.length ? `<p>Mandatory steps with no response: ${escapeHtml(checked.mandatoryMissing.map((r) => r.id).join(", "))}</p>` : "") +
     `<table><thead><tr><th>Ref</th><th>Test</th><th>Result</th><th>Reason</th></tr></thead><tbody>${answered.map((r) =>
       `<tr><td>${escapeHtml(r.ref)}</td><td>${escapeHtml(r.id)} ${escapeHtml(r.title.slice(0, 70))}</td><td class="${cls(r)}">${escapeHtml(r.result)}</td><td>${escapeHtml(r.reason)}</td></tr>`).join("")}</tbody></table>` +
-    `<p class="hint">Ask the agent about any test step, or write the report for the client:</p>`;
+    `<p class="hint">Ask the agent about any test step, or write the report for the client:</p></details>`;
   const buttons = document.createElement("div");
   buttons.className = "report-buttons";
   for (const [label, format] of [["Excel report", "excel"], ["PDF report", "pdf"]]) {
@@ -419,40 +461,34 @@ function showChecked(card, checked) {
     });
     buttons.append(b);
   }
-  body.append(buttons);
+  body.querySelector("details").append(buttons);
 }
 
+// Reads the file and shows its name above the question box. Nothing else happens until a question is sent.
 async function attach(file) {
   if (!file) return;
-  if (!store && !loading) start();
-  if (!store && !loading) { addMessage("error", "Enter the database key first: click Enter keys in the sidebar. The report is checked against the message data."); return; }
-  const card = addMessage("attachment", "");
-  const cardBody = card.querySelector(".body");
-  cardBody.classList.add("thinking");
-  cardBody.textContent = `Reading ${file.name}…`;
+  if (busy) { addMessage("error", "Wait for the answer to finish, then attach the file."); return; }
+  busy = true;
+  sendBtn.disabled = true;
+  attachedChip.hidden = false;
+  attachedChip.querySelector("span").textContent = `Reading ${file.name}…`;
   try {
     const report = await readAttachment(file);
-    cardBody.textContent = `Read ${report.tests.length} test steps. Waiting for the data to finish loading…`;
-    await loadingDone;
-    if (!store) throw new Error("The data did not load, so the report could not be checked. See the message in the sidebar.");
-    const checked = await checkReport(store, report, (text) => { cardBody.textContent = `${text}…`; });
-    cardBody.classList.remove("thinking");
-    setAttached(checked);
-    showChecked(card, checked);
-    conv.attachment = checked;
-    conv.items.push({ role: "attachment", checked });
-    await saveConv();
-    updateContext();
+    attached = { name: report.name, report, checked: null, shown: false };
   } catch (err) {
-    card.remove();
     addMessage("error", err.message || String(err));
+  } finally {
+    busy = false;
+    sendBtn.disabled = false;
+    renderAttached();
+    updateContext();
+    input.focus();
   }
-  messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
 document.getElementById("attach").addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => { attach(fileInput.files[0]); fileInput.value = ""; });
-document.getElementById("detach").addEventListener("click", () => detach());
+document.getElementById("detach").addEventListener("click", () => { if (!busy) detach(); });
 // A file dropped anywhere on the chat area is attached.
 const mainEl = document.querySelector("main");
 mainEl.addEventListener("dragover", (e) => { e.preventDefault(); mainEl.classList.add("dropping"); });
