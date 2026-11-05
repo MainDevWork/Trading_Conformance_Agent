@@ -86,7 +86,7 @@
 </head>
 <body>
 <main>
-  <nav><a href="../../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold layer</a><a href="silver_layer.html">Silver layer</a><a href="bronze_data_diagram.html">Bronze layer</a></nav>
+  <nav><a href="../index.html"><strong>Open the chat</strong></a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold layer</a><a href="silver_layer.html">Silver layer</a><a href="bronze_data_diagram.html">Bronze layer</a></nav>
 
   <h1>Agent methodology: agentic RAG (retrieval-augmented generation with a tool-calling loop)</h1>
 
@@ -100,7 +100,7 @@
 
       <rect class="b web" x="130" y="45" width="340" height="70" rx="10"/>
       <text class="t" x="300" y="75">Analyst enters the database key</text>
-      <text class="sm" x="300" y="97">web/app.js</text>
+      <text class="sm" x="300" y="97">web/ui/app.js</text>
       <g class="badge"><circle cx="130" cy="45" r="13"/><text x="130" y="45">A</text></g>
 
       <rect class="b data" x="130" y="145" width="340" height="80" rx="10"/>
@@ -157,7 +157,7 @@
       <text class="t" x="300" y="518">Agent retrieves before asking the model</text>
       <text class="s" x="300" y="541">summary queries on the in-browser tables</text>
       <text class="s" x="300" y="558">and reference topics, added to the question</text>
-      <text class="sm" x="300" y="577">web/retrieve.js</text>
+      <text class="sm" x="300" y="577">web/agent/retrieve.js</text>
       <g class="badge"><circle cx="130" cy="490" r="13"/><text x="130" y="490">2</text></g>
 
       <rect class="b ai" x="130" y="620" width="340" height="100" rx="10"/>
@@ -217,7 +217,7 @@
       <rect class="b web" x="130" y="1765" width="340" height="80" rx="10"/>
       <text class="t" x="300" y="1793">Save the conversation in the browser</text>
       <text class="s" x="300" y="1814">and update the context bar</text>
-      <text class="sm" x="300" y="1832">web/memory.js</text>
+      <text class="sm" x="300" y="1832">web/agent/memory.js</text>
       <g class="badge"><circle cx="130" cy="1765" r="13"/><text x="130" y="1765">11</text></g>
       <path class="arrow" d="M300,1735 V1761"/>
       <path class="arrow" d="M474,1805 H795 V1714" style="stroke-dasharray:5 4"/>

@@ -1,6 +1,6 @@
 # Client report template: the layout of the report to the client
 
-`web/client_report.js` writes the report from the results of a checked client report. The Excel report has the three sheets below. The PDF report has the Summary, then the test results. Text in angle brackets says what goes in the cell.
+`web/reports/client_report.js` writes the report from the results of a checked client report. The Excel report has the three sheets below. The PDF report has the Summary, then the test results. Text in angle brackets says what goes in the cell.
 
 ## Sheet: Summary
 

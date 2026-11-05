@@ -2,7 +2,7 @@
 
 ## Once, when the database key is entered
 
-- A. The analyst enters the database key (`web/app.js`).
+- A. The analyst enters the database key (`web/ui/app.js`).
 - B. The page gets the 9 gold tables from cloud storage, or from the copy saved in this browser.
 - C. The page creates the tables in the in-browser database (DuckDB-WASM), with file and network access switched off.
 
@@ -15,7 +15,7 @@
 ## For every question
 
 1. The analyst asks a question, which is added to the conversation.
-2. The agent retrieves before asking the model (`web/retrieve.js`): summary queries on the in-browser tables and reference topics, added to the question.
+2. The agent retrieves before asking the model (`web/agent/retrieve.js`): summary queries on the in-browser tables and reference topics, added to the question.
 3. The agent builds the request: the same instructions, example queries, core reference and table columns every time, plus the memory notes and the conversation. It offers 7 tools, or 9 with a report.
 4. The agent sends the request to the language model, `nvidia/nemotron-3.5-lightning:free`.
 5. Does the reply call any tools? If not, the reply is the answer: go to step 9.
@@ -24,7 +24,7 @@
 8. Have 12 requests to the model been used? If not, the next round starts at step 4. If so, one last request is sent with tools switched off, and the model must answer from the results it already has.
 9. Does the answer name tables, columns or SQL? If so, one rewrite request is sent with tools off: the same numbers and conclusions, in plain words.
 10. The page shows the answer text. The queries are not shown.
-11. The page saves the conversation in the browser and updates the context bar (`web/memory.js`).
+11. The page saves the conversation in the browser and updates the context bar (`web/agent/memory.js`).
 
 ## What step 2 adds to the question
 
