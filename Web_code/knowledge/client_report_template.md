@@ -11,7 +11,7 @@ Conformance test results
 | Client CompID | <CompIDs in the client's report> |
 | Client report checked | <file name of the client's Volume 202 report> |
 | Checked on | <date of the check, day/month/year> |
-| Messages checked | JSE Vonnegut exports of the Native Trading Gateway, 01/07/2026 to 30/09/2026 |
+| Messages checked | JSE Trading FIX message data, 01/07/2026 to 30/09/2026 |
 | Overall result | <Not passed if any step failed; Needs analyst review if any step needs review; otherwise Passed, for the tests the exported messages can check> |
 | Test steps: Pass | <number of steps> |
 | Test steps: Fail | <number of steps> |

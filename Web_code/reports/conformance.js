@@ -13,7 +13,7 @@ export const RESULTS = {
   NOT_ATTEMPTED: "Not attempted",
 };
 
-// Tests whose messages are not in the Vonnegut exports of the Native Trading Gateway (see knowledge/tests.md).
+// Tests whose messages are not in the Trading FIX message data (see knowledge/tests.md).
 const NOT_CHECKABLE = [
   [/^I\d/, "Market data tests use the market data services, whose messages are not in the exports."],
   [/^T(5|6|7|8)-/, "Trade reports and trade downloads go through the Post Trade Gateway, whose messages are not in the exports."],

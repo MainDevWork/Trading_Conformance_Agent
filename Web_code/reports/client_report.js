@@ -2,14 +2,14 @@
 // an Excel workbook (ExcelJS) or a PDF (jsPDF with its table plug-in). Both files use the same layout, defined once
 // below: a summary, then one row per test step.
 
-import { loadScript } from "./attachments.js?v=23";
-import { RESULTS, fmtClock, fmtDate } from "./conformance.js?v=23";
+import { loadScript } from "./attachments.js?v=24";
+import { RESULTS, fmtClock, fmtDate } from "./conformance.js?v=24";
 
 const EXCELJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
 const JSPDF_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
 const AUTOTABLE_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js";
 
-export const MESSAGES_CHECKED = "JSE Vonnegut exports of the Native Trading Gateway, 01/07/2026 to 30/09/2026";
+export const MESSAGES_CHECKED = "JSE Trading FIX message data, 01/07/2026 to 30/09/2026";
 
 // What each result means, printed under the summary of every report.
 export const RESULT_MEANINGS = [

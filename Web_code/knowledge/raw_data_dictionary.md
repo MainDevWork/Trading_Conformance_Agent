@@ -1,6 +1,6 @@
-# Raw data dictionary: Vonnegut conformance exports, July to September 2026
+# Raw data dictionary: Trading FIX message data, July to September 2026
 
-36 Excel exports, 3,763,516 rows, in 11 datasets: one per message type. A dataset is the Excel files of one message type, combined in the bronze layer into one table with every month's rows. Every value in the exports is text, as Vonnegut wrote it; an empty cell has no value. Filled is the share of the dataset's rows with a value in the field. Months are those whose files have the column.
+36 Excel exports, 3,763,516 rows, in 11 datasets: one per message type. A dataset is the Excel files of one message type, combined in the bronze layer into one table with every month's rows. Every value in the exports is text, as it is written in the export; an empty cell has no value. Filled is the share of the dataset's rows with a value in the field. Months are those whose files have the column.
 
 ## Datasets
 
@@ -22,7 +22,7 @@
 
 | Field | Format in the export | Meaning | In datasets |
 | --- | --- | --- | --- |
-| Timestamp | Text: date, 24-hour time with 4 decimal places of a second, then a redundant am or pm, e.g. 2026-08-03 09:41:49.8992 am | When Vonnegut captured the message, in South African time (SAST, UTC+2). | Logon, Logon Response, Logout, New Order, Order Cancel Request, Order Cancel/Replace Request, Order Mass Cancel Request, Execution Report, Order Cancel Reject, Order Mass Cancel Report, Reject |
+| Timestamp | Text: date, 24-hour time with 4 decimal places of a second, then a redundant am or pm, e.g. 2026-08-03 09:41:49.8992 am | When the message was captured, in South African time (SAST, UTC+2). | Logon, Logon Response, Logout, New Order, Order Cancel Request, Order Cancel/Replace Request, Order Mass Cancel Request, Execution Report, Order Cancel Reject, Order Mass Cancel Report, Reject |
 | Comp ID | Text: 6 letters and digits, e.g. GJEN09. Every CompID in the exports is fictitious. | The CompID of the client connection the message was sent on or to. A CompID is the login name of one client connection; one firm can have several. Empty on some JSE replies. | Logon, Logon Response, Logout, New Order, Order Cancel Request, Order Cancel/Replace Request, Order Mass Cancel Request, Execution Report, Order Cancel Reject, Order Mass Cancel Report, Reject |
 | Message Type | Text: one character | The message type: A Logon, B Logon Response, 5 Logout, D New Order, F Order Cancel Request, G Order Cancel/Replace Request, q Order Mass Cancel Request, 8 Execution Report, 9 Order Cancel Reject, r Order Mass Cancel Report, 3 Reject. Every row of a dataset has its dataset's type. | Logon, Logon Response, Logout, New Order, Order Cancel Request, Order Cancel/Replace Request, Order Mass Cancel Request, Execution Report, Order Cancel Reject, Order Mass Cancel Report, Reject |
 | Client Order ID | Text: up to 20 letters, digits and hyphens, e.g. 00178573862373600000 or 125-R1 | The ID the client gave its request. The JSE does not check that it is unique, and keeps it per CompID. On a JSE reply it is the ID of the client request the reply answers; on an execution report, the ID of the last request that changed the order. | New Order, Order Cancel Request, Order Cancel/Replace Request, Order Mass Cancel Request, Execution Report, Order Cancel Reject, Order Mass Cancel Report, Reject |
@@ -44,7 +44,7 @@
 | Execution Instruction | Text: a code number | 0 None, 2 Include in the end-of-day volume auction (the JSE removed this auction in May 2026). | New Order, Execution Report |
 | Self Trade Prevention Key | Text: up to 12 characters; a few values hold unprintable characters | A key issued by the JSE that stops two orders with the same key trading with each other (self-match prevention). Used only with protocol version 3. | New Order, Execution Report |
 | Partition ID | Text: a code number | The matching engine partition: 1 Equity, 2 Derivatives. | Order Cancel Reject, Order Mass Cancel Report |
-| Source | Text: network address and port, e.g. 10.10.63.132:21501 | The network address the message was sent from, as captured by Vonnegut. | Order Cancel Reject, Reject |
+| Source | Text: network address and port, e.g. 10.10.63.132:21501 | The network address the message was sent from, as captured. | Order Cancel Reject, Reject |
 | Destination | Text: network address and port, e.g. 156.48.0.148:58428 | The network address the message was sent to. | Order Cancel Reject, Reject |
 | Bytes | Text: a whole number, with a thousands comma above 999 | The length of the message, in bytes. | Order Cancel Reject, Reject |
 | Sequence No | Text: a whole number | The message sequence number. | Order Cancel Reject, Reject |

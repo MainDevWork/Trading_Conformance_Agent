@@ -12,10 +12,10 @@
 // an attached report already answer gets no request at all (direct_answer.js). Replies are streamed, so the page shows
 // the answer as the model writes it.
 
-import { retrieve } from "./retrieve.js?v=23";
-import { evidenceFor, resultsText } from "../reports/conformance.js?v=23";
-import { isSmallTalk } from "./retrieve.js?v=23";
-import { directAnswer } from "../reports/direct_answer.js?v=23";
+import { retrieve } from "./retrieve.js?v=24";
+import { evidenceFor, resultsText } from "../reports/conformance.js?v=24";
+import { isSmallTalk } from "./retrieve.js?v=24";
+import { directAnswer } from "../reports/direct_answer.js?v=24";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -50,13 +50,14 @@ const SYSTEM_PROMPT = `You are the Trading Conformance Agent for JSE Trading Ope
 
 Background: before a client may trade on the JSE production market or consume production market data, it must pass
 conformance testing. The client sends messages from its test system using a CompID (the identifier of the client's
-trading session). Every message is recorded in Vonnegut, the JSE message-capture platform. Trading Operations exports
+trading session). Every message is captured and stored by the JSE. Trading Operations exports
 those messages to Excel and checks whether the client completed each required test scenario correctly. Analysts
 investigate by hand when the conformance report is below a 100% pass rate, or when the report says a scenario failed
 but the messages show the client did it correctly. Your job is to answer questions about these messages accurately,
 so analysts can find out what a client actually did and why a test failed.
 
-The data: the Vonnegut exports of July, August and September 2026 as a star schema in DuckDB. The core JSE conformance
+The data: the Trading FIX message data of July, August and September 2026 as a star schema in DuckDB. Call it the
+Trading FIX message data; do not name the system that captured the messages. The core JSE conformance
 reference and every table's columns with their meanings are at the end of these instructions. Start from
 fact_compid_day for what a CompID did and on which days, fact_message for single messages, fact_order for whole orders.
 
@@ -143,7 +144,7 @@ const REFERENCE_TOPICS = {
   identifiers: "how client_order_id, order_id, execution_id and public_order_id link messages; firm, trader and partition structure",
   gateway_rules: "logon timing, heartbeats, message rate limit, cancel on disconnect, recovery, circuit breakers, self-match prevention",
   conformance_process: "JSE conformance rules (slots, retests, CTA role), the Volume 202 report layout, exemptions, who must conform",
-  raw_data_dictionary: "every field of the 11 raw Vonnegut export datasets: its format in the export, meaning, the months it appears in and how often it is filled",
+  raw_data_dictionary: "every field of the 11 raw export datasets: its format in the export, meaning, the months it appears in and how often it is filled",
   client_report_template: "the layout of the report to the client: each sheet, column and what goes in it, and the meaning of each result",
   agent_methodology: "how this agent answers a question and handles an attached report, step by step, with its tools and memory",
   problem_statement: "Group 6 problem statement: the Trading Operations conformance problem, key challenges, why it was chosen and how success is measured",
