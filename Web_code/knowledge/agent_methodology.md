@@ -2,7 +2,7 @@
 
 ## Once, when the database key is entered
 
-- A. The analyst enters the database key (`web/ui/app.js`).
+- A. The analyst enters the database key (`Web_code/ui/app.js`).
 - B. The page gets the 9 gold tables from cloud storage, or from the copy saved in this browser.
 - C. The page creates the tables in the in-browser database (DuckDB-WASM), with file and network access switched off.
 
@@ -15,7 +15,7 @@
 ## For every question
 
 1. The analyst asks a question, which is added to the conversation. If a report is attached and every word of the question is on a fixed list, such as "give me the results", "what failed" or "give me the excel report", the page writes the table or the report file from the fixed-rule results with no request to the model: go to step 10.
-2. The agent retrieves before asking the model (`web/agent/retrieve.js`): summary queries on the in-browser tables and reference topics, added to the question.
+2. The agent retrieves before asking the model (`Web_code/agent/retrieve.js`): summary queries on the in-browser tables and reference topics, added to the question.
 3. The agent builds the request: the same instructions, example queries, core reference and table columns every time, plus the memory notes and the conversation. It offers 7 tools, or 9 with a report.
 4. The agent sends the request to the language model, `nvidia/nemotron-3.5-lightning:free`, with its reasoning step switched off. The reply is streamed, so the page shows the answer as the model writes it. While the agent answers, a Stop button replaces the Send button: it cancels the request and keeps the text written so far in the conversation, marked as stopped, so the analyst can send a different prompt.
 5. Does the reply call any tools? If not, the reply is the answer: go to step 9.
@@ -24,7 +24,7 @@
 8. Have 12 requests been used, or 60 seconds passed since the question? If not, the next round starts at step 4. If so, one last request is sent with tools switched off, and the model must answer from the results it already has.
 9. Does the answer contain SQL? If so, one rewrite request is sent with tools off: the same numbers and conclusions, in plain words. Table and column names are replaced with plain words with no request.
 10. The page shows the answer text, how long it took and how many requests the model received. The queries are not shown.
-11. The page saves the conversation in the browser and updates the context bar (`web/agent/memory.js`).
+11. The page saves the conversation in the browser and updates the context bar (`Web_code/agent/memory.js`).
 
 ## What step 2 adds to the question
 

@@ -9,12 +9,12 @@ A web chat page where a JSE Trading Operations analyst asks questions about the 
 | Path               | Contents                                                                                                                                                                                                                                                                                              |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `index.html`     | The page. Stays in the root so GitHub Pages serves it as the site's home page.                                                                                                                                                                                                                        |
-| `web/ui/` | The chat screen: `app.js` (chat, keys form, attached reports, sidebar button), `style.css`, `icon.svg` (the agent's icon, also the browser tab icon) |
-| `web/agent/` | The agent: `agent.js` (language model and its tools), `retrieve.js` (facts and reference found before the model is asked), `data.js` (loads the data into the browser), `memory.js` (saved conversations and memory notes, in the browser) |
-| `web/reports/` | Client reports: `attachments.js` (reads an attached client report), `conformance.js` (checks it against the messages), `direct_answer.js` (answers from the results with no request to the model), `client_report.js` (writes the report to the client) |
-| `web/knowledge/` | The JSE conformance reference the agent reads (see below)                                                                                                                                                                                                                                             |
+| `Web_code/ui/` | The chat screen: `app.js` (chat, keys form, attached reports, sidebar button), `style.css`, `icon.svg` (the agent's icon, also the browser tab icon) |
+| `Web_code/agent/` | The agent: `agent.js` (language model and its tools), `retrieve.js` (facts and reference found before the model is asked), `data.js` (loads the data into the browser), `memory.js` (saved conversations and memory notes, in the browser) |
+| `Web_code/reports/` | Client reports: `attachments.js` (reads an attached client report), `conformance.js` (checks it against the messages), `direct_answer.js` (answers from the results with no request to the model), `client_report.js` (writes the report to the client) |
+| `Web_code/knowledge/` | The JSE conformance reference the agent reads (see below)                                                                                                                                                                                                                                             |
 | `code/` | Not in this repository (excluded by `.gitignore`). The Python scripts that build the bronze, silver and gold layers in Supabase. Needed only to rebuild the tables, not to run the page |
-| `pages/`  | The diagram pages: `system_architecture.html`, `agent_methodology.html`, `data_architecture.html`, `bronze_data_diagram.html` (bronze layer), `silver_layer.html` (silver layer), `gold_star_schema.html` (gold layer)                                                                    |
+| `Pages/`  | The diagram pages: `system_architecture.html`, `agent_methodology.html`, `data_architecture.html`, `bronze_data_diagram.html` (bronze layer), `silver_layer.html` (silver layer), `gold_star_schema.html` (gold layer)                                                                    |
 | `academy/sql/` | Not in this repository (excluded by `.gitignore`). SQL Server stored procedures that build the same tables from the Excel files |
 | `Clients_Conformance_Tests/` | Clients' Volume 202 reports with real CompIDs. Excluded from git. `Fictitious_CompIDs/` in it holds copies with the fictitious CompIDs, as Excel and PDF, made by `code/anonymise_reports.py`; use only these with the page |
 | `.nojekyll`      | Tells GitHub Pages to serve the files as they are; must stay in the root                                                                                                                                                                                                                              |
@@ -27,18 +27,18 @@ Click **Enter keys** in the sidebar and enter two keys in the form that opens. N
 
 | Key on the page | What to enter                                                                     | Use                                                                                                         |
 | --------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Database key    | The Supabase publishable key (starts `sb_publishable_`). Never the service key. | `web/agent/data.js` uses it to download the message data from the private Supabase Storage bucket `fix-data`. |
-| AI API key      | An OpenRouter key (starts `sk-or-v1-`)                                          | `web/agent/agent.js` sends it only to openrouter.ai, with each question.                                        |
+| Database key    | The Supabase publishable key (starts `sb_publishable_`). Never the service key. | `Web_code/agent/data.js` uses it to download the message data from the private Supabase Storage bucket `fix-data`. |
+| AI API key      | An OpenRouter key (starts `sk-or-v1-`)                                          | `Web_code/agent/agent.js` sends it only to openrouter.ai, with each question.                                        |
 
-Every question is sent to the model `nvidia/nemotron-3.5-lightning:free`, set as `MODEL` in `web/agent/agent.js`. The page has no setting to change it.
+Every question is sent to the model `nvidia/nemotron-3.5-lightning:free`, set as `MODEL` in `Web_code/agent/agent.js`. The page has no setting to change it.
 
 ## Check a client's conformance test report
 
 A client sends its Volume 202 conformance test report: one row per test step, with the CompID, test time and IDs (order ID, client order ID, execution ID) the client recorded. To check it:
 
 1. Click the paperclip button beside the question box, or drop the file on the chat area. Excel (`.xlsx`, `.xls`) and PDF files are read, in the browser; the file is not uploaded anywhere.
-2. `web/reports/attachments.js` finds each test step by the column headed "Test Case ID", and the other columns by their headings, so moved or extra columns do not matter. A PDF has no columns, so the table is rebuilt from where each piece of text is on the page. The page shows the file's name above the question box and does nothing else with the file until a prompt is sent. A file with no prompt sent yet is not saved, so it must be attached again after a reload.
-3. When the analyst sends a prompt, `web/reports/conformance.js` looks up every ID the client wrote in `fact_message`, collects every message of those orders, and gives each step one result by a fixed rule for that test (from `web/knowledge/tests.md`):
+2. `Web_code/reports/attachments.js` finds each test step by the column headed "Test Case ID", and the other columns by their headings, so moved or extra columns do not matter. A PDF has no columns, so the table is rebuilt from where each piece of text is on the page. The page shows the file's name above the question box and does nothing else with the file until a prompt is sent. A file with no prompt sent yet is not saved, so it must be attached again after a reload.
+3. When the analyst sends a prompt, `Web_code/reports/conformance.js` looks up every ID the client wrote in `fact_message`, collects every message of those orders, and gives each step one result by a fixed rule for that test (from `Web_code/knowledge/tests.md`):
 
    | Result | Meaning |
    | --- | --- |
@@ -48,8 +48,8 @@ A client sends its Volume 202 conformance test report: one row per test step, wi
    | Not checkable | The step uses a gateway or service whose messages are not exported (market data, Post Trade, Drop Copy, FIX, derivatives). |
    | Not attempted | The client gave no response. |
 
-4. A prompt that the results alone answer, such as "give me the results", "what failed", "result of T3.6" or "give me the excel report", is answered by `web/reports/direct_answer.js` with no request to the model. It answers only when every word of the prompt is on its fixed lists; any other prompt goes to the model. The results are sent to the model with such a prompt and every later one, with what the messages show only for steps that Fail, Need review or are named in the prompt, and the model is told to do only what the prompt asks. The model has two more tools: `get_test_evidence` (every message of one step) and `create_client_report`. A closed section under the first answer, opened by a click, holds the result of each step.
-5. The **Excel report** and **PDF report** buttons in that section, or asking the agent for a report, write the file for the client: a summary, then one row per test step with its result and reason. The analyst can ask the agent to change a result; the report then says the analyst changed it and keeps the automatic reason. The layout is in `web/knowledge/client_report_template.md`.
+4. A prompt that the results alone answer, such as "give me the results", "what failed", "result of T3.6" or "give me the excel report", is answered by `Web_code/reports/direct_answer.js` with no request to the model. It answers only when every word of the prompt is on its fixed lists; any other prompt goes to the model. The results are sent to the model with such a prompt and every later one, with what the messages show only for steps that Fail, Need review or are named in the prompt, and the model is told to do only what the prompt asks. The model has two more tools: `get_test_evidence` (every message of one step) and `create_client_report`. A closed section under the first answer, opened by a click, holds the result of each step.
+5. The **Excel report** and **PDF report** buttons in that section, or asking the agent for a report, write the file for the client: a summary, then one row per test step with its result and reason. The analyst can ask the agent to change a result; the report then says the analyst changed it and keeps the automatic reason. The layout is in `Web_code/knowledge/client_report_template.md`.
 
 The September 2026 export has no time in force or order quantity on new orders and no liquidity indicator on execution reports, so tests that need those (for example T21-001) get Needs review, with what the timing of the messages shows.
 
@@ -57,34 +57,34 @@ To make the fictitious copies of new client reports, put the reports in `Clients
 
 ## How a question is answered
 
-1. When the database key is entered, `web/agent/data.js` downloads `gold/manifest.json` and the gold Parquet tables from Supabase (Parquet is a compressed file format for tables), and loads them into DuckDB-WASM, the version of the DuckDB SQL database that runs in the browser.
-2. `web/agent/retrieve.js` searches the question for the CompIDs, months, reject codes and test IDs it names. A follow-up question that names no CompID uses the CompID of the latest earlier question that did. For each CompID (at most 2) it runs four summary queries on the in-browser tables: activity per month, messages per type, rejections per reject code with their meanings, and how the CompID's orders ended, limited to the months named. It adds the meaning of each reject code named and up to 2 topic files from `web/knowledge/`, chosen by words in the question. The results, with the SQL that produced them, are added to the question. No language model is involved in this step.
-3. `web/agent/agent.js` sends the conversation to OpenRouter. The system prompt starts with the same text in every request: instructions with four example queries, `web/knowledge/core.md`, and every table's columns with their meanings. After it come the memory notes and, in a conversation that continues an earlier one, that conversation's summary (see "Memory and the context bar"). The model may call four tools, plus the three memory tools:
+1. When the database key is entered, `Web_code/agent/data.js` downloads `gold/manifest.json` and the gold Parquet tables from Supabase (Parquet is a compressed file format for tables), and loads them into DuckDB-WASM, the version of the DuckDB SQL database that runs in the browser.
+2. `Web_code/agent/retrieve.js` searches the question for the CompIDs, months, reject codes and test IDs it names. A follow-up question that names no CompID uses the CompID of the latest earlier question that did. For each CompID (at most 2) it runs four summary queries on the in-browser tables: activity per month, messages per type, rejections per reject code with their meanings, and how the CompID's orders ended, limited to the months named. It adds the meaning of each reject code named and up to 2 topic files from `Web_code/knowledge/`, chosen by words in the question. The results, with the SQL that produced them, are added to the question. No language model is involved in this step.
+3. `Web_code/agent/agent.js` sends the conversation to OpenRouter. The system prompt starts with the same text in every request: instructions with four example queries, `Web_code/knowledge/core.md`, and every table's columns with their meanings. After it come the memory notes and, in a conversation that continues an earlier one, that conversation's summary (see "Memory and the context bar"). The model may call four tools, plus the three memory tools:
    - `run_sql`: one SELECT statement, returning at most 200 rows.
    - `describe_table`: for one table, each column's meaning, distinct-value count, empty-value count and most common values, plus 5 sample rows.
-   - `read_reference`: one topic file from `web/knowledge/`.
-   - `lookup_reject_codes`: the Volume 10 meaning of the given reject codes, from `web/knowledge/reject_codes.json`.
-     `web/agent/agent.js` runs each tool call the model makes and returns the result to the model, until the model replies with text, for up to 12 rounds or 60 seconds. After that, one last request with tools switched off asks the model to answer from the results it has. The reply is streamed, so the page shows the answer as the model writes it, and the model's reasoning step is switched off. While the agent answers, a **Stop** button replaces the **Send** button. It cancels the request; text already written stays in the conversation, marked as stopped, and a prompt stopped before any text was written is not kept in the conversation.
-4. `web/agent/agent.js` replaces table names and column names with an underscore with plain words in the answer. If the answer contains an SQL query, it asks the model once to rewrite it in plain words, with tools switched off.
+   - `read_reference`: one topic file from `Web_code/knowledge/`.
+   - `lookup_reject_codes`: the Volume 10 meaning of the given reject codes, from `Web_code/knowledge/reject_codes.json`.
+     `Web_code/agent/agent.js` runs each tool call the model makes and returns the result to the model, until the model replies with text, for up to 12 rounds or 60 seconds. After that, one last request with tools switched off asks the model to answer from the results it has. The reply is streamed, so the page shows the answer as the model writes it, and the model's reasoning step is switched off. While the agent answers, a **Stop** button replaces the **Send** button. It cancels the request; text already written stays in the conversation, marked as stopped, and a prompt stopped before any text was written is not kept in the conversation.
+4. `Web_code/agent/agent.js` replaces table names and column names with an underscore with plain words in the answer. If the answer contains an SQL query, it asks the model once to rewrite it in plain words, with tools switched off.
 5. The page shows the answer text and a line saying how long it took and how many requests the model received; the tool calls and their SQL are not shown.
 
 The button at the top left of the chat area (a rectangle with a line down its left side) hides and shows the sidebar. The choice is kept in the browser, so it stays after a reload.
 
 ## Memory and the context bar
 
-`web/agent/memory.js` keeps the memory in the browser's own database (IndexedDB), on that computer only. Other computers and other analysts do not have it, and clearing the browser's site data for the page deletes it.
+`Web_code/agent/memory.js` keeps the memory in the browser's own database (IndexedDB), on that computer only. Other computers and other analysts do not have it, and clearing the browser's site data for the page deletes it.
 
 - **Conversations.** Every question, answer and attached report is saved as it happens. After a reload the page opens the last conversation again. The sidebar lists the saved conversations under **Conversations**: click one to open it, or × to delete it. Download links of reports written earlier are not saved; the Excel report and PDF report buttons write them again.
 - **Memory notes.** Short facts sent with every question of every conversation, listed in the sidebar under **Memory notes**, with × to delete one. The model saves them with three tools:
   - `save_memory`: saves one note of at most 500 characters, when the analyst asks it to remember something, says how answers should be written, or the model reaches a finding a later conversation would need. At most 100 notes are kept.
   - `forget_memory`: deletes a note by its number.
   - `search_past_conversations`: finds earlier conversations that contain the words given, such as a CompID or test ID, and returns passages from up to 5 of them.
-- **Context bar.** Above the question box: the tokens (pieces of words, about 4 characters each) that the request of the next question starts with, out of 64,000. It counts the system prompt, the memory notes, the tool definitions, the conversation so far and an attached report's results; the facts retrieved for the next question and its tool results come on top. The characters are converted to tokens with the ratio OpenRouter reported for the last request. The bar turns amber from 32,000 tokens and red from 64,000. The model accepts up to 1,000,000 tokens, but published tests found models answer less accurately long before their limit: in the NoLiMa test (Modarressi et al., 2025), 10 of 12 models scored less than half their short-request score at 32,000 tokens. The levels are `CONTEXT_WARN_TOKENS` and `CONTEXT_LIMIT_TOKENS` in `web/agent/agent.js`.
+- **Context bar.** Above the question box: the tokens (pieces of words, about 4 characters each) that the request of the next question starts with, out of 64,000. It counts the system prompt, the memory notes, the tool definitions, the conversation so far and an attached report's results; the facts retrieved for the next question and its tool results come on top. The characters are converted to tokens with the ratio OpenRouter reported for the last request. The bar turns amber from 32,000 tokens and red from 64,000. The model accepts up to 1,000,000 tokens, but published tests found models answer less accurately long before their limit: in the NoLiMa test (Modarressi et al., 2025), 10 of 12 models scored less than half their short-request score at 32,000 tokens. The levels are `CONTEXT_WARN_TOKENS` and `CONTEXT_LIMIT_TOKENS` in `Web_code/agent/agent.js`.
 - **Continue in a new conversation.** Shown when the bar is amber or red. One request with no tools asks the model for a summary of the conversation of at most 300 words; a new conversation starts with that summary and the attached report, and sends the summary with every question.
 
-## Reference files: `web/knowledge/`
+## Reference files: `Web_code/knowledge/`
 
-Taken from JSE Volumes 00E, 01E, 10, 201 and 202 (the versions are listed at the top of `core.md`). Only `core.md` is sent with every question. `web/agent/retrieve.js` adds up to 2 others to a question whose words match them, and the model can read any other with `read_reference`, so a question costs only the reference it uses.
+Taken from JSE Volumes 00E, 01E, 10, 201 and 202 (the versions are listed at the top of `core.md`). Only `core.md` is sent with every question. `Web_code/agent/retrieve.js` adds up to 2 others to a question whose words match them, and the model can read any other with `read_reference`, so a question costs only the reference it uses.
 
 | File                       | Contents                                                                                                                                             |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -99,12 +99,12 @@ Taken from JSE Volumes 00E, 01E, 10, 201 and 202 (the versions are listed at the
 | `gateway_rules.md`       | Logon, heartbeats, rate limit, cancel on disconnect, recovery, circuit breakers, self-match prevention                                               |
 | `conformance_process.md` | Conformance rules, the Volume 202 report, exemptions                                                                                                 |
 | `raw_data_dictionary.md` | Every field of the 11 raw datasets: its format in the export, its meaning, the months it appears in and how often it is filled |
-| `client_report_template.md` | The layout of the report to the client: each sheet and column, and what goes in it. `web/reports/client_report.js` writes the report; this file describes it |
-| `agent_methodology.md` | How the agent answers a question and handles an attached report, in the same steps as `pages/agent_methodology.html` |
+| `client_report_template.md` | The layout of the report to the client: each sheet and column, and what goes in it. `Web_code/reports/client_report.js` writes the report; this file describes it |
+| `agent_methodology.md` | How the agent answers a question and handles an attached report, in the same steps as `Pages/agent_methodology.html` |
 | `problem_statement.md` | Group 6 problem statement |
 | `project_brief.md` | JSE Academy final project brief |
 
-To add a topic, add the file, an entry in `REFERENCE_TOPICS` in `web/agent/agent.js`, and the words that select it in `TOPIC_WORDS` in `web/agent/retrieve.js`. When the JSE publishes a new version of a volume, update the matching file here.
+To add a topic, add the file, an entry in `REFERENCE_TOPICS` in `Web_code/agent/agent.js`, and the words that select it in `TOPIC_WORDS` in `Web_code/agent/retrieve.js`. When the JSE publishes a new version of a volume, update the matching file here.
 
 ## Rebuild the Supabase data
 
@@ -166,4 +166,4 @@ Changes made in `silver/message.parquet`, compared with the bronze tables:
 - `-1`, the exports' "not set" value, becomes empty in `reject_code`, `minimum_quantity`, `stop_price` and `password_expiry`.
 - The network capture columns (`source`, `destination`, `bytes`, `sequence_no`, `packet_id`) are left out; they are in `bronze/combined/`.
 
-After loading, `web/agent/data.js` switches off file, network and settings access for the SQL connection.
+After loading, `Web_code/agent/data.js` switches off file, network and settings access for the SQL connection.

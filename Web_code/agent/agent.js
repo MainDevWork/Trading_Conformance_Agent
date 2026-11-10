@@ -12,9 +12,9 @@
 // an attached report already answer gets no request at all (direct_answer.js). Replies are streamed, so the page shows
 // the answer as the model writes it.
 
-import { retrieve } from "./retrieve.js?v=20";
-import { evidenceFor, resultsText } from "../reports/conformance.js?v=20";
-import { directAnswer } from "../reports/direct_answer.js?v=20";
+import { retrieve } from "./retrieve.js?v=21";
+import { evidenceFor, resultsText } from "../reports/conformance.js?v=21";
+import { directAnswer } from "../reports/direct_answer.js?v=21";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -28,7 +28,7 @@ const TOOL_TIME_LIMIT_MS = 60_000;
 
 // The language model every question is sent to. Fixed here; the page has no setting to change it.
 export const MODEL = "nvidia/nemotron-3.5-lightning:free";
-// Kept for copies of web/ui/app.js saved in browsers before 01/11/2026, which import this name.
+// Kept for copies of Web_code/ui/app.js saved in browsers before 01/11/2026, which import this name.
 export const DEFAULT_MODEL = MODEL;
 
 // The most tokens (pieces of words, about 4 characters each) one request to MODEL may hold, as OpenRouter's model
@@ -482,7 +482,7 @@ async function callModel(apiKey, messages, model, allowTools = true, tools = TOO
 // knowledge/ holds the reference taken from JSE Volumes 00E, 01E, 10, 201 and 202 and the project brief.
 // core.md is added to every system prompt; the other files are read only when the model calls read_reference,
 // and reject_codes.json only when it calls lookup_reject_codes. Each file is downloaded once.
-// The address is taken relative to this file (web/agent/agent.js), not to the page, so it works wherever index.html is served.
+// The address is taken relative to this file (Web_code/agent/agent.js), not to the page, so it works wherever index.html is served.
 const KNOWLEDGE_URL = new URL("../knowledge/", import.meta.url);
 const fileCache = new Map();
 function loadKnowledge(name, asJson = false) {

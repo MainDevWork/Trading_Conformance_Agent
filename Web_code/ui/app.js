@@ -1,9 +1,9 @@
-import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=20";
-import { loadStore } from "../agent/data.js?v=20";
-import { readAttachment } from "../reports/attachments.js?v=20";
-import { checkReport } from "../reports/conformance.js?v=20";
-import { makeClientReport } from "../reports/client_report.js?v=20";
-import * as memoryStore from "../agent/memory.js?v=20";
+import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=21";
+import { loadStore } from "../agent/data.js?v=21";
+import { readAttachment } from "../reports/attachments.js?v=21";
+import { checkReport } from "../reports/conformance.js?v=21";
+import { makeClientReport } from "../reports/client_report.js?v=21";
+import * as memoryStore from "../agent/memory.js?v=21";
 
 window.appStarted = true;
 
@@ -253,7 +253,7 @@ input.addEventListener("keydown", (e) => {
 });
 document.getElementById("clear").addEventListener("click", () => { if (!busy) openConversation(memoryStore.newConversation()); });
 
-// ---- Memory: saved conversations and notes (web/agent/memory.js) ----
+// ---- Memory: saved conversations and notes (Web_code/agent/memory.js) ----
 const conversationsEl = document.getElementById("conversations");
 const notesEl = document.getElementById("notes");
 const memoryState = document.getElementById("memory-state");
