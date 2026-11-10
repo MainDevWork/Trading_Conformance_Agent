@@ -3,6 +3,9 @@
 > [!NOTE]
 > This system works with a data set of real JSE trading FIX messages from conformance testing between 01/07/2026 and 30/09/2026. The CompIDs are the only fictitious part of the data: each real CompID has been replaced with a made-up one. Every other value is real trading FIX message data.
 
+> [!IMPORTANT]
+> To see and test the system you need two keys: one for the database and one for the AI model. To request them, send me a LinkedIn connection request at [linkedin.com/in/ndivhuwo-makhavhu](https://www.linkedin.com/in/ndivhuwo-makhavhu) with a note that asks for the keys and states why you want to test the system. Keys are given only to people currently employed at a company.
+
 Website: [maindevwork.github.io/Trading_Conformance_Agent](https://maindevwork.github.io/Trading_Conformance_Agent/)
 
 A web chat page where a JSE Trading Operations analyst asks questions about the Trading FIX message data from conformance testing (July to September 2026), and a language model answers them by running SQL queries against those exports.

@@ -2,7 +2,7 @@
 // request to the language model. A question is answered here only when every word in it is on the lists below; any
 // other word, such as "why", sends the question to the model.
 
-import { RESULTS } from "./conformance.js?v=25";
+import { RESULTS } from "./conformance.js?v=26";
 
 const FILLER = new Set(("give me the show list all what are is was were of for this that these those in from on please " +
   "can could would you i we want need see get tell attached client clients report reports file test tests step steps " +

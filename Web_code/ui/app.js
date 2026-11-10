@@ -1,9 +1,9 @@
-import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=25";
-import { loadStore } from "../agent/data.js?v=25";
-import { readAttachment } from "../reports/attachments.js?v=25";
-import { checkReport } from "../reports/conformance.js?v=25";
-import { makeClientReport } from "../reports/client_report.js?v=25";
-import * as memoryStore from "../agent/memory.js?v=25";
+import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=26";
+import { loadStore } from "../agent/data.js?v=26";
+import { readAttachment } from "../reports/attachments.js?v=26";
+import { checkReport } from "../reports/conformance.js?v=26";
+import { makeClientReport } from "../reports/client_report.js?v=26";
+import * as memoryStore from "../agent/memory.js?v=26";
 
 window.appStarted = true;
 

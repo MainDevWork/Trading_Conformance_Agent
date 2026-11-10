@@ -97,7 +97,6 @@ main.dropping { outline: 3px dashed var(--accent); outline-offset: -8px; }
 #messages:not(:empty) ~ #welcome { display: none; }
 #welcome img { filter: drop-shadow(0 6px 18px rgba(11, 92, 173, .25)); }
 .welcome-title { font-size: 22px; font-weight: 700; margin-top: 6px; }
-.welcome-text { font-size: 14px; color: var(--muted); }
 #messages { flex: 1; overflow-y: auto; padding: 24px 24px 24px 56px; }
 /* The messages and the composer are 90% of the chat area's width, up to 1400px, so they widen with the screen. */
 .msg { width: min(1400px, 90%); margin: 0 auto 18px; }
