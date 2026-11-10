@@ -1,9 +1,9 @@
-import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=24";
-import { loadStore } from "../agent/data.js?v=24";
-import { readAttachment } from "../reports/attachments.js?v=24";
-import { checkReport } from "../reports/conformance.js?v=24";
-import { makeClientReport } from "../reports/client_report.js?v=24";
-import * as memoryStore from "../agent/memory.js?v=24";
+import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=25";
+import { loadStore } from "../agent/data.js?v=25";
+import { readAttachment } from "../reports/attachments.js?v=25";
+import { checkReport } from "../reports/conformance.js?v=25";
+import { makeClientReport } from "../reports/client_report.js?v=25";
+import * as memoryStore from "../agent/memory.js?v=25";
 
 window.appStarted = true;
 
@@ -253,7 +253,6 @@ document.getElementById("clear").addEventListener("click", () => { if (!busy) op
 
 // ---- Memory: saved conversations and notes (Web_code/agent/memory.js) ----
 const conversationsEl = document.getElementById("conversations");
-const notesEl = document.getElementById("notes");
 const memoryState = document.getElementById("memory-state");
 
 // The memory passed to the agent for one question. question is used as the conversation's name for a note saved
@@ -341,25 +340,9 @@ async function renderConversations() {
   }
 }
 
-async function renderNotes() {
-  const notes = await memoryStore.listNotes().catch(() => []);
-  notesEl.innerHTML = "";
-  if (!notes.length) notesEl.innerHTML = `<li class="hint">No notes yet. Ask the agent to remember something, or it saves findings itself.</li>`;
-  for (const n of notes) {
-    const li = document.createElement("li");
-    const text = document.createElement("span");
-    text.textContent = `[${n.id}] ${n.text}`;
-    text.title = `Saved ${formatDate(n.saved)}${n.conversation ? ` in "${n.conversation}"` : ""}`;
-    const del = document.createElement("button");
-    del.type = "button";
-    del.className = "item-delete";
-    del.textContent = "×";
-    del.title = "Delete this note";
-    del.setAttribute("aria-label", `Delete note ${n.id}`);
-    del.addEventListener("click", async () => { await memoryStore.deleteNote(n.id); renderNotes(); updateContext(); });
-    li.append(text, del);
-    notesEl.append(li);
-  }
+// The memory notes are not shown on the page; they are still saved and sent with every question. A note saved or
+// deleted changes the size of the next request, so the context bar is updated.
+function renderNotes() {
   updateContext();
 }
 

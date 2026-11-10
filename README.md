@@ -75,7 +75,7 @@ The button at the top left of the chat area (a rectangle with a line down its le
 `Web_code/agent/memory.js` keeps the memory in the browser's own database (IndexedDB), on that computer only. Other computers and other analysts do not have it, and clearing the browser's site data for the page deletes it.
 
 - **Conversations.** Every question, answer and attached report is saved as it happens. After a reload the page opens the last conversation again. The sidebar lists the saved conversations under **Conversations**: click one to open it, or × to delete it. Download links of reports written earlier are not saved; the Excel report and PDF report buttons write them again.
-- **Memory notes.** Short facts sent with every question of every conversation, listed in the sidebar under **Memory notes**, with × to delete one. The model saves them with three tools:
+- **Memory notes.** Short facts sent with every question of every conversation, not shown on the page. To delete one, ask the agent to forget it. The model saves them with three tools:
   - `save_memory`: saves one note of at most 500 characters, when the analyst asks it to remember something, says how answers should be written, or the model reaches a finding a later conversation would need. At most 100 notes are kept.
   - `forget_memory`: deletes a note by its number.
   - `search_past_conversations`: finds earlier conversations that contain the words given, such as a CompID or test ID, and returns passages from up to 5 of them.
