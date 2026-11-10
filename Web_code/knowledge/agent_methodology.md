@@ -15,7 +15,7 @@
 ## For every question
 
 1. The analyst asks a question, which is added to the conversation. If a report is attached and every word of the question is on a fixed list, such as "give me the results", "what failed" or "give me the excel report", the page writes the table or the report file from the fixed-rule results with no request to the model: go to step 10.
-2. The agent retrieves before asking the model (`Web_code/agent/retrieve.js`): summary queries on the in-browser tables and reference topics, added to the question.
+2. The agent retrieves before asking the model (`Web_code/agent/retrieve.js`): summary queries on the in-browser tables and reference topics, added to the question. A greeting, thanks or other small talk, where every word is on a fixed list ("hello", "thanks", "how are you?"), gets no retrieval: one request is sent with tools switched off, the model replies briefly, and the agent goes to step 9.
 3. The agent builds the request: the same instructions, example queries, core reference and table columns every time, plus the memory notes and the conversation. It offers 7 tools, or 9 with a report.
 4. The agent sends the request to the language model, `nvidia/nemotron-3.5-lightning:free`, with its reasoning step switched off. The reply is streamed, so the page shows the answer as the model writes it. While the agent answers, a Stop button replaces the Send button: it cancels the request and keeps the text written so far in the conversation, marked as stopped, so the analyst can send a different prompt.
 5. Does the reply call any tools? If not, the reply is the answer: go to step 9.

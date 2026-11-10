@@ -1,9 +1,9 @@
-import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=21";
-import { loadStore } from "../agent/data.js?v=21";
-import { readAttachment } from "../reports/attachments.js?v=21";
-import { checkReport } from "../reports/conformance.js?v=21";
-import { makeClientReport } from "../reports/client_report.js?v=21";
-import * as memoryStore from "../agent/memory.js?v=21";
+import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=23";
+import { loadStore } from "../agent/data.js?v=23";
+import { readAttachment } from "../reports/attachments.js?v=23";
+import { checkReport } from "../reports/conformance.js?v=23";
+import { makeClientReport } from "../reports/client_report.js?v=23";
+import * as memoryStore from "../agent/memory.js?v=23";
 
 window.appStarted = true;
 
@@ -146,7 +146,7 @@ async function send(text) {
   sendBtn.hidden = true;
   stopBtn.hidden = false;
   stopBtn.disabled = false;
-  // The waiting message shows the current step and the seconds since the question was sent.
+  // The waiting message shows the current step.
   const pending = addMessage("assistant", "");
   const pendingBody = pending.querySelector(".body");
   pendingBody.classList.add("thinking");
@@ -157,7 +157,7 @@ async function send(text) {
   let drawnAt = 0;
   // The text of the reply being written, kept if the analyst presses Stop.
   let partial = "";
-  const showStep = () => { if (!writing) pendingBody.textContent = `${step}… ${Math.round((Date.now() - sentAt) / 1000)} s`; };
+  const showStep = () => { if (!writing) pendingBody.textContent = `${step}…`; };
   const onStep = (text) => { writing = false; partial = ""; pendingBody.classList.add("thinking"); step = text; showStep(); };
   // At most 8 redraws a second; the finished answer replaces this text.
   const onText = (text) => {
@@ -170,7 +170,6 @@ async function send(text) {
     if (atEnd) messagesEl.scrollTop = messagesEl.scrollHeight;
   };
   showStep();
-  const ticker = setInterval(showStep, 1000);
   // The results of a report checked for this question are added under its answer, in a closed section.
   const showResultsOnce = () => {
     if (!attached?.checked || attached.shown) return;
@@ -237,7 +236,6 @@ async function send(text) {
       addMessage("error", err.message);
     }
   } finally {
-    clearInterval(ticker);
     busy = false;
     stopper = null;
     sendBtn.disabled = false;

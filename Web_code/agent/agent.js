@@ -12,9 +12,10 @@
 // an attached report already answer gets no request at all (direct_answer.js). Replies are streamed, so the page shows
 // the answer as the model writes it.
 
-import { retrieve } from "./retrieve.js?v=21";
-import { evidenceFor, resultsText } from "../reports/conformance.js?v=21";
-import { directAnswer } from "../reports/direct_answer.js?v=21";
+import { retrieve } from "./retrieve.js?v=23";
+import { evidenceFor, resultsText } from "../reports/conformance.js?v=23";
+import { isSmallTalk } from "./retrieve.js?v=23";
+import { directAnswer } from "../reports/direct_answer.js?v=23";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -76,20 +77,26 @@ How to work:
   numbers or code meanings, and do not state a code meaning or test rule from memory.
 - Call describe_table only when you need a column's most common values before filtering on it.
 
-Example queries:
+Talking with the analyst: you are also someone the analyst can simply talk to. When the message is a greeting, thanks
+or small talk ("Hello", "thanks", "how are you?"), reply briefly and naturally, in one or two sentences, as a
+colleague would, and say what you can help with if it fits. Do not query the data, call a tool or repeat an earlier
+answer for such a message. In every reply, do only what the message asks: never start an analysis of a CompID, test
+or month that the message does not name or clearly refer to.
+
+Example queries (ABC123 stands for the CompID the analyst names; never use it as a real CompID):
 -- Rejections of one CompID in August, with their meanings
 SELECT f.reject_code, r.meaning, f.message_type_name, count(*) AS messages
 FROM fact_message f LEFT JOIN dim_reject_code r USING (reject_code)
-WHERE f.comp_id = 'GJEN09' AND f.is_rejection AND f.date BETWEEN '2026-08-01' AND '2026-08-31'
+WHERE f.comp_id = 'ABC123' AND f.is_rejection AND f.date BETWEEN '2026-08-01' AND '2026-08-31'
 GROUP BY ALL ORDER BY messages DESC
 -- Every message of one order, in time order
 SELECT timestamp, message_type_name, report_event, client_order_id, reject_code FROM fact_message
 WHERE order_id = 'O0SnTxKEgvzy' ORDER BY timestamp
 -- How a CompID's orders ended
-SELECT outcome, count(*) AS orders FROM fact_order WHERE comp_id = 'GJEN09' GROUP BY 1 ORDER BY 2 DESC
+SELECT outcome, count(*) AS orders FROM fact_order WHERE comp_id = 'ABC123' GROUP BY 1 ORDER BY 2 DESC
 -- The days a CompID tested, and what it did on each
 SELECT date, messages, logons, new_orders, amend_requests, cancel_requests, order_rejects, gateway_rejects
-FROM fact_compid_day WHERE comp_id = 'GJEN09' ORDER BY date
+FROM fact_compid_day WHERE comp_id = 'ABC123' ORDER BY date
 
 An attached client report: an analyst can attach a client's Volume 202 conformance test report (Excel or PDF). When
 the analyst sends a question with it, the page checks every test step the client answered against the messages, by
@@ -569,18 +576,20 @@ export async function chat(store, apiKey, history, onStep = () => {}, attachment
              tokens: { firstPrompt: null, firstChars: 0, largestPrompt: 0 } };
   }
 
+  // A greeting, thanks or small talk gets one reply with no retrieval and no tools.
+  const smallTalk = isSmallTalk(asked);
   // Retrieval: the facts and reference topics for what the question names are added to the question.
-  onStep("Finding the data and reference for the question");
+  if (!smallTalk) onStep("Finding the data and reference for the question");
   const question = turns[turns.length - 1];
   const earlier = turns.slice(0, -1).filter((m) => m.role === "user").map((m) => m.content);
-  const found = await retrieve(store, question.content, earlier, async (topic) => (await readReference(topic)).text, Boolean(attachment));
+  const found = smallTalk ? { text: "" } : await retrieve(store, question.content, earlier, async (topic) => (await readReference(topic)).text, Boolean(attachment));
   checkStop();
   if (found.text) {
     question.content = `${question.content}\n\n${found.text}`;
     steps.push({ tool: "retrieve", args: { compids: found.compids, months: found.months, codes: found.codes, topics: found.topics },
                  result: found.text.slice(0, 4000) });
   }
-  if (attachment) question.content = `${question.content}
+  if (attachment && !smallTalk) question.content = `${question.content}
 
 ${resultsText(attachment.checked, asked)}`;
   const tools = toolsFor(attachment, memory);
@@ -602,6 +611,10 @@ ${resultsText(attachment.checked, asked)}`;
     return reply;
   };
   let answer = null;
+  if (smallTalk) {
+    onStep("Replying");
+    answer = (await ask(false)).content || "Hello. Ask me about a CompID's conformance test messages, or attach a client's report.";
+  }
   for (let round = 0; round < MAX_TOOL_ROUNDS && answer === null; round++) {
     if (round > 0 && Date.now() - startedAt > TOOL_TIME_LIMIT_MS) break;
     onStep(`Waiting for the language model's reply (request ${round + 1})`);

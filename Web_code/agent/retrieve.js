@@ -26,6 +26,18 @@ const TOPIC_WORDS_WITH_REPORT = {
   tests: /\b(T\d{1,2}|G1|OT1)\b|\bwhy\b|\brules?\b|requirement/i,
   conformance_process: /retest|\bslot|exempt|\bCTA\b/i,
 };
+// Words of a greeting, thanks or other small talk. A message made only of these words asks nothing about the data,
+// so it gets no retrieval and no tools (see isSmallTalk).
+const SMALL_TALK_WORDS = new Set(("hi hello hey hiya howzit morning afternoon evening good day thanks thank you cheers ok okay " +
+  "great nice cool awesome bye goodbye see later how are is it going doing what's whats up who what can do i said to there " +
+  "again agent yes no sure please and well fine all right alright too much appreciated welcome sorry the").split(" "));
+
+// True when the message is a greeting, thanks or small talk, such as "Hello", "thanks!" or "how are you?".
+export function isSmallTalk(text) {
+  const words = String(text).toLowerCase().replace(/[’]/g, "'").match(/[a-z']+/g);
+  return Boolean(words) && words.length <= 12 && words.every((w) => SMALL_TALK_WORDS.has(w));
+}
+
 const MAX_TOPICS = 2;
 const MAX_COMPIDS = 2;
 
