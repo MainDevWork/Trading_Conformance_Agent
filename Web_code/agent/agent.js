@@ -12,9 +12,9 @@
 // an attached report already answer gets no request at all (direct_answer.js). Replies are streamed, so the page shows
 // the answer as the model writes it.
 
-import { retrieve } from "./retrieve.js?v=19";
-import { evidenceFor, resultsText } from "../reports/conformance.js?v=19";
-import { directAnswer } from "../reports/direct_answer.js?v=19";
+import { retrieve } from "./retrieve.js?v=20";
+import { evidenceFor, resultsText } from "../reports/conformance.js?v=20";
+import { directAnswer } from "../reports/direct_answer.js?v=20";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;

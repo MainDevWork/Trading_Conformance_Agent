@@ -1,9 +1,9 @@
-import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=19";
-import { loadStore } from "../agent/data.js?v=19";
-import { readAttachment } from "../reports/attachments.js?v=19";
-import { checkReport } from "../reports/conformance.js?v=19";
-import { makeClientReport } from "../reports/client_report.js?v=19";
-import * as memoryStore from "../agent/memory.js?v=19";
+import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=20";
+import { loadStore } from "../agent/data.js?v=20";
+import { readAttachment } from "../reports/attachments.js?v=20";
+import { checkReport } from "../reports/conformance.js?v=20";
+import { makeClientReport } from "../reports/client_report.js?v=20";
+import * as memoryStore from "../agent/memory.js?v=20";
 
 window.appStarted = true;
 
@@ -586,8 +586,6 @@ async function load(supabaseKey) {
   }
   text.textContent = "Data loaded. The agent can answer questions.";
   bar.style.width = "100%";
-  const rows = Object.entries(store.manifest.tables).map(([name, t]) => `<tr><td>${name}</td><td>${t.rows.toLocaleString()}</td></tr>`);
-  document.getElementById("tables").innerHTML = rows.join("");
   updateContext();
 }
 

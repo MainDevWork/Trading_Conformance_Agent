@@ -2,8 +2,8 @@
 // an Excel workbook (ExcelJS) or a PDF (jsPDF with its table plug-in). Both files use the same layout, defined once
 // below: a summary, then one row per test step.
 
-import { loadScript } from "./attachments.js?v=19";
-import { RESULTS, fmtClock, fmtDate } from "./conformance.js?v=19";
+import { loadScript } from "./attachments.js?v=20";
+import { RESULTS, fmtClock, fmtDate } from "./conformance.js?v=20";
 
 const EXCELJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
 const JSPDF_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
