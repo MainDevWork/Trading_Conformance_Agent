@@ -1,9 +1,9 @@
 // Writes the results of a checked conformance test report (conformance.js) as a file to send back to the client:
 // an Excel workbook (ExcelJS) or a PDF (jsPDF with its table plug-in). Both files use the same layout, defined once
-// below: a summary, then one row per test step, then (Excel only) every message found for each test step.
+// below: a summary, then one row per test step.
 
-import { loadScript } from "./attachments.js?v=18";
-import { RESULTS, fmtClock, fmtDate } from "./conformance.js?v=18";
+import { loadScript } from "./attachments.js?v=19";
+import { RESULTS, fmtClock, fmtDate } from "./conformance.js?v=19";
 
 const EXCELJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
 const JSPDF_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
@@ -36,16 +36,6 @@ export const RESULT_COLUMNS = [
   ["IDs not found", 22, (r) => (r.idsMissing || []).join("\n")],
   ["Client comment", 28, (r) => r.clientComment],
   ["JSE comment in report", 24, (r) => r.jseComment],
-];
-
-const MESSAGE_COLUMNS = [
-  ["Ref", 7, (r) => r.ref], ["Test case ID", 11, (r) => r.id], ["Time", 23, (r, m) => m.time.replace(/^(\d{4})-(\d{2})-(\d{2})/, "$3/$2/$1")], ["CompID", 9, (r, m) => m.comp_id],
-  ["Message", 26, (r, m) => m.message_type_name], ["Event", 18, (r, m) => m.report_event], ["Order ID", 15, (r, m) => m.order_id],
-  ["Client order ID", 22, (r, m) => m.client_order_id], ["Execution ID", 15, (r, m) => m.execution_id],
-  ["Order type", 11, (r, m) => m.order_type_name], ["Order status", 15, (r, m) => m.order_status_name],
-  ["Display quantity", 9, (r, m) => m.display_quantity], ["Executed quantity", 9, (r, m) => m.executed_quantity],
-  ["Self-trade prevention key", 15, (r, m) => m.self_trade_prevention_key], ["Reject code", 8, (r, m) => m.reject_code],
-  ["Reject meaning", 40, (r, m) => m.reject_meaning],
 ];
 
 const RESULT_COLOURS = { [RESULTS.PASS]: "D1FADF", [RESULTS.FAIL]: "FEE4E2", [RESULTS.REVIEW]: "FEF0C7", [RESULTS.NOT_CHECKABLE]: "EAECF0", [RESULTS.NOT_ATTEMPTED]: "F2F4F7" };
@@ -130,11 +120,6 @@ export function buildWorkbook(ExcelJS, c, summary = "") {
   }
   t.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: RESULT_COLUMNS.length } };
 
-  const m = wb.addWorksheet("Messages", { views: [{ state: "frozen", ySplit: 1 }] });
-  m.columns = MESSAGE_COLUMNS.map(([h, w]) => ({ header: h, width: w }));
-  header(m);
-  for (const r of c.results) for (const msg of [...(r.messages || []), ...(r.session || [])]) m.addRow(MESSAGE_COLUMNS.map(([, , get]) => get(r, msg) ?? ""));
-  m.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: MESSAGE_COLUMNS.length } };
   return wb;
 }
 

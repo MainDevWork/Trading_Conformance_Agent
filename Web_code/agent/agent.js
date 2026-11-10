@@ -12,9 +12,9 @@
 // an attached report already answer gets no request at all (direct_answer.js). Replies are streamed, so the page shows
 // the answer as the model writes it.
 
-import { retrieve } from "./retrieve.js?v=18";
-import { evidenceFor, resultsText } from "../reports/conformance.js?v=18";
-import { directAnswer } from "../reports/direct_answer.js?v=18";
+import { retrieve } from "./retrieve.js?v=19";
+import { evidenceFor, resultsText } from "../reports/conformance.js?v=19";
+import { directAnswer } from "../reports/direct_answer.js?v=19";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -161,7 +161,7 @@ const REPORT_TOOLS = [
     type: "function",
     function: {
       name: "create_client_report",
-      description: "Write the results of the attached client report as a file for the client: Excel (summary, test results, messages) or PDF (summary and test results). The page shows a download link below the answer.",
+      description: "Write the results of the attached client report as a file for the client: Excel (summary and test results) or PDF (summary and test results). The page shows a download link below the answer.",
       parameters: {
         type: "object",
         properties: {

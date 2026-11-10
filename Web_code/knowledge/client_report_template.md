@@ -1,6 +1,6 @@
 # Client report template: the layout of the report to the client
 
-`web/reports/client_report.js` writes the report from the results of a checked client report. The Excel report has the three sheets below. The PDF report has the Summary, then the test results. Text in angle brackets says what goes in the cell.
+`web/reports/client_report.js` writes the report from the results of a checked client report. The Excel report has the two sheets below. The PDF report has the Summary, then the test results. Text in angle brackets says what goes in the cell.
 
 ## Sheet: Summary
 
@@ -49,26 +49,3 @@ One row per test step.
 | IDs not found | <IDs from the report not in the messages> |
 | Client comment | <the client's comment> |
 | JSE comment in report | <the JSE comment already in the client's report> |
-
-## Sheet: Messages
-
-One row per message found for a test step.
-
-| Column | What goes in it |
-| --- | --- |
-| Ref | <Ref, e.g. T3.6> |
-| Test case ID | <Test case ID, e.g. T3-006> |
-| Time | <date and time of the message> |
-| CompID | <CompID that sent or received it> |
-| Message | <message, e.g. New Order, Execution Report> |
-| Event | <what the execution report says happened, e.g. Trade, Cancelled> |
-| Order ID | <order ID> |
-| Client order ID | <client order ID> |
-| Execution ID | <execution ID> |
-| Order type | <order type> |
-| Order status | <order status> |
-| Display quantity | <display quantity> |
-| Executed quantity | <quantity traded> |
-| Self-trade prevention key | <self-trade prevention key> |
-| Reject code | <reject code> |
-| Reject meaning | <its meaning> |
