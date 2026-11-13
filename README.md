@@ -10,6 +10,18 @@ Website: [maindevwork.github.io/Trading_Conformance_Agent](https://maindevwork.g
 
 A web chat page where a JSE Trading Operations analyst asks questions about the Trading FIX message data from conformance testing (July to September 2026), and a language model answers them by running SQL queries against those exports.
 
+## Time to complete a client report
+
+By hand, a Trading Operations analyst takes about three days, sometimes more, to complete one client's conformance report. Each test case takes an hour or more, and three tasks add hours that the analyst does not control:
+
+| Task done by hand | Why it adds time | What this system does instead |
+| --- | --- | --- |
+| Finding each test case's messages and results in the internal trading system | The analyst searches the system test case by test case | Looks up every ID in the client's report in the message data and checks every test step by a fixed rule for that test, when the first prompt is sent with the report |
+| Waiting for the IT department when the internal system fails | The work stops until IT fixes the fault | Works from the exported message data, loaded into the browser, so a fault in the internal system after the export does not stop the check |
+| Sending the client queries about details of the report and its results | Each query waits for the client's reply and a discussion | The analyst asks the agent, which answers from the messages and states what the messages show for each test step, so fewer queries go to the client |
+
+With this system one client report is completed in under one hour, and in at most two hours, against about three days by hand. The line under each answer on the page states how long that answer took.
+
 ## Folders
 
 | Path               | Contents                                                                                                                                                                                                                                                                                              |
@@ -17,7 +29,7 @@ A web chat page where a JSE Trading Operations analyst asks questions about the 
 | `index.html`     | The page. Stays in the root so GitHub Pages serves it as the site's home page.                                                                                                                                                                                                                        |
 | `Web_code/ui/` | The chat screen: `app.js` (chat, keys form, attached reports, sidebar button), `style.css`, `icon.svg` (the agent's icon, also the browser tab icon) |
 | `Web_code/agent/` | The agent: `agent.js` (language model and its tools), `retrieve.js` (facts and reference found before the model is asked), `data.js` (loads the data into the browser), `memory.js` (saved conversations and memory notes, in the browser) |
-| `Web_code/reports/` | Client reports: `attachments.js` (reads an attached client report), `conformance.js` (checks it against the messages), `direct_answer.js` (answers from the results with no request to the model), `client_report.js` (writes the report to the client) |
+| `Web_code/reports/` | Client reports: `attachments.js` (reads an attached client report), `conformance.js` (checks it against the messages), `direct_answer.js` (answers from the results with no request to the model), `client_report.js` (writes the Excel report to the client), `assessment_pdf.js` (writes the PDF report to the client) |
 | `Web_code/knowledge/` | The JSE conformance reference the agent reads (see below)                                                                                                                                                                                                                                             |
 | `code/` | Not in this repository (excluded by `.gitignore`). The Python scripts that build the bronze, silver and gold layers in Supabase. Needed only to rebuild the tables, not to run the page |
 | `Pages/`  | The diagram pages: `project_brief.html` (the problem, what the system does, the data), `system_architecture.html`, `agent_methodology.html`, `data_architecture.html`, `bronze_data_diagram.html` (bronze layer), `silver_layer.html` (silver layer), `gold_star_schema.html` (gold layer)                                                                    |
@@ -52,10 +64,14 @@ A client sends its Volume 202 conformance test report: one row per test step, wi
    | Fail | The messages show it was not, or the report's IDs belong to another CompID. The reason says what is wrong. |
    | Needs review | The messages do not settle it: some messages are not in the export, a column is empty in that month's export, or the report's test time is more than 5 minutes from the messages. |
    | Not checkable | The step uses a gateway or service whose messages are not exported (market data, Post Trade, Drop Copy, FIX, derivatives). |
-   | Not attempted | The client gave no response. |
+   | Not attempted | The client gave no response. Shown in the chat only; the Excel and PDF reports leave these steps out. |
 
 4. A prompt that the results alone answer, such as "give me the results", "what failed", "result of T3.6" or "give me the excel report", is answered by `Web_code/reports/direct_answer.js` with no request to the model. It answers only when every word of the prompt is on its fixed lists; any other prompt goes to the model. The results are sent to the model with such a prompt and every later one, with what the messages show only for steps that Fail, Need review or are named in the prompt, and the model is told to do only what the prompt asks. The model has two more tools: `get_test_evidence` (every message of one step) and `create_client_report`. A closed section under the first answer, opened by a click, holds the result of each step.
-5. The **Excel report** and **PDF report** buttons in that section, or asking the agent for a report, write the file for the client: a summary, then one row per test step with its result and reason. The analyst can ask the agent to change a result; the report then says the analyst changed it and keeps the automatic reason. The layout is in `Web_code/knowledge/client_report_template.md`.
+5. The **Excel report** and **PDF report** buttons in that section, or asking the agent for a report, write the file for the client. Steps the client gave no response for are left out of both files.
+   - Excel: a summary sheet, then one row per test step with its result and reason.
+   - PDF: the trading conformance assessment, in the layout of `Updates/WKP_Trading_Conformance_Client_Report_Card_Format.pdf`. Page 1 holds the overall result, the counts (required tests, evidence provided, passed, failed, pass rate, retest or fix), the decision with a ring chart of the share of tests passed, and the controls the check applies. Then one section each for passed, failed and review tests, with a table per test: the request and response the test needs, the criteria its rule applies (`criteriaFor` in `Web_code/reports/conformance.js`), what the messages show, and the conclusion. It ends with the approval condition.
+
+   The analyst can ask the agent to change a result; the report then says the analyst changed it and keeps the automatic reason. The layout is in `Web_code/knowledge/client_report_template.md`. The two file libraries (ExcelJS and jsPDF) are downloaded while the report is checked, so writing a file does not wait for them.
 
 The September 2026 export has no time in force or order quantity on new orders and no liquidity indicator on execution reports, so tests that need those (for example T21-001) get Needs review, with what the timing of the messages shows.
 
@@ -72,7 +88,17 @@ To make the fictitious copies of new client reports, put the reports in `Clients
    - `lookup_reject_codes`: the Volume 10 meaning of the given reject codes, from `Web_code/knowledge/reject_codes.json`.
      `Web_code/agent/agent.js` runs each tool call the model makes and returns the result to the model, until the model replies with text, for up to 12 rounds or 60 seconds. After that, one last request with tools switched off asks the model to answer from the results it has. The reply is streamed, so the page shows the answer as the model writes it, and the model's reasoning step is switched off. While the agent answers, a **Stop** button replaces the **Send** button. It cancels the request; text already written stays in the conversation, marked as stopped, and a prompt stopped before any text was written is not kept in the conversation.
 4. `Web_code/agent/agent.js` replaces table names and column names with an underscore with plain words in the answer. If the answer contains an SQL query, it asks the model once to rewrite it in plain words, with tools switched off.
-5. The page shows the answer text and a line saying how long it took and how many requests the model received; the tool calls and their SQL are not shown.
+5. The page shows the answer text and a line saying how long it took, how many requests the model received, and after how many seconds the first words of the reply were shown; the tool calls and their SQL are not shown. When the first words are shown only at the end on one computer but early on another, a program on the slower computer, such as an antivirus program that scans web traffic, or a company proxy server, is holding back the streamed reply until it is complete.
+
+### Speed and token use
+
+A token is a piece of a word, about 4 characters; the model is charged and limited by the number of tokens sent and written.
+
+- **Checking a client report.** `fact_message` has about 2.2 million rows, and a query that filters on its ID or CompID columns reads the whole table. `Web_code/reports/conformance.js` checks a whole report with three queries, however many test steps it has: one for every ID of every step across the five ID columns, one for the messages of the orders found, and one for the logon and mass cancel messages of every step that needs them. The rows returned are sorted into the steps with lookup tables keyed by step, order ID and client order ID, instead of filtering every row again for each step.
+- **Repeated queries.** The tables do not change while the page is open, so the result of each retrieval query and each `run_sql` statement is kept by its SQL text. A follow-up question about the same CompID and months, or a statement the model already ran, uses the kept result without reading the tables again.
+- **Small talk.** A greeting or thanks is sent with a short system prompt of about 500 characters and no tools, instead of the full instructions, reference and table columns.
+- **Answers already in the results.** Questions about an attached report that its results answer are answered with no request to the model (step 4 of "Check a client's conformance test report").
+- **Thinking.** When the model cannot switch off its reasoning step, the page shows "The language model is thinking" with the number of words of reasoning received so far, until the answer text starts.
 
 The button at the top left of the chat area (a rectangle with a line down its left side) hides and shows the sidebar. The choice is kept in the browser, so it stays after a reload.
 

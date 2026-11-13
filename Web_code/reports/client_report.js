@@ -1,9 +1,11 @@
 // Writes the results of a checked conformance test report (conformance.js) as a file to send back to the client:
-// an Excel workbook (ExcelJS) or a PDF (jsPDF with its table plug-in). Both files use the same layout, defined once
-// below: a summary, then one row per test step.
+// an Excel workbook (ExcelJS), with a summary sheet and one row per test step, or a PDF (jsPDF with its table
+// plug-in) in the trading conformance assessment layout written by assessment_pdf.js.
+// Test steps the client gave no response for are left out of both files.
 
-import { loadScript } from "./attachments.js?v=26";
-import { RESULTS, fmtClock, fmtDate } from "./conformance.js?v=26";
+import { loadScript } from "./attachments.js?v=27";
+import { RESULTS, fmtClock, fmtDate } from "./conformance.js?v=27";
+import { buildAssessmentPdf } from "./assessment_pdf.js?v=27";
 
 const EXCELJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
 const JSPDF_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
@@ -17,7 +19,6 @@ export const RESULT_MEANINGS = [
   [RESULTS.FAIL, "The messages show the test step was not done as required, or the report's details do not match the messages. The reason says what is wrong."],
   [RESULTS.REVIEW, "The messages do not settle the result, for example because some messages are not in the export or the report's test time is wrong. A JSE analyst decides."],
   [RESULTS.NOT_CHECKABLE, "The step uses a gateway or service whose messages are not in the exports (market data, Post Trade, Drop Copy, FIX, derivatives)."],
-  [RESULTS.NOT_ATTEMPTED, "The client gave no response for this step."],
 ];
 
 // The columns of the "Test results" table: heading, width in Excel characters, and the value for one test step.
@@ -48,7 +49,7 @@ function applyChanges(checked, changes = []) {
   for (const c of changes || []) {
     const want = String(c.test || "").trim().toUpperCase();
     const result = Object.values(RESULTS).find((v) => v.toLowerCase() === String(c.result || "").trim().toLowerCase());
-    if (!result) continue;
+    if (!result || result === RESULTS.NOT_ATTEMPTED) continue;
     for (const r of results) {
       if (r.id.toUpperCase() !== want && r.ref.toUpperCase() !== want) continue;
       r.reason = `Changed by the JSE analyst from ${r.result} to ${result}${c.reason ? `: ${c.reason}` : ""}. Automatic check: ${r.reason}`;
@@ -69,7 +70,7 @@ function summaryRows(c, summary) {
     ["Checked on", fmtDate(c.checkedAt)],
     ["Messages checked", MESSAGES_CHECKED],
     ["Overall result", c.overall],
-    ...Object.entries(c.counts).map(([k, v]) => [`Test steps: ${k}`, v]),
+    ...Object.entries(c.counts).filter(([k]) => k !== RESULTS.NOT_ATTEMPTED).map(([k, v]) => [`Test steps: ${k}`, v]),
     ["Mandatory steps with no response", c.mandatoryMissing.map((r) => r.id).join(", ") || "None"],
     ["JSE comments", summary || ""],
   ];
@@ -111,7 +112,7 @@ export function buildWorkbook(ExcelJS, c, summary = "") {
   const t = wb.addWorksheet("Test results", { views: [{ state: "frozen", ySplit: 1, xSplit: 2 }] });
   t.columns = RESULT_COLUMNS.map(([h, w]) => ({ header: h, width: w }));
   header(t);
-  for (const r of c.results) {
+  for (const r of c.results.filter((x) => x.result !== RESULTS.NOT_ATTEMPTED)) {
     const row = t.addRow(RESULT_COLUMNS.map(([, , get]) => get(r) ?? ""));
     row.alignment = { vertical: "top", wrapText: true };
     const cell = row.getCell(RESULT_COLUMNS.findIndex(([h]) => h === "Result") + 1);
@@ -123,41 +124,10 @@ export function buildWorkbook(ExcelJS, c, summary = "") {
   return wb;
 }
 
-// The PDF's standard fonts hold only Western European characters.
-const pdfText = (v) => String(v ?? "").replace(/…/g, "...").replace(/×/g, "x").replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[–—]/g, "-");
-
-function buildPdf(c, summary) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  doc.setFontSize(15);
-  doc.text("Conformance test results", 12, 14);
-  doc.autoTable({
-    startY: 19, theme: "plain", styles: { fontSize: 8.5, cellPadding: 1.2 }, columnStyles: { 0: { fontStyle: "bold", cellWidth: 60 } },
-    body: summaryRows(c, summary).map(([k, v]) => [k, pdfText(v)]),
-  });
-  doc.autoTable({
-    startY: doc.lastAutoTable.finalY + 4, styles: { fontSize: 7.5, cellPadding: 1.2 }, headStyles: { fillColor: [11, 92, 173] },
-    head: [["Result", "What it means"]], body: RESULT_MEANINGS, columnStyles: { 0: { cellWidth: 30 } },
-    didParseCell: (d) => { if (d.section === "body" && d.column.index === 0) d.cell.styles.fillColor = `#${RESULT_COLOURS[d.cell.raw]}`; },
-  });
-  doc.addPage();
-  const cols = [["Ref", 11], ["Test case ID", 17], ["Test", 55], ["Mand.", 11], ["CompID", 15], ["Test time in report", 24], ["Result", 20], ["Reason and what the messages show", 120]];
-  doc.autoTable({
-    styles: { fontSize: 7, cellPadding: 1.2, overflow: "linebreak", valign: "top" }, headStyles: { fillColor: [11, 92, 173] },
-    head: [cols.map(([h]) => h)], columnStyles: Object.fromEntries(cols.map(([, w], i) => [i, { cellWidth: w }])),
-    body: c.results.map((r) => [r.ref, r.id, r.title, r.mandatory, r.compid, r.time, r.result,
-      [r.reason, r.shows].filter(Boolean).join("\n")].map(pdfText)),
-    didParseCell: (d) => {
-      if (d.section === "body" && d.column.index === 6) { d.cell.styles.fillColor = `#${RESULT_COLOURS[d.cell.raw] || "FFFFFF"}`; d.cell.styles.fontStyle = "bold"; }
-    },
-  });
-  const pages = doc.getNumberOfPages();
-  for (let p = 1; p <= pages; p++) {
-    doc.setPage(p);
-    doc.setFontSize(7);
-    doc.text(`${pdfText(c.file)} - checked ${fmtDate(c.checkedAt)} - page ${p} of ${pages}`, 12, 203);
-  }
-  return doc.output("blob");
+// Downloads the libraries that write the files, so a report asked for later is written without waiting for them.
+export function preloadReportLibraries() {
+  loadScript(EXCELJS_URL, "ExcelJS").catch(() => {});
+  loadScript(JSPDF_URL, "jspdf").then(() => loadScript(AUTOTABLE_URL, "jspdf")).catch(() => {});
 }
 
 // format: "excel", "pdf" or "both". Returns [{ name, blob }].
@@ -172,7 +142,7 @@ export async function makeClientReport(checked, { format = "excel", summary = ""
   if (format === "pdf" || format === "both") {
     await loadScript(JSPDF_URL, "jspdf");
     await loadScript(AUTOTABLE_URL, "jspdf");
-    files.push({ name: `${fileStem(c)}.pdf`, blob: buildPdf(c, summary) });
+    files.push({ name: `${fileStem(c)}.pdf`, blob: buildAssessmentPdf(c, summary) });
   }
   return { files, applied: c.applied, overall: c.overall, counts: c.counts };
 }

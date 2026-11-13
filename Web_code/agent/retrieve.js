@@ -58,11 +58,19 @@ async function lookups(store) {
 }
 
 // A query result as a text table: a header line, then one line per row, values separated by " | ".
+// The tables never change while the page is open, so each result is kept by its SQL text and a follow-up question
+// about the same CompID and months reuses it instead of reading fact_message again. At most 200 results are kept.
+const MAX_SAVED_RESULTS = 200;
 async function textTable(store, sql) {
+  store.savedResults ??= new Map();
+  if (store.savedResults.has(sql)) return store.savedResults.get(sql);
   const table = await store.conn.query(`SELECT COLUMNS(*)::VARCHAR FROM (\n${sql}\n)`);
   const columns = table.schema.fields.map((f) => f.name);
   const rows = table.toArray().map((r) => columns.map((c) => r[c] ?? "").join(" | "));
-  return rows.length ? [columns.join(" | "), ...rows].join("\n") : "(no rows)";
+  const text = rows.length ? [columns.join(" | "), ...rows].join("\n") : "(no rows)";
+  if (store.savedResults.size >= MAX_SAVED_RESULTS) store.savedResults.delete(store.savedResults.keys().next().value);
+  store.savedResults.set(sql, text);
+  return text;
 }
 
 function findCompids(text, compids) {

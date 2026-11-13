@@ -84,7 +84,7 @@ function readResponse(entry) {
   return { ids: [...ids].slice(0, 40), claims };
 }
 
-function notCheckable(id) {
+export function notCheckable(id) {
   for (const [pattern, reason] of NOT_CHECKABLE) if (pattern.test(id)) return reason;
   return null;
 }
@@ -378,27 +378,203 @@ function selfMatchRule({ orders }) {
   return review("The orders carry the same key, but the export does not show the resting order being cancelled when the second order was entered.");
 }
 
+// What each rule in RULES checks, in words, for the assessment PDF (client_report.js): the request the client had to
+// send, the response the gateway had to return, the criteria the rule applies, and what to redo after a failure.
+// Change the text here whenever a rule above changes.
+const order = (type, when) => ({
+  request: `A New Order with order type ${type}${when ? ` ${when}` : ""}, sent by the CompID in the report.`,
+});
+const CRITERIA = {
+  logon: (version) => ({
+    request: `A Logon message from the CompID${version ? ` with protocol version ${version}` : ""} near the test time in the report.`,
+    response: "A Logon Response from the gateway.",
+    criteria: `Logon messages of the CompID within 10 minutes of the test time${version ? `; at least one with protocol version ${version}` : ""}; a Logon Response with code 0 (accepted).`,
+    redo: `Log on again${version ? ` with protocol version ${version}` : ""} and record the time of the accepted logon.`,
+  }),
+  auction: (type) => ({
+    ...order(`${type} (${TYPE_NAMES[type]})`, "during the opening or closing auction"),
+    response: "An accepted (New) Execution Report, then a trade Execution Report at the uncross.",
+    criteria: `New Order: order type ${type}; not rejected; no trade within 1 second of entry (an order in an auction rests until the uncross). Execution Reports: New (accepted), then a trade later.`,
+    redo: `Enter a ${TYPE_NAMES[type]} order during an auction and capture the accepted and uncross trade Execution Reports.`,
+  }),
+  aggressive: (type) => ({
+    ...order(`${type} (${TYPE_NAMES[type]})`, "with time in force IOC or FOK during continuous trading"),
+    response: "A trade Execution Report when the order is entered.",
+    criteria: `New Order: order type ${type}; not rejected. The first Execution Report is a trade, within 1 second of the New Order. An order that rests in the order book fails.`,
+    redo: `Repeat with an executable ${TYPE_NAMES[type]} order using IOC or FOK and capture the matching trade Execution Report.`,
+  }),
+  stop: (type) => ({
+    ...order(`${type} (${TYPE_NAMES[type]})`),
+    response: "An accepted Execution Report, a Triggered Execution Report when the stop price is reached, then a trade.",
+    criteria: `New Order: order type ${type}; not rejected. Execution Reports: Triggered, then a trade.`,
+    redo: `Repeat the ${TYPE_NAMES[type]} order so that the stop price is reached, and capture the Triggered and trade Execution Reports.`,
+  }),
+  pegged: (type) => ({
+    ...order(`${type} (${TYPE_NAMES[type]})`, "during continuous trading"),
+    response: "An accepted (New) Execution Report.",
+    criteria: `New Order: order type ${type}; not rejected; a New (accepted) Execution Report for the order.`,
+    redo: `Repeat the ${TYPE_NAMES[type]} order and capture its accepted Execution Report.`,
+  }),
+  amend: {
+    request: "An order resting in the order book, then an Order Cancel/Replace Request changing its price or quantity.",
+    response: "An Amended Execution Report for the same order.",
+    criteria: "No Order Cancel Reject for the request; an Amended Execution Report for the order.",
+    redo: "Repeat the amendment on a resting order and capture the Amended Execution Report.",
+  },
+  iceberg: {
+    request: "A New Order with a display quantity above 0 and below its order quantity, during continuous trading.",
+    response: "An accepted Execution Report; trades and refills of the displayed part.",
+    criteria: "Not rejected; display quantity above 0; order quantity above the display quantity, or total traded quantity above the display quantity, or at least one refill (Restated Execution Report).",
+    redo: "Repeat with an order quantity above the display quantity and capture the accepted Execution Report.",
+  },
+  selfMatch: {
+    request: "A resting order with a self-trade prevention key, then a second order from the same CompID with the same key that would match it.",
+    response: "The resting order cancelled or expired when the second order is entered, with no trade between the two.",
+    criteria: "Two orders of the CompID with the same key. Within 1 second of the second order the resting order is Cancelled or Expired, and the two orders do not both trade at that moment.",
+    redo: "Repeat with the same self-trade prevention key on both orders, logged on with protocol version 3.",
+  },
+};
+const CRITERIA_OF = {
+  "T1-001": CRITERIA.logon(null), "T1-002": CRITERIA.logon("2"), "T1-003": CRITERIA.logon("3"),
+  "T2-001": CRITERIA.auction("1"), "T2-002": CRITERIA.auction("2"),
+  "T3-001": CRITERIA.aggressive("1"), "T3-002": CRITERIA.aggressive("2"),
+  "T3-003": {
+    ...order("2 (limit)", "during continuous trading, without IOC or FOK"),
+    response: "An accepted (New) Execution Report, then a later trade Execution Report for the same order.",
+    criteria: "New Order: order type 2; not rejected; no trade within 1 second of entry. Execution Reports: New (accepted), then a trade later. Ending Cancelled or Expired without a trade fails.",
+    redo: "Repeat during continuous trading so the order rests, then is matched; capture both the accepted and the trade Execution Reports.",
+  },
+  "T3-004": CRITERIA.stop("3"), "T3-005": CRITERIA.stop("4"),
+  "T3-006": CRITERIA.amend, "T3-016": CRITERIA.amend,
+  "T3-007": {
+    request: "An order resting in the order book, then an Order Cancel Request for it.",
+    response: "A Cancelled Execution Report for the same order.",
+    criteria: "No Order Cancel Reject for the request; an Order Cancel Request from the client and a Cancelled Execution Report for the order.",
+    redo: "Repeat the cancellation on a resting order and capture the Cancelled Execution Report.",
+  },
+  "T3-008": {
+    request: "An Order Mass Cancel Request from the CompID near the test time in the report.",
+    response: "An Order Mass Cancel Report, and a Cancelled Execution Report for each order cancelled.",
+    criteria: "An Order Mass Cancel Report with status 7 (accepted) within 10 minutes of the test time.",
+    redo: "Enter non-executable orders, send the Order Mass Cancel Request and capture the accepted Order Mass Cancel Report.",
+  },
+  "T3-009": {
+    request: "Orders entered with cancel on disconnect set to 1, then the connection dropped.",
+    response: "An Expired Execution Report for each order after the disconnect.",
+    criteria: "Every order entered with cancel on disconnect 1; every order ends Expired. A cancel on disconnect gives Expired, not Cancelled.",
+    redo: "Repeat with cancel on disconnect set on every order, drop the connection, log on again and capture the Expired Execution Reports.",
+  },
+  "T3-013": CRITERIA.selfMatch, "T25-001": CRITERIA.selfMatch,
+  "T4-001": {
+    request: "Orders entered, a disconnect, then logons to the real-time and recovery channels with the same CompID and a request for the missed messages.",
+    response: "The missed messages, sent on the recovery channel.",
+    criteria: "The orders, logouts and logons are in the exported messages. Recovery channel messages are not exported, so a JSE analyst decides whether the missed messages were recovered.",
+    redo: "Supply the recovery channel log showing the Missed Message Request and its acknowledgement.",
+  },
+  "T10-001": {
+    request: "An order resting in the order book, cancelled by the JSE Market Operations (CTA).",
+    response: "A Cancelled Execution Report with no Order Cancel Request from the client.",
+    criteria: "A Cancelled Execution Report for the order and no Order Cancel Request from the client's CompID.",
+    redo: "Repeat with the CTA cancelling the resting order; the client must not send a cancel request.",
+  },
+  "T10-002": {
+    request: "An order that trades, then the CTA cancels the trade.",
+    response: "A Trade Cancel Execution Report for the trade.",
+    criteria: "A Trade Cancel Execution Report for the order.",
+    redo: "Repeat with the CTA cancelling the trade and capture the Trade Cancel Execution Report.",
+  },
+  "T12-001": CRITERIA.pegged("50"), "T13-001": CRITERIA.pegged("51"),
+  "T20-001": CRITERIA.iceberg,
+  "T20-002": {
+    request: "An iceberg order, and another order that trades through its displayed and hidden parts.",
+    response: "Trade Execution Reports on the iceberg order, with refills of the displayed part.",
+    criteria: "Trades on the order; total traded quantity above the display quantity, or at least one refill (Restated Execution Report).",
+    redo: "Repeat with an aggressive order larger than the displayed part and capture the trade and refill Execution Reports.",
+  },
+  "T21-001": {
+    request: "An order during continuous trading that is partly or fully filled.",
+    response: "Trade Execution Reports carrying the liquidity indicator.",
+    criteria: "Each trade Execution Report carries liquidity indicator 1 (added liquidity) or 2 (removed liquidity).",
+    redo: "Repeat with an order that trades and capture the trade Execution Reports with the liquidity indicator.",
+  },
+  "T22-001": {
+    request: "A New Order during continuous trading that is accepted as New, sent by the CompID in the report.",
+    response: "An accepted (New) Execution Report carrying the working indicator.",
+    criteria: "The New (accepted) Execution Report of the order carries working indicator 1 or 2. An empty working indicator fails.",
+    redo: "Repeat and capture the accepted Execution Report with the working indicator.",
+  },
+  "G1-001": {
+    request: "Logons while the CompID is suspended, then after it is reinstated.",
+    response: "Logon Responses from the gateway.",
+    criteria: "Within 10 minutes of the test time: a logon refused with code 626 (CompID suspended), then a later logon accepted with code 0.",
+    redo: "Repeat the suspended logon and the logon after reinstatement, and record the test time.",
+  },
+  "OT1-001": {
+    request: "An order entered by one CompID, then an Order Cancel Request for it from another CompID of the same firm.",
+    response: "A Cancelled Execution Report for the order.",
+    criteria: "An Order Cancel Request from a CompID other than the one that entered the order, and a Cancelled Execution Report.",
+    redo: "Repeat with the second CompID cancelling the first CompID's resting order.",
+  },
+};
+
+// The criteria of a test step: { request, response, criteria, redo }.
+export function criteriaFor(r) {
+  if (r.id === "T3-013" && /iceberg/i.test(r.title)) return CRITERIA.iceberg;
+  return CRITERIA_OF[r.id] || {
+    request: "The messages of the test step as described in Volume 202.",
+    response: "The gateway's responses to those messages.",
+    criteria: "There is no automatic check for this test; a JSE analyst assesses the messages found.",
+    redo: "Repeat the test step and record the IDs of its messages in the report.",
+  };
+}
+
+// The columns of fact_message that hold an ID a client can write in a report.
+const ID_COLUMNS = ["order_id", "execution_id", "client_order_id", "orig_client_order_id", "public_order_id"];
+
+const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${fmtClock(d)}`;
+
+// Adds a value to the list kept under a key of a Map.
+const push = (map, key, value) => { if (!map.has(key)) map.set(key, []); map.get(key).push(value); };
+
 // Checks every test step of a report. Returns { file, kind, checkedAt, compids, results, counts, overall,
 // mandatoryMissing }. Each result is the test step from the report plus result, reason, shows (what the messages
 // show, in plain words), idsGiven, idsFound, idsMissing, timeNote and messages (the messages found).
+// Speed: fact_message has about 2.2 million rows, and a query that filters on these columns reads the whole table
+// once. So the whole report is checked with three queries, however many test steps it has: one for every ID of every
+// step, one for the messages of the orders found, and one for the session messages of every logon and mass cancel
+// step. The rows returned are then sorted into the steps with lookup tables (Map objects) keyed by step, order ID
+// and client order ID, instead of filtering every row again for each step.
 export async function checkReport(store, report, onStep = () => {}) {
   const conn = store.conn;
-  const known = new Set((await rows(conn, "SELECT comp_id FROM dim_compid")).map((r) => r.comp_id));
+  store.knownCompids ??= new Set((await rows(conn, "SELECT comp_id FROM dim_compid")).map((r) => r.comp_id));
+  const known = store.knownCompids;
   const results = report.tests.map((t, i) => ({ ...t, key: i, ...readResponse(t) }));
   for (const r of results) {
     r.answered = Boolean(r.compid || r.time || r.fields.length);
     r.reportTime = parseTime(r.time);
   }
 
-  // 1. Every ID of every answered test step, looked up in the five ID columns in one query.
+  // 1. Every ID of every answered test step, looked up in the five ID columns in one reading of fact_message.
   onStep("Looking up the IDs in the report");
-  const pairs = results.filter((r) => r.answered).flatMap((r) => r.ids.map((v) => `(${r.key}, ${quote(v)})`));
-  const hits = pairs.length ? await rows(conn, `WITH ids(k, v) AS (VALUES ${pairs.join(", ")})
-    SELECT DISTINCT i.k, i.v, f.message_id, f.order_id, f.client_order_id FROM ids i JOIN fact_message f ON f.order_id = i.v
-    UNION SELECT DISTINCT i.k, i.v, f.message_id, f.order_id, f.client_order_id FROM ids i JOIN fact_message f ON f.execution_id = i.v
-    UNION SELECT DISTINCT i.k, i.v, f.message_id, f.order_id, f.client_order_id FROM ids i JOIN fact_message f ON f.client_order_id = i.v
-    UNION SELECT DISTINCT i.k, i.v, f.message_id, f.order_id, f.client_order_id FROM ids i JOIN fact_message f ON f.orig_client_order_id = i.v
-    UNION SELECT DISTINCT i.k, i.v, f.message_id, f.order_id, f.client_order_id FROM ids i JOIN fact_message f ON f.public_order_id = i.v`) : [];
+  const stepsOfId = new Map();
+  for (const r of results) if (r.answered) for (const v of r.ids) push(stepsOfId, v, r.key);
+  const hits = [];
+  if (stepsOfId.size) {
+    const list = [...stepsOfId.keys()].map(quote).join(", ");
+    const found = await rows(conn, `SELECT message_id, ${ID_COLUMNS.join(", ")} FROM fact_message
+      WHERE ${ID_COLUMNS.map((c) => `${c} IN (${list})`).join(" OR ")}`);
+    const seen = new Set();
+    for (const m of found) {
+      for (const c of ID_COLUMNS) {
+        for (const k of stepsOfId.get(m[c]) || []) {
+          const id = `${k}|${m[c]}|${m.message_id}`;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          hits.push({ k, v: m[c], message_id: m.message_id, order_id: m.order_id, client_order_id: m.client_order_id });
+        }
+      }
+    }
+  }
 
   // 2. All messages of the orders found, plus the messages found directly (such as a rejected new order, which has
   // no order ID) and Order Cancel Rejects of the orders' requests.
@@ -415,24 +591,58 @@ export async function checkReport(store, report, onStep = () => {}) {
       .filter(Boolean).join(" OR ");
     for (const m of await rows(conn, `SELECT ${MESSAGE_COLUMNS} FROM fact_message f LEFT JOIN dim_reject_code r USING (reject_code) WHERE ${where}`)) messages.set(m.message_id, m);
   }
-  const allMessages = [...messages.values()];
+  // Lookup tables: each step's messages are taken by key instead of by reading every message again.
+  const hitsOfStep = new Map();
+  for (const h of hits) push(hitsOfStep, h.k, h);
+  const messagesOfOrder = new Map();
+  const noOrderByClientId = new Map();
+  for (const m of messages.values()) {
+    if (m.order_id) push(messagesOfOrder, m.order_id, m);
+    else if (m.client_order_id) push(noOrderByClientId, m.client_order_id, m);
+  }
 
   onStep("Checking each test against the messages");
+  const prepared = [];
   for (const r of results) {
-    const own = hits.filter((h) => h.k === String(r.key));
+    const own = hitsOfStep.get(r.key) || [];
     r.idsGiven = r.ids;
-    r.idsFound = [...new Set(own.map((h) => h.v))];
-    r.idsMissing = r.ids.filter((v) => !r.idsFound.includes(v));
-    const myOrders = new Set(own.map((h) => h.order_id).filter(Boolean));
-    const myMessages = new Set(own.map((h) => h.message_id));
-    const myClientIds = new Set(allMessages.filter((m) => myOrders.has(m.order_id)).map((m) => m.client_order_id));
-    r.messages = allMessages.filter((m) => myMessages.has(m.message_id) || myOrders.has(m.order_id) ||
-      (!m.order_id && myClientIds.has(m.client_order_id)))
-      .sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+    const found = new Set(own.map((h) => h.v));
+    r.idsFound = [...found];
+    r.idsMissing = r.ids.filter((v) => !found.has(v));
+    const picked = new Map();
+    const clientIds = new Set();
+    for (const h of own) if (messages.has(h.message_id)) picked.set(h.message_id, messages.get(h.message_id));
+    for (const o of new Set(own.map((h) => h.order_id).filter(Boolean))) {
+      for (const m of messagesOfOrder.get(o) || []) {
+        picked.set(m.message_id, m);
+        if (m.client_order_id) clientIds.add(m.client_order_id);
+      }
+    }
+    for (const c of clientIds) for (const m of noOrderByClientId.get(c) || []) picked.set(m.message_id, m);
+    r.messages = [...picked.values()].sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
     r.session = [];
-    await checkOne(conn, r, known);
-    delete r.ids;
+    const p = prepare(r, known);
+    if (p) prepared.push([r, p]);
   }
+
+  // 3. The session messages (logons, logouts, mass cancels) of every step that needs them, in one query.
+  const windows = prepared.filter(([, p]) => p.window);
+  if (windows.length) {
+    onStep("Reading the logon and mass cancel messages");
+    const where = windows.map(([, p]) => `(f.comp_id = ${quote(p.window.comp)} AND f.timestamp BETWEEN '${iso(p.window.from)}' AND '${iso(p.window.to)}')`).join(" OR ");
+    const session = await rows(conn, `SELECT ${MESSAGE_COLUMNS} FROM fact_message f LEFT JOIN dim_reject_code r USING (reject_code)
+      WHERE (${where})
+        AND (f.message_type IN ('A', 'B', '5', 'q', 'r', '3') OR (f.message_type = '8' AND f.report_event IN ('Cancelled', 'Expired')))
+      ORDER BY f.timestamp, f.message_id`);
+    const at = new Map(session.map((m) => [m, parseTime(m.time)]));
+    for (const [r, p] of windows) {
+      const { comp, from, to } = p.window;
+      r.session = session.filter((m) => m.comp_id === comp && at.get(m) >= from && at.get(m) <= to).slice(0, 300);
+    }
+  }
+
+  for (const [r, p] of prepared) finish(r, p, known);
+  for (const r of results) delete r.ids;
 
   const counts = Object.fromEntries(Object.values(RESULTS).map((v) => [v, results.filter((r) => r.result === v).length]));
   const mandatoryMissing = results.filter((r) => r.result === RESULTS.NOT_ATTEMPTED && /^y/i.test(r.mandatory) &&
@@ -445,39 +655,41 @@ export async function checkReport(store, report, onStep = () => {}) {
   return { file: report.name, kind: report.kind, checkedAt: new Date(), compids, results, counts, overall, mandatoryMissing };
 }
 
-async function checkOne(conn, r, known) {
+// The first part of checking one step: the result of a step with no response or with no exported messages, or else
+// the step's orders and the time window of the session messages it needs. Returns null when the result is already set.
+function prepare(r, known) {
   if (!r.answered) {
     r.result = RESULTS.NOT_ATTEMPTED;
     r.reason = r.clientComment ? `The client wrote: "${r.clientComment}".` : "The client gave no response for this step.";
     r.shows = "";
-    return;
+    return null;
   }
-  const notes = [];
   const reason = notCheckable(r.id);
   if (reason) {
     r.result = RESULTS.NOT_CHECKABLE;
     r.reason = reason;
     r.shows = "";
     r.messages = [];
-    return;
+    return null;
   }
   const orders = ordersOf(r.messages);
   const clientOrders = orders.filter((o) => !r.compid || o.comp === r.compid);
   const main = clientOrders[0] || orders[0];
 
-  // The session messages (logons, logouts, mass cancels) of the CompID around the test time, or around the orders.
+  // The session messages of the CompID within 10 minutes of the test time, or of the orders.
+  let window = null;
   const compid = r.compid && known.has(r.compid) ? r.compid : main?.comp;
   const times = [r.reportTime, ...orders.flatMap((o) => o.msgs.map((m) => parseTime(m.time)))].filter(Boolean);
   if (compid && times.length && (SESSION_TESTS.test(r.id) || /^T(3-009|4-001)$/.test(r.id))) {
     const around = SESSION_TESTS.test(r.id) && r.reportTime ? [r.reportTime] : times;
-    const from = new Date(Math.min(...around) - 10 * 60_000), to = new Date(Math.max(...around) + 10 * 60_000);
-    const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${fmtClock(d)}`;
-    r.session = await rows(conn, `SELECT ${MESSAGE_COLUMNS} FROM fact_message f LEFT JOIN dim_reject_code r USING (reject_code)
-      WHERE f.comp_id = ${quote(compid)} AND f.timestamp BETWEEN '${iso(from)}' AND '${iso(to)}'
-        AND (f.message_type IN ('A', 'B', '5', 'q', 'r', '3') OR (f.message_type = '8' AND f.report_event IN ('Cancelled', 'Expired')))
-      ORDER BY f.timestamp, f.message_id LIMIT 300`);
+    window = { comp: compid, from: new Date(Math.min(...around) - 10 * 60_000), to: new Date(Math.max(...around) + 10 * 60_000) };
   }
+  return { orders, clientOrders, main, window };
+}
 
+// The second part: the rule for the test decides the result from the step's orders and session messages.
+function finish(r, { orders, clientOrders, main }, known) {
+  const notes = [];
   let verdict;
   if (r.compid && !known.has(r.compid) && !orders.length) {
     verdict = review(`CompID ${r.compid} sent no messages in the exports of July to September 2026.`);

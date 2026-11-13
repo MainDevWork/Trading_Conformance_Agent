@@ -1,9 +1,9 @@
-import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=26";
-import { loadStore } from "../agent/data.js?v=26";
-import { readAttachment } from "../reports/attachments.js?v=26";
-import { checkReport } from "../reports/conformance.js?v=26";
-import { makeClientReport } from "../reports/client_report.js?v=26";
-import * as memoryStore from "../agent/memory.js?v=26";
+import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=27";
+import { loadStore } from "../agent/data.js?v=27";
+import { readAttachment } from "../reports/attachments.js?v=27";
+import { checkReport } from "../reports/conformance.js?v=27";
+import { makeClientReport, preloadReportLibraries } from "../reports/client_report.js?v=27";
+import * as memoryStore from "../agent/memory.js?v=27";
 
 window.appStarted = true;
 
@@ -105,13 +105,17 @@ function addMessage(role, text, steps) {
   return wrap;
 }
 
-// The line under an answer that says how long it took and how many requests the language model received.
-function timingLine(totalMs, timing) {
+// The line under an answer that says how long it took, when its first words were shown, and how many requests the
+// language model received. firstTextMs is null when the answer was shown only once it was complete. When the first
+// words appear only at the very end on one computer but early on another, something between that computer and
+// OpenRouter, such as an antivirus program that scans web traffic or a company proxy, is holding back the streamed reply.
+function timingLine(totalMs, timing, firstTextMs = null) {
   const line = document.createElement("div");
   line.className = "steps";
   const seconds = (ms) => (ms < 10_000 ? (ms / 1000).toFixed(1) : Math.round(ms / 1000));
   line.textContent = `Answered in ${seconds(totalMs)} s: ` + (timing.requests
-    ? `${seconds(timing.modelMs)} s waiting for the language model, ${timing.requests} request${timing.requests > 1 ? "s" : ""}.`
+    ? `${seconds(timing.modelMs)} s waiting for the language model, ${timing.requests} request${timing.requests > 1 ? "s" : ""}` +
+      `${firstTextMs !== null ? `; first words shown after ${seconds(firstTextMs)} s` : ""}.`
     : "no request to the language model.");
   return line;
 }
@@ -155,19 +159,30 @@ async function send(text) {
   // True while the model's text is being shown in the waiting message, in place of the step.
   let writing = false;
   let drawnAt = 0;
+  // A redraw put off because the last one was less than 120 ms ago, and when the first words were shown.
+  let redraw = null;
+  let firstTextAt = null;
   // The text of the reply being written, kept if the analyst presses Stop.
   let partial = "";
   const showStep = () => { if (!writing) pendingBody.textContent = `${step}…`; };
   const onStep = (text) => { writing = false; partial = ""; pendingBody.classList.add("thinking"); step = text; showStep(); };
-  // At most 8 redraws a second; the finished answer replaces this text.
-  const onText = (text) => {
-    partial = text;
-    if (!writing) { writing = true; pendingBody.classList.remove("thinking"); drawnAt = 0; }
-    if (Date.now() - drawnAt < 120) return;
+  // At most 8 redraws a second. A piece that arrives sooner is drawn by a timer, so the page never shows less than
+  // has been received while the model pauses. The finished answer replaces this text.
+  const draw = () => {
+    redraw = null;
+    if (!writing) return;
     drawnAt = Date.now();
     const atEnd = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
-    pendingBody.innerHTML = renderMarkdown(text);
+    pendingBody.innerHTML = renderMarkdown(partial);
     if (atEnd) messagesEl.scrollTop = messagesEl.scrollHeight;
+  };
+  const onText = (text) => {
+    partial = text;
+    if (firstTextAt === null) firstTextAt = Date.now();
+    if (!writing) { writing = true; pendingBody.classList.remove("thinking"); drawnAt = 0; }
+    const wait = 120 - (Date.now() - drawnAt);
+    if (wait <= 0) draw();
+    else if (!redraw) redraw = setTimeout(draw, wait);
   };
   showStep();
   // The results of a report checked for this question are added under its answer, in a closed section.
@@ -187,6 +202,7 @@ async function send(text) {
     if (attached && !attached.checked) {
       step = `Checking ${attached.name} against the messages`;
       showStep();
+      preloadReportLibraries();
       attached.checked = await checkReport(store, attached.report, (text) => { step = text; showStep(); });
       conv.attachment = attached.checked;
       renderAttached();
@@ -206,7 +222,7 @@ async function send(text) {
     pending.remove();
     history.push({ role: "assistant", content: data.answer });
     const answerEl = addMessage("assistant", data.answer);
-    answerEl.append(timingLine(Date.now() - sentAt, data.timing));
+    answerEl.append(timingLine(Date.now() - sentAt, data.timing, firstTextAt === null ? null : firstTextAt - sentAt));
     if (made.length) answerEl.querySelector(".body").append(downloadLinks(made));
     conv.items.push({ role: "user", content: text, ...(newFile ? { file: newFile } : {}) }, { role: "assistant", content: data.answer, steps: data.steps });
     showResultsOnce();
@@ -236,6 +252,7 @@ async function send(text) {
       addMessage("error", err.message);
     }
   } finally {
+    clearTimeout(redraw);
     busy = false;
     stopper = null;
     sendBtn.disabled = false;

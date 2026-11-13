@@ -12,10 +12,10 @@
 // an attached report already answer gets no request at all (direct_answer.js). Replies are streamed, so the page shows
 // the answer as the model writes it.
 
-import { retrieve } from "./retrieve.js?v=26";
-import { evidenceFor, resultsText } from "../reports/conformance.js?v=26";
-import { isSmallTalk } from "./retrieve.js?v=26";
-import { directAnswer } from "../reports/direct_answer.js?v=26";
+import { retrieve } from "./retrieve.js?v=27";
+import { evidenceFor, resultsText } from "../reports/conformance.js?v=27";
+import { isSmallTalk } from "./retrieve.js?v=27";
+import { directAnswer } from "../reports/direct_answer.js?v=27";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -113,7 +113,7 @@ Each test step has a result: Pass, Fail, Needs review, Not checkable or Not atte
 - When the analyst asks for a report, file, Excel or PDF for the client, call create_client_report. Pass format
   "excel", "pdf" or "both"; summary: a short plain paragraph to the client stating the overall result, which steps
   failed and what they must redo; and changes only for results the analyst has asked to change, each with their
-  reason. Then tell the analyst the file is ready below the answer.
+  reason. Then tell the analyst the file is ready below the answer. The files leave out steps with no response.
 - Present several test steps as a table: test, result, reason.
 
 Memory: the page saves every conversation and a list of notes in the analyst's browser.
@@ -133,6 +133,15 @@ The answer:
 - If the data cannot answer the question, say so and say what data would be needed.
 - Format money in South African Rand (prices in the data are in cents) and dates as day/month/year.
 `;
+
+// The whole system message for a greeting, thanks or small talk, which needs no data, reference or tools. It is
+// about 500 characters, sent instead of the full instructions, reference and table columns, so the reply starts sooner
+// and uses fewer tokens.
+const SMALL_TALK_PROMPT = `You are the Trading Conformance Agent for JSE Trading Operations. You answer an analyst's
+questions about the Trading FIX message data of clients' conformance tests (July to September 2026), and check
+clients' Volume 202 conformance test reports against those messages. The analyst's message is a greeting, thanks or
+small talk: reply briefly and naturally in one or two sentences, as a colleague would, and say what you can help with
+if it fits. Do not start any analysis and do not repeat an earlier answer.`;
 
 // The topics of knowledge/*.md that read_reference can return (core.md is always in the system prompt).
 const REFERENCE_TOPICS = {
@@ -169,7 +178,7 @@ const REPORT_TOOLS = [
     type: "function",
     function: {
       name: "create_client_report",
-      description: "Write the results of the attached client report as a file for the client: Excel (summary and test results) or PDF (summary and test results). The page shows a download link below the answer.",
+      description: "Write the results of the attached client report as a file for the client: Excel (summary sheet and one row per test step) or PDF (trading conformance assessment: overall result, counts, decision, and the criteria and evidence of each passed, failed and review test). Steps with no client response are left out of both. The page shows a download link below the answer.",
       parameters: {
         type: "object",
         properties: {
@@ -182,7 +191,7 @@ const REPORT_TOOLS = [
               type: "object",
               properties: {
                 test: { type: "string", description: "Test case ID or reference" },
-                result: { type: "string", enum: ["Pass", "Fail", "Needs review", "Not checkable", "Not attempted"] },
+                result: { type: "string", enum: ["Pass", "Fail", "Needs review", "Not checkable"] },
                 reason: { type: "string", description: "The analyst's reason" },
               },
               required: ["test", "result"],
@@ -326,6 +335,10 @@ async function runSql(store, sql) {
   // (a second statement, CREATE, DROP, SET, ...) fails to parse.
   const body = sql.trim().replace(/;\s*$/, "");
   if (!body) return { error: "Only a single SELECT (or WITH ... SELECT) statement is allowed." };
+  // The tables never change while the page is open, so a statement the model already ran returns the saved result
+  // instead of reading the tables again. At most 100 results are kept.
+  store.sqlResults ??= new Map();
+  if (store.sqlResults.has(body)) return store.sqlResults.get(body);
   let result;
   try {
     result = await queryAsText(store.conn, `SELECT * FROM (\n${body}\n) LIMIT ${MAX_ROWS + 1}`);
@@ -334,8 +347,11 @@ async function runSql(store, sql) {
   }
   const truncated = result.rows.length > MAX_ROWS;
   const rows = result.rows.slice(0, MAX_ROWS);
-  return { columns: result.columns, rows, row_count: rows.length, truncated,
-           note: truncated ? `Only the first ${MAX_ROWS} rows are shown; aggregate or add LIMIT.` : null };
+  const answer = { columns: result.columns, rows, row_count: rows.length, truncated,
+                   note: truncated ? `Only the first ${MAX_ROWS} rows are shown; aggregate or add LIMIT.` : null };
+  if (store.sqlResults.size >= 100) store.sqlResults.delete(store.sqlResults.keys().next().value);
+  store.sqlResults.set(body, answer);
+  return answer;
 }
 
 async function runTool(store, name, args, attachment, memory) {
@@ -401,10 +417,12 @@ let reasoningOff = true;
 class OpenRouterError extends Error {}
 
 // Reads a streamed reply: lines "data: {json}" with pieces of the text and of the tool calls, ending with "data: [DONE]".
-// Lines starting with ":" only keep the connection open. onPiece() is called for each piece received, and
-// onText(textSoFar) when the text grows.
-async function readStream(response, onPiece, onText) {
+// Lines starting with ":" only keep the connection open. onPiece() is called for each piece received,
+// onText(textSoFar) when the text grows, and onThinking(words) when a model whose reasoning step cannot be switched
+// off sends a piece of its reasoning before any text, with the number of words of reasoning so far.
+async function readStream(response, onPiece, onText, onThinking) {
   const reply = { content: "", usage: null };
+  let thought = 0;
   const calls = [];
   const decoder = new TextDecoder();
   const reader = response.body.getReader();
@@ -426,6 +444,8 @@ async function readStream(response, onPiece, onText) {
       const delta = chunk.choices?.[0]?.delta;
       if (!delta) continue;
       onPiece();
+      const reasoning = delta.reasoning || delta.reasoning_content;
+      if (reasoning && !reply.content) { thought += (reasoning.match(/\S+/g) || []).length; onThinking(thought); }
       if (delta.content) { reply.content += delta.content; onText(reply.content); }
       for (const piece of delta.tool_calls || []) {
         const call = calls[piece.index ?? calls.length] ??= { id: "", type: "function", function: { name: "", arguments: "" } };
@@ -444,7 +464,7 @@ async function readStream(response, onPiece, onText) {
 // onText(textSoFar) is called as the reply's text is received. stopSignal (an AbortSignal), when it fires, cancels the
 // request: the analyst pressed Stop.
 // Returns the reply message and usage: the token counts OpenRouter reports for the request and the reply.
-async function callModel(apiKey, messages, model, allowTools = true, tools = TOOLS, onText = () => {}, stopSignal = null) {
+async function callModel(apiKey, messages, model, allowTools = true, tools = TOOLS, onText = () => {}, stopSignal = null, onThinking = () => {}) {
   const controller = new AbortController();
   const cancel = () => controller.abort();
   if (stopSignal?.aborted) cancel();
@@ -471,7 +491,7 @@ async function callModel(apiKey, messages, model, allowTools = true, tools = TOO
       if (/reasoning/i.test(text)) { reasoningOff = false; response = await post(); }
     }
     if (!response.ok) throw new OpenRouterError(`OpenRouter returned ${response.status}: ${(await response.text()).slice(0, 500)}`);
-    if ((response.headers.get("content-type") || "").includes("text/event-stream")) return await readStream(response, restartTimer, onText);
+    if ((response.headers.get("content-type") || "").includes("text/event-stream")) return await readStream(response, restartTimer, onText, onThinking);
     // A reply sent whole, not streamed.
     const body = JSON.parse(await response.text());
     if (body.error) throw new OpenRouterError(`OpenRouter error: ${JSON.stringify(body.error)}`);
@@ -562,6 +582,7 @@ export async function chat(store, apiKey, history, onStep = () => {}, attachment
   const turns = history.filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content }));
   const steps = [];
   const timing = { requests: 0, modelMs: 0 };
+  const onThinking = (words) => onStep(`The language model is thinking (${words} words so far)`);
 
   // A question the results of the attached report already answer gets no request to the model.
   const asked = turns[turns.length - 1].content;
@@ -603,9 +624,9 @@ ${resultsText(attachment.checked, asked)}`;
     if (tokens.firstPrompt === null) tokens.firstPrompt = prompt;
     tokens.largestPrompt = Math.max(tokens.largestPrompt, prompt);
   };
-  const ask = async (allowTools) => {
+  const ask = async (allowTools, sent = messages, sentTools = tools) => {
     const sentAt = Date.now();
-    const reply = await callModel(apiKey, messages, model, allowTools, tools, onText, stopSignal);
+    const reply = await callModel(apiKey, sent, model, allowTools, sentTools, onText, stopSignal, onThinking);
     timing.requests++;
     timing.modelMs += Date.now() - sentAt;
     count(reply);
@@ -614,7 +635,9 @@ ${resultsText(attachment.checked, asked)}`;
   let answer = null;
   if (smallTalk) {
     onStep("Replying");
-    answer = (await ask(false)).content || "Hello. Ask me about a CompID's conformance test messages, or attach a client's report.";
+    // Only the short system message and the conversation are sent: no tables, reference, memory notes or tools.
+    const short = [{ role: "system", content: SMALL_TALK_PROMPT }, ...turns.slice(-6)];
+    answer = (await ask(false, short, [])).content || "Hello. Ask me about a CompID's conformance test messages, or attach a client's report.";
   }
   for (let round = 0; round < MAX_TOOL_ROUNDS && answer === null; round++) {
     if (round > 0 && Date.now() - startedAt > TOOL_TIME_LIMIT_MS) break;
