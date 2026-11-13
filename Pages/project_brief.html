@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project brief</title>
+<style>
+  :root { --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5f6b7a; --border: #cfd6de; --accent: #0b5cad; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #12161c; --panel: #1a2029; --text: #e4e8ee; --muted: #98a3b1; --border: #2c3542; --accent: #4c9be8; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 32px 16px 48px; }
+  nav { font-size: 13px; margin-bottom: 18px; color: var(--muted); }
+  nav a { color: inherit; margin-right: 14px; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 22px; }
+  h2 { font-size: 17px; margin: 30px 0 10px; }
+  p, ul { margin: 0 0 10px; }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  table { border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); font-size: 14px; width: 100%; }
+  th, td { padding: 8px 11px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  thead th { font-size: 12px; color: var(--muted); }
+  td.r { text-align: right; white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <nav><a href="../index.html"><strong>Open the chat</strong></a><a href="project_brief.html">Project brief</a><a href="system_architecture.html">System architecture</a><a href="agent_methodology.html">Agent methodology</a><a href="data_architecture.html">Data architecture</a><a href="gold_star_schema.html">Gold layer</a><a href="silver_layer.html">Silver layer</a><a href="bronze_data_diagram.html">Bronze layer</a></nav>
+
+  <h1>Project brief</h1>
+  <p class="sub">JSE Data &amp; Digital Academy final case study, Group 6 · Tshephang Tsheoga, Ndivhuwo Makhavhu, Sixolisile Mahlasela · Sponsor: Head of Trading Operations</p>
+
+  <h2>The problem</h2>
+  <p>Before a client may trade on the JSE or receive production market data, Trading Operations must confirm that the client's systems send and handle messages as the JSE specifications require. The client runs a set of conformance tests under a CompID, the login name of one client connection to the JSE trading gateway, and every message of those tests is recorded. A conformance report then states whether each test passed.</p>
+  <p>When a report shows less than a 100% pass rate, an analyst checks the recorded messages by hand to find the cause. In some cases the report shows a test as failed although the messages show the client completed it. The analyst then asks the client for more information or a retest, which delays the client's move to production. Few analysts know how each test is configured, so the work depends on those people being available.</p>
+
+  <h2>What the system does</h2>
+  <table>
+    <thead><tr><th>Task</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td>Answer questions</td><td>The analyst types a question in the chat, such as which messages of a CompID were rejected and why. The agent writes and runs SQL queries on the message data in the browser and answers in plain words.</td></tr>
+      <tr><td>Check a client's report</td><td>The analyst attaches the client's conformance test report (Excel or PDF). The system finds the messages of each test step and gives the step one result: Pass, Fail, Needs review, Not checkable or Not attempted, with the reason.</td></tr>
+      <tr><td>Write the reply to the client</td><td>The system writes a report for the client, as Excel or PDF, with a summary and one row per test step with its result and reason.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>The data</h2>
+  <table>
+    <tbody>
+      <tr><td>Source</td><td>36 Excel exports of the JSE Trading FIX message data, 11 message types</td></tr>
+      <tr><td>Period</td><td>01/07/2026 to 30/09/2026</td></tr>
+      <tr><td>Rows in the exports</td><td class="r">3,763,516</td></tr>
+      <tr><td>Messages after cleaning</td><td class="r">2,169,820</td></tr>
+      <tr><td>CompIDs</td><td>Each real CompID is replaced with a fictitious one. Every other value is real.</td></tr>
+      <tr><td>Storage</td><td>Private cloud storage; the page downloads the tables only after a database key is entered.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>How the result is measured</h2>
+  <ul>
+    <li>Time an analyst takes to check one client's conformance report, by hand and with the system.</li>
+    <li>Number of test steps the system gives the same result as the analyst.</li>
+    <li>Number of follow-up requests and retests sent to clients.</li>
+    <li>Number of clients completing conformance, and their pass and fail rates.</li>
+  </ul>
+</main>
+</body>
+</html>
