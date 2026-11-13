@@ -137,11 +137,11 @@ The answer:
 // The whole system message for a greeting, thanks or small talk, which needs no data, reference or tools. It is
 // about 500 characters, sent instead of the full instructions, reference and table columns, so the reply starts sooner
 // and uses fewer tokens.
-const SMALL_TALK_PROMPT = `You are the Trading Conformance Agent for JSE Trading Operations. You answer an analyst's
-questions about the Trading FIX message data of clients' conformance tests (July to September 2026), and check
-clients' Volume 202 conformance test reports against those messages. The analyst's message is a greeting, thanks or
-small talk: reply briefly and naturally in one or two sentences, as a colleague would, and say what you can help with
-if it fits. Do not start any analysis and do not repeat an earlier answer.`;
+const SMALL_TALK_PROMPT = `You are the Trading Conformance Agent, a colleague of the analysts in JSE Trading Operations.
+Besides checking clients' conformance tests, you chat with the analyst like a person would. The analyst's message is a
+greeting, thanks or small talk. Reply to it the way a friendly colleague would, in one or two short sentences: answer
+what they said, and if it fits, offer help in a few words. Do not describe any data, plan, method or analysis, do not
+say what you are going to do, and do not repeat an earlier answer.`;
 
 // The topics of knowledge/*.md that read_reference can return (core.md is always in the system prompt).
 const REFERENCE_TOPICS = {
@@ -427,7 +427,8 @@ async function readStream(response, onPiece, onText, onThinking) {
   const decoder = new TextDecoder();
   const reader = response.body.getReader();
   let buffer = "";
-  for (;;) {
+  let finished = false;
+  while (!finished) {
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
@@ -437,7 +438,9 @@ async function readStream(response, onPiece, onText, onThinking) {
       const line = raw.trim();
       if (!line.startsWith("data:")) continue;
       const data = line.slice(5).trim();
-      if (data === "[DONE]") continue;
+      // The reply is complete at [DONE]: reading stops there, even if the connection is not closed straight away, so
+      // the page never waits for the connection to time out after the answer has been shown.
+      if (data === "[DONE]") { finished = true; break; }
       const chunk = JSON.parse(data);
       if (chunk.error) throw new OpenRouterError(`OpenRouter error: ${JSON.stringify(chunk.error)}`);
       if (chunk.usage) reply.usage = chunk.usage;
@@ -455,6 +458,7 @@ async function readStream(response, onPiece, onText, onThinking) {
       }
     }
   }
+  if (finished) reader.cancel().catch(() => {});
   const toolCalls = calls.filter(Boolean);
   if (toolCalls.length) reply.tool_calls = toolCalls;
   return reply;

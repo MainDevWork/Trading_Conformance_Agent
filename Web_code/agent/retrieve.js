@@ -26,16 +26,24 @@ const TOPIC_WORDS_WITH_REPORT = {
   tests: /\b(T\d{1,2}|G1|OT1)\b|\bwhy\b|\brules?\b|requirement/i,
   conformance_process: /retest|\bslot|exempt|\bCTA\b/i,
 };
-// Words of a greeting, thanks or other small talk. A message made only of these words asks nothing about the data,
-// so it gets no retrieval and no tools (see isSmallTalk).
-const SMALL_TALK_WORDS = new Set(("hi hello hey hiya howzit morning afternoon evening good day thanks thank you cheers ok okay " +
-  "great nice cool awesome bye goodbye see later how are is it going doing what's whats up who what can do i said to there " +
-  "again agent yes no sure please and well fine all right alright too much appreciated welcome sorry the").split(" "));
+// Words that show a message is about the work: the data, a client, a test, a report or a request to find something.
+// A short message with none of these words, no digits and no CompID is a greeting, thanks or other small talk, so it
+// gets no retrieval and no tools (see isSmallTalk).
+const WORK_WORDS = new RegExp(String.raw`\b(` + [
+  "comp ?ids?", "orders?", "tests?", "testing", "reports?", String.raw`reject\w*`, "messages?", "fix", "data", "dataset",
+  "clients?", "trades?", "trading", String.raw`fail\w*`, "pass(ed|es|ing)?", "results?", String.raw`check\w*`, "excel", "pdf",
+  "spreadsheet", String.raw`log ?on\w*`, String.raw`log ?out\w*`, String.raw`cancel\w*`, String.raw`amend\w*`, "auctions?",
+  "sessions?", "july", "august", "september", "months?", "codes?", "volume", "conformance", "quer(y|ies)", "sql", "tables?",
+  "count", "how many", "show", "list", "find", "give", "explain", String.raw`summar\w*`, String.raw`analy\w*`,
+  String.raw`attach\w*`, "files?", "exports?", "gateway", "execution", "remember", "forget", "note",
+].join("|") + String.raw`)\b`, "i");
 
-// True when the message is a greeting, thanks or small talk, such as "Hello", "thanks!" or "how are you?".
+// True when the message is a greeting, thanks or small talk, such as "Hello", "thanks!", "how's your day going?" or
+// "what can you do?": at most 15 words, with no digits and no word about the work.
 export function isSmallTalk(text) {
-  const words = String(text).toLowerCase().replace(/[’]/g, "'").match(/[a-z']+/g);
-  return Boolean(words) && words.length <= 12 && words.every((w) => SMALL_TALK_WORDS.has(w));
+  const t = String(text).replace(/[’]/g, "'");
+  const words = t.toLowerCase().match(/[a-z0-9']+/g);
+  return Boolean(words) && words.length <= 15 && !/\d/.test(t) && !WORK_WORDS.test(t);
 }
 
 const MAX_TOPICS = 2;

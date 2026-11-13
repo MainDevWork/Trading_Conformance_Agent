@@ -51,10 +51,10 @@ duckdbReady.catch(() => {}); // a failure is reported when loadStore awaits it
 // Returns { conn, manifest }. manifest.tables[table] has description, rows and columns
 // (each column with its description, distinct and empty value counts and most common values).
 export async function loadStore(supabaseKey, onProgress) {
-  onProgress("Starting DuckDB…", 0);
+  onProgress("Loading the data…", 0);
   const { db, conn } = await duckdbReady;
 
-  onProgress("Downloading the table list…", 0);
+  onProgress("Loading the data…", 0);
   const manifestText = await (await download(supabaseKey, "manifest.json")).text();
   const manifest = JSON.parse(manifestText);
   const cache = await openCache();
@@ -66,7 +66,7 @@ export async function loadStore(supabaseKey, onProgress) {
   for (const [i, table] of tableNames.entries()) {
     const file = `${table}.parquet`;
     const hit = useSaved && await cache.match(file);
-    onProgress(`Loading table ${i + 1} of ${tableNames.length}: ${table}${hit ? " (saved copy)" : ""}`, i / tableNames.length);
+    onProgress("Loading the data…", i / tableNames.length);
     let bytes;
     if (hit) {
       bytes = await hit.arrayBuffer();

@@ -4,6 +4,7 @@ import { readAttachment } from "../reports/attachments.js?v=27";
 import { checkReport } from "../reports/conformance.js?v=27";
 import { makeClientReport, preloadReportLibraries } from "../reports/client_report.js?v=27";
 import * as memoryStore from "../agent/memory.js?v=27";
+import { isSmallTalk } from "../agent/retrieve.js?v=27";
 
 window.appStarted = true;
 
@@ -140,7 +141,9 @@ async function send(text) {
   if (!store && !loading) { addMessage("error", "Enter the database key first: click Enter keys in the sidebar."); return; }
   history.push({ role: "user", content: text });
   // A report attached since the last answer: its name is shown on this question.
-  const newFile = attached && !attached.shown ? attached.name : null;
+  // A greeting or small talk does not check an attached report: the report is checked with the first real question.
+  const chatOnly = isSmallTalk(text);
+  const newFile = attached && !attached.shown && !chatOnly ? attached.name : null;
   const questionEl = addMessage("user", text);
   if (newFile) showFileName(questionEl, newFile);
   input.value = "";
@@ -199,7 +202,7 @@ async function send(text) {
     if (stop.signal.aborted) throw new Error("Stopped");
     if (!store) throw new Error("The data did not load, so the question could not be answered. See the message in the sidebar.");
     // A report is checked against the messages when the first question is sent with it, not when it is attached.
-    if (attached && !attached.checked) {
+    if (attached && !attached.checked && !chatOnly) {
       step = `Checking ${attached.name} against the messages`;
       showStep();
       preloadReportLibraries();
@@ -209,7 +212,7 @@ async function send(text) {
       if (stop.signal.aborted) throw new Error("Stopped");
     }
     const made = [];
-    const context = attached ? {
+    const context = attached?.checked ? {
       checked: attached.checked,
       // Called by the create_client_report tool: the files are shown as download links under the answer.
       makeReport: async (args) => {
@@ -582,7 +585,7 @@ async function load(supabaseKey) {
     text.textContent = `Loading failed: ${err.message || err}`;
     return;
   }
-  text.textContent = "Data loaded. The agent can answer questions.";
+  text.textContent = "Loading the data: complete.";
   bar.style.width = "100%";
   updateContext();
 }
