@@ -1,0 +1,22 @@
+don't put the "not attempted" in the report produced
+
+use the tsephange's pdf test result for the agent to produce instead of the pdf version of the current view
+
+dashboard of the details of the collective client test conformance test results 
+
+token economics/data governance
+
+the parameters of the prototype project
+
+how to embed this system into JSE's environment
+
+test the performance and who to update it
+
+remove telltale of api keys
+
+land on correct data instead of going through everything in the data base
+
+manual advantage
+- 3days for one client report
+- take calls for clinets and answer quieries
+- handle bottlenecks of the vonneguts failures and contact the Vonnegut developer to sort the issue
