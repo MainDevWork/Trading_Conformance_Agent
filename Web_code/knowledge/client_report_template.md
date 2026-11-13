@@ -1,6 +1,6 @@
 # Client report template: the layout of the report to the client
 
-`Web_code/reports/client_report.js` writes the report from the results of a checked client report. The Excel report has the two sheets below. The PDF report is the trading conformance assessment described at the end. Test steps the client gave no response for are left out of both files. Text in angle brackets says what goes in the cell.
+`Web_code/reports/client_report.js` writes the report from the results of a checked client report. The Excel report has the two sheets below. The PDF report is the trading conformance assessment described at the end. Of the test steps the client gave no response for, the required ones (Mandatory Y, All or Equity Market, no exemption) are included in both files as Not attempted, including those the client marked N/A; the others are left out. Text in angle brackets says what goes in the cell.
 
 ## Sheet: Summary
 
@@ -17,7 +17,7 @@ Conformance test results
 | Test steps: Fail | <number of steps> |
 | Test steps: Needs review | <number of steps> |
 | Test steps: Not checkable | <number of steps> |
-| Mandatory steps with no response | <test IDs marked Mandatory Y, for All or Equity Market, with no response and no N/A comment> |
+| Test steps: Not attempted (required) | <number of required steps with no response> |
 | JSE comments | <a short paragraph to the client: the overall result, which steps failed and what to redo> |
 
 | Result | What it means |
@@ -26,10 +26,11 @@ Conformance test results
 | Fail | The messages show the test step was not done as required, or the report's details do not match the messages. The reason says what is wrong. |
 | Needs review | The messages do not settle the result, for example because some messages are not in the export or the report's test time is wrong. A JSE analyst decides. |
 | Not checkable | The step uses a gateway or service whose messages are not in the exports (market data, Post Trade, Drop Copy, FIX, derivatives). |
+| Not attempted | A required test step the client gave no response for. It must be run and its evidence supplied. |
 
 ## Sheet: Test results
 
-One row per test step the client gave a response for.
+One row per test step the client gave a response for, and per required test step it did not.
 
 | Column | What goes in it |
 | --- | --- |
@@ -40,7 +41,7 @@ One row per test step the client gave a response for.
 | CompID | <CompID the client gave> |
 | Test time in report | <test time the client gave> |
 | Time of the messages | <date and time of the message nearest the client's test time> |
-| Result | <Pass, Fail, Needs review or Not checkable> |
+| Result | <Pass, Fail, Needs review, Not checkable, or Not attempted for a required step> |
 | Reason | <why: what the messages show against what the test needs, and any detail in the report that does not match the messages, such as a wrong test time> |
 | What the messages show | <each order the client's IDs lead to: its type, when it was entered, and every message after it with its time; for logon and mass cancel tests, the session messages> |
 | IDs found | <IDs from the report found in the messages> |
@@ -58,12 +59,12 @@ Page 1:
 | --- | --- |
 | Title line | <CompIDs> \| Client conformance result \| Trading only \| <date of the latest message assessed, e.g. 09 September 2026> |
 | Overall result | FAIL - <failed tests + required tests with no evidence> OF <tests> TESTS NEED ACTION; or REVIEW - <n> OF <tests> TESTS AWAIT A JSE DECISION; or PASS - ALL <tests> TESTS PASSED |
-| Counts | Required tests (Mandatory Y, All or Equity Market, no exemption); Evidence provided (required tests the client answered); Passed; Failed; Needs review (only when above 0); Pass rate (passed / tests); Retest / fix (tests needing action / tests) |
+| Counts | Required tests (Mandatory Y, All or Equity Market, no exemption); Evidence provided (required tests the client answered); Passed; Failed; Needs review (only when above 0); Not attempted (required tests with no response, only when above 0); Pass rate (passed / tests); Retest / fix (tests needing action / tests) |
 | Executive decision | <how many tests were assessed and their results; required tests with evidence; required tests with no evidence; the approval decision; the scope; the JSE comment to the client> |
 | Ring chart | <share of tests passed (green), needing review (orange) and needing action (red)> |
 | Assessment and specification controls | Required tests, Client evidence, Message and field validation, Timing and correlation, Pass criteria, Traceability, Messages checked |
 
-Then one section per result, each starting on a new page: Passed tests, Failed tests, Tests for JSE review. One table per test:
+Then one section per result, each starting on a new page: Passed tests, Failed tests, Tests for JSE review, Required tests not attempted. Passed + failed + needs review + not attempted equals the number of tests in the overall result. One table per test:
 
 | Row | What goes in it |
 | --- | --- |

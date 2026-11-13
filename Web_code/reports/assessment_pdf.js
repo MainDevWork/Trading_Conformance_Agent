@@ -4,15 +4,17 @@
 // controls the assessment applies. Then one section per result (Passed, Failed, Needs review), each starting on a new
 // page, with one table per test: the request and response the test needs, the criteria the rule applies, what the
 // messages show, and the conclusion. The last section ends with the approval condition.
-// Only trading tests the Trading FIX message data can check are assessed; tests with no client response are not
-// listed, and required tests among them are named in the decision and the approval condition.
+// Only trading tests the Trading FIX message data can check are assessed. Of the tests with no client response, the
+// required ones are counted and listed as Not attempted, so the counts add up to the number of tests; the others are
+// left out.
 
-import { RESULTS, criteriaFor, notCheckable } from "./conformance.js?v=27";
+import { RESULTS, criteriaFor, isRequired, notCheckable } from "./conformance.js?v=27";
 
 const C = {
   green: "#78BE20", darkBlue: "#163A5F", teal: "#00787A", red: "#D64541", grey: "#5A6770", orange: "#F5A623",
   amber: "#C27C0E", text: "#2B2B2B", panel: "#F2F4F4", panelLine: "#D5DBDB", rowAlt: "#F5F7F7",
-  passLight: "#EAF5DC", failLight: "#FBE6E5", reviewLight: "#FDF1DC", noteFill: "#FFF6DD",
+  passLight: "#EAF5DC", failLight: "#FBE6E5", reviewLight: "#FDF1DC", noteFill: "#FFF6DD", missing: "#3D4A54",
+  missingLight: "#E8ECEF",
 };
 const PAGE_W = 210, PAGE_H = 297, M = 10, INNER = PAGE_W - 2 * M;
 const FOOTER = "JSE Trading Conformance | Client Assessment";
@@ -25,14 +27,14 @@ const pdfText = (v) => String(v ?? "").replace(/…/g, "...").replace(/×/g, "x"
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const percent = (n, of) => (of ? `${Math.round((100 * n) / of)}%` : "0%");
 
-const required = (r) => /^y/i.test(r.mandatory) && !/^y/i.test(r.exemption) && /^(all|equity)/i.test(r.market);
-
 // The counts and lists every part of the PDF uses.
 function assess(c) {
   const inScope = (r) => r.result !== RESULTS.NOT_CHECKABLE && !notCheckable(r.id);
   const assessed = c.results.filter((r) => inScope(r) && r.result !== RESULTS.NOT_ATTEMPTED);
-  const requiredTests = c.results.filter((r) => inScope(r) && required(r));
-  const missing = c.mandatoryMissing.filter((r) => inScope(r) && c.results.some((x) => x.key === r.key && x.result === RESULTS.NOT_ATTEMPTED));
+  const requiredTests = c.results.filter((r) => inScope(r) && isRequired(r));
+  // Every required test with no response, including those the client marked N/A, so that
+  // passed + failed + needs review + not attempted = the number of tests.
+  const missing = requiredTests.filter((r) => r.result === RESULTS.NOT_ATTEMPTED);
   const by = (result) => assessed.filter((r) => r.result === result);
   const outside = c.results.filter((r) => r.result === RESULTS.NOT_CHECKABLE).map((r) => r.id);
   const times = assessed.map((r) => r.messageTime).filter(Boolean).sort((a, b) => a - b);
@@ -48,7 +50,7 @@ function assess(c) {
 // Text shrunk until it fits the width given.
 function fitText(doc, text, size, width) {
   doc.setFontSize(size);
-  while (size > 7 && doc.getTextWidth(text) > width) doc.setFontSize(--size);
+  while (size > 4 && doc.getTextWidth(text) > width) doc.setFontSize(size -= 0.25);
   return size;
 }
 
@@ -115,6 +117,7 @@ function firstPage(doc, c, a, summary) {
     [a.required, "REQUIRED TESTS", C.darkBlue], [a.evidence, "EVIDENCE PROVIDED", C.teal],
     [a.passed.length, "PASSED", C.green], [a.failed.length, "FAILED", C.red],
     ...(a.review.length ? [[a.review.length, "NEEDS REVIEW", C.amber]] : []),
+    ...(a.missing.length ? [[a.missing.length, "NOT ATTEMPTED", C.missing]] : []),
     [percent(a.passed.length, a.total), "PASS RATE", C.grey], [percent(needAction, a.total), "RETEST / FIX", C.orange],
   ];
   const gap = 1.2, tw = (INNER - gap * (tiles.length - 1)) / tiles.length, ty = 46, th = 15;
@@ -127,7 +130,7 @@ function firstPage(doc, c, a, summary) {
     doc.setFontSize(15);
     doc.text(String(value), x + tw / 2, ty + 7.3, { align: "center" });
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.3);
+    fitText(doc, label, 6.3, tw - 2);
     doc.text(label, x + tw / 2, ty + 12.5, { align: "center" });
   });
 
@@ -140,7 +143,7 @@ function firstPage(doc, c, a, summary) {
     sentences.push("The report holds no trading test that the Trading FIX message data can check.");
   }
   if (a.required) sentences.push(`${a.evidence} of ${plural(a.required, "required test")} contained client evidence.`);
-  if (a.missing.length) sentences.push(`No evidence was supplied for ${a.missing.map((r) => r.id).join(", ")}.`);
+  if (a.missing.length) sentences.push(`${plural(a.missing.length, "required test")} ${a.missing.length === 1 ? "was" : "were"} not attempted: ${a.missing.map((r) => r.id).join(", ")}.`);
   if (needAction) {
     const parts = [a.failed.length ? `all ${plural(a.failed.length, "failed test")} ${a.failed.length === 1 ? "is" : "are"} corrected and successfully repeated` : "",
                    a.missing.length ? `evidence is supplied for ${plural(a.missing.length, "required test")}` : ""].filter(Boolean);
@@ -189,7 +192,7 @@ function firstPage(doc, c, a, summary) {
   const share = (n) => (a.total ? (2 * Math.PI * n) / a.total : 0);
   let angle = 0;
   if (!a.total) ringSegment(doc, cx, cy, outer, inner, 0, 2 * Math.PI - 0.0002, C.panelLine);
-  for (const [n, fill] of [[a.passed.length, C.green], [a.review.length, C.orange], [needAction, C.red]]) {
+  for (const [n, fill] of [[a.passed.length, C.green], [a.review.length, C.orange], [a.failed.length, C.red], [a.missing.length, C.missing]]) {
     ringSegment(doc, cx, cy, outer, inner, angle, Math.min(angle + share(n), 2 * Math.PI - 0.0002), fill);
     angle += share(n);
   }
@@ -235,6 +238,9 @@ const SECTIONS = [
   { result: RESULTS.REVIEW, key: "review", title: "TESTS FOR JSE REVIEW - CRITERIA AND OBSERVED EVIDENCE",
     subtitle: "The exported messages do not settle these results. A JSE analyst decides each one.", line: C.orange, light: C.reviewLight,
     conclusion: () => "NEEDS REVIEW. A JSE analyst decides the result from the messages." },
+  { result: RESULTS.NOT_ATTEMPTED, key: "missing", title: "REQUIRED TESTS NOT ATTEMPTED",
+    subtitle: "The client gave no evidence for these required tests. Each must be run and its evidence supplied.", line: C.missing, light: C.missingLight,
+    conclusion: (r) => `NOT ATTEMPTED. Run this required test and record the IDs of its messages in the report.${r.clientComment ? ` The client's comment must be explained.` : ""}` },
 ];
 
 // The rows of one test's table.
@@ -242,7 +248,9 @@ function testRows(r, section) {
   const k = criteriaFor(r);
   const given = [r.compid ? `CompID ${r.compid}` : "", r.time ? `test time ${r.time}` : ""].filter(Boolean).join(", ");
   const shows = r.shows ? r.shows.replace(/\n/g, " ") : "";
-  const observed = [r.reason, shows.length > 700 ? `${shows.slice(0, 700)}...` : shows].filter(Boolean).join("\n");
+  const observed = r.result === RESULTS.NOT_ATTEMPTED
+    ? (r.clientComment ? `No evidence. The client wrote: "${r.clientComment}".` : "No evidence. The client gave no response for this test.")
+    : [r.reason, shows.length > 700 ? `${shows.slice(0, 700)}...` : shows].filter(Boolean).join("\n");
   return [
     ["TEST", `${r.id} - ${r.title}`],
     ["REQUEST", `${k.request}${given ? ` Client report: ${given}.` : ""}`],
@@ -288,7 +296,7 @@ function section(doc, s, tests) {
 function approval(doc, c, a, y) {
   const lines = [];
   if (a.failed.length) lines.push(`Repeat all ${plural(a.failed.length, "failed test")}: ${a.failed.map((r) => r.id).join(", ")}.`);
-  if (a.missing.length) lines.push(`Supply evidence for ${plural(a.missing.length, "required test")}: ${a.missing.map((r) => r.id).join(", ")}.`);
+  if (a.missing.length) lines.push(`Run and supply evidence for ${plural(a.missing.length, "required test")} not attempted: ${a.missing.map((r) => r.id).join(", ")}.`);
   if (a.review.length) lines.push(`A JSE analyst decides ${plural(a.review.length, "test")}: ${a.review.map((r) => r.id).join(", ")}.`);
   lines.push(lines.length ? "Approval requires complete results and every configured criterion to pass." : "Every assessed test passed every configured criterion.");
   doc.setFontSize(8.5);

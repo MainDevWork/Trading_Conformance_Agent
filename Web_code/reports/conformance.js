@@ -528,6 +528,9 @@ export function criteriaFor(r) {
   };
 }
 
+// A required test step: Mandatory Y, for All or Equity Market, with no agreed exemption.
+export const isRequired = (r) => /^y/i.test(r.mandatory) && !/^y/i.test(r.exemption) && /^(all|equity)/i.test(r.market);
+
 // The columns of fact_message that hold an ID a client can write in a report.
 const ID_COLUMNS = ["order_id", "execution_id", "client_order_id", "orig_client_order_id", "public_order_id"];
 
