@@ -19,6 +19,19 @@ test the performance and who to update it
 land on correct data instead of going through everything in the data base
 
 manual advantage
-- 3days for one client report
+- 3 days for one client report
 - take calls for clinets and answer quieries
 - handle bottlenecks of the vonneguts failures and contact the Vonnegut developer to sort the issue
+
+so here are some of the here's some of the stuff concerning the manual task for Trading Operation analysts
+to do their workturns out it can take them three days to complete one client reports it can take them more than an hour to complete one test case for a Client
+and since there's multiple test cases for one client report it can take more than three days the analyst also has to make calls or communicate
+ateic commun or calls make to has alsost analythehan three days an more take can it report clthe analyst also has to make calls or communicate
+they have to make calls and communicate with the client to confirm certain details as they working through the reports itself They also need to pull in the test results from their legacy system that they use
+in order to get the test result details but the system that they use only pulls out test results of 1 test case and sometimes their legacy system falters and does not provide them the information they needed
+because the system is failing in some way and this acts as a bottleneck and they have to contact the developers the IT developers of their system to sort out the issue which adds to the time even further 
+so this adds again to the consuming time and the manual task of analysing through test conformance details for just a single clients that do not conformance tests with the AG and also sometimes
+if it's not a if sometimes they need to verify certain details that it's unclear the information they got from their system iTunes unclear so they have to search through the trading fix messages 
+and this has to do for further extract of information from their system and do even more in depth analysis and that adds to the hours with the agent it can be less then an hour 30 minutes Or even 10 minutes 
+to number one analyse a client reports and develop a test complete test result report and verifying details through querying the agents All of this can be completed in under 10 minutes
+so instead of having one client report take days multiple client reports up to eight and even more 10 and even more can all be completed in just one day Through this trading conformance agents 
