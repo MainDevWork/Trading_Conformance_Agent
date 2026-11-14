@@ -20,7 +20,7 @@ By hand, a Trading Operations analyst takes about three days, sometimes more, to
 | Waiting for the IT department when the internal system fails | The work stops until IT fixes the fault | Works from the exported message data, loaded into the browser, so a fault in the internal system after the export does not stop the check |
 | Sending the client queries about details of the report and its results | Each query waits for the client's reply and a discussion | The analyst asks the agent, which answers from the messages and states what the messages show for each test step, so fewer queries go to the client |
 
-With this system one client report is completed in under one hour, and in at most two hours, against about three days by hand. The line under each answer on the page states how long that answer took.
+With this system one client report is completed in under an hour, and in as little as 10 minutes, against about three days by hand. The line under each answer on the page states how long that answer took.
 
 ## Folders
 
