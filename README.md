@@ -8,7 +8,9 @@
 
 Website: [maindevwork.github.io/Trading_Conformance_Agent](https://maindevwork.github.io/Trading_Conformance_Agent/)
 
-A web chat page where a JSE Trading Operations analyst asks questions about the Trading FIX message data from conformance testing (July to September 2026), and a language model answers them by running SQL queries against those exports.
+Developed an AI agent that allows JSE Trading Operations analysts to examine conformance test reports for clients. Clients are required to successfully go through these tests using their trading system before being allowed to connect to the live JSE market.
+
+Organized 3.76 million FIX (Financial Information eXchange) trading messages from the Vonnegut system, the JSE technology that captures trading messages, into 2.17 million unique messages that can be queried in plain English by analysts via the agent.
 
 ## Time to complete a client report
 
@@ -20,7 +22,7 @@ By hand, a Trading Operations analyst takes about three days, sometimes more, to
 | Waiting for the IT department when the internal system fails | The work stops until IT fixes the fault | Works from the exported message data, loaded into the browser, so a fault in the internal system after the export does not stop the check |
 | Sending the client queries about details of the report and its results | Each query waits for the client's reply and a discussion | The analyst asks the agent, which answers from the messages and states what the messages show for each test step, so fewer queries go to the client |
 
-With this system one client report is completed in under an hour, and in as little as 10 minutes, against about three days by hand. The line under each answer on the page states how long that answer took.
+Using this agent worked to accelerate the examination of these reports, from often taking up 3 days to examine one client test report manually, to completing a report review in less than 30 minutes. The line under each answer on the page states how long that answer took.
 
 ## Folders
 
