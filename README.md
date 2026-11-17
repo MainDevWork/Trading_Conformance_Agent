@@ -204,7 +204,7 @@ After loading, `Web_code/agent/data.js` switches off file, network and settings 
 
 ## Row counts
 
-The 36 Excel exports hold 3,763,516 rows across 11 message types. `code/silver.py` cleans them into 2,169,820 distinct messages: pandas cleans the rows of each file, and DuckDB, run inside the Python script with SQL, combines the files, merges repeated rows, fills missing CompIDs and links requests to orders. 1,593,696 export rows (42.3%) were repeats and were merged. The same cleaning was written a second time in T-SQL as the stored procedure `silver.build_silver` on Microsoft SQL Server, and `05_check_counts.sql` compares its counts with the Python run. The counts below are from the cleaning run of 01/11/2026 (`Documents/data_quality_report.xlsx`).
+The 36 Excel exports hold 3,763,516 rows of Trading FIX message data across 11 message types. `code/silver.py` cleans them into 2,169,820 distinct Trading FIX messages: pandas cleans the rows of each file, and DuckDB, run inside the Python script with SQL, combines the files, merges repeated rows, fills missing CompIDs and links requests to orders. 1,593,696 export rows (42.3%) were repeats and were merged. The same cleaning was written a second time in T-SQL as the stored procedure `silver.build_silver` on Microsoft SQL Server, and `05_check_counts.sql` compares its counts with the Python run. The counts below are from the cleaning run of 01/11/2026 (`Documents/data_quality_report.xlsx`).
 
 | Dataset | Type | Export rows | Messages after cleaning | Repeated rows merged | Share repeated |
 | --- | --- | ---: | ---: | ---: | ---: |
