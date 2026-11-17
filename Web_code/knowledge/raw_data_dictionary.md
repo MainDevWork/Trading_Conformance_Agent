@@ -1,6 +1,6 @@
 # Raw data dictionary: Trading FIX message data, July to September 2026
 
-36 Excel exports, 3,763,516 rows, in 11 datasets: one per message type. A dataset is the Excel files of one message type, combined in the bronze layer into one table with every month's rows. Every value in the exports is text, as it is written in the export; an empty cell has no value. Filled is the share of the dataset's rows with a value in the field. Months are those whose files have the column.
+36 Excel exports, 3,763,516 rows, in 11 datasets: one per message type. A dataset is the Excel files of one message type, combined in the bronze layer into one table with every month's rows. Every value in the exports is text, as it is written in the export; an empty cell has no value. Filled is the share of the dataset's rows with a value in the field. Months are those whose files have the column. After cleaning, the 3,763,516 rows form 2,169,820 distinct messages in `fact_message`; 1,593,696 rows (42.3%) were repeats. Messages after cleaning, per dataset: Logon 55,557; Logon Response 19,947; Logout 15,617; New Order 205,175; Order Cancel Request 318,157; Order Cancel/Replace Request 558,305; Order Mass Cancel Request 246; Execution Report 245,298; Order Cancel Reject 14,601; Order Mass Cancel Report 309; Reject 736,608.
 
 ## Datasets
 

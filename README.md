@@ -201,3 +201,24 @@ Changes made in `silver/message.parquet`, compared with the bronze tables:
 - The network capture columns (`source`, `destination`, `bytes`, `sequence_no`, `packet_id`) are left out; they are in `bronze/combined/`.
 
 After loading, `Web_code/agent/data.js` switches off file, network and settings access for the SQL connection.
+
+## Row counts
+
+The 36 Excel exports hold 3,763,516 rows across 11 message types. `code/silver.py` cleans them into 2,169,820 distinct messages: pandas cleans the rows of each file, and DuckDB, run inside the Python script with SQL, combines the files, merges repeated rows, fills missing CompIDs and links requests to orders. 1,593,696 export rows (42.3%) were repeats and were merged. The same cleaning was written a second time in T-SQL as the stored procedure `silver.build_silver` on Microsoft SQL Server, and `05_check_counts.sql` compares its counts with the Python run. The counts below are from the cleaning run of 01/11/2026 (`Documents/data_quality_report.xlsx`).
+
+| Dataset | Type | Export rows | Messages after cleaning | Repeated rows merged | Share repeated |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Logon | A | 74,580 | 55,557 | 19,023 | 25.5% |
+| Logon Response | B | 23,846 | 19,947 | 3,899 | 16.4% |
+| Logout | 5 | 21,306 | 15,617 | 5,689 | 26.7% |
+| New Order | D | 325,344 | 205,175 | 120,169 | 36.9% |
+| Order Cancel Request | F | 539,586 | 318,157 | 221,429 | 41.0% |
+| Order Cancel/Replace Request | G | 929,951 | 558,305 | 371,646 | 40.0% |
+| Order Mass Cancel Request | q | 354 | 246 | 108 | 30.5% |
+| Execution Report | 8 | 699,162 | 245,298 | 453,864 | 64.9% |
+| Order Cancel Reject | 9 | 21,909 | 14,601 | 7,308 | 33.4% |
+| Order Mass Cancel Report | r | 464 | 309 | 155 | 33.4% |
+| Reject | 3 | 1,127,014 | 736,608 | 390,406 | 34.6% |
+| **Total** | | **3,763,516** | **2,169,820** | **1,593,696** | **42.3%** |
+
+5,611 messages with no CompID were given one from related messages (`comp_id_filled`), and 232,316 client requests were linked to the JSE order they refer to (`order_id_linked`).
