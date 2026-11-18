@@ -17,7 +17,7 @@ Rules from the Academy brief that apply to answers: use real data and say when a
 
 ## Which interface the messages come from
 
-The exports are messages of the JSE **Basic Native Trading Gateway** (the JSE's own binary order-entry protocol for equities), not FIX. The message type letters show it: in the Native gateway `B` is Logon Response; in FIX `B` is News. Use the Native codes in these references. Do not use FIX tag numbers or FIX code meanings; several differ (the `field_codes` reference lists the differences).
+The exports are the JSE's **Trading FIX message data**: the FIX messages recorded during client conformance tests. Read message types and code values with the meanings in these references, which are the meanings used in this data (`B` is Logon Response). Do not use code meanings from memory; the `field_codes` reference lists every code value.
 
 | Code | Message | In `fact_message` | Sent by |
 |---|---|---|---|
