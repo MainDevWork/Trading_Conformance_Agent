@@ -87,7 +87,7 @@
 
   <h2>Components</h2>
   <div class="figure">
-    <svg viewBox="0 0 1200 730" role="img" aria-label="Component diagram: chat page, report checker, agent, reference files, memory, in-browser database and data loader in the browser tab, connected to the language model and cloud storage">
+    <svg viewBox="0 0 1200 730" role="img" aria-label="Component diagram: chat page, report checker, agent, reference files, in-browser memory, in-browser database and data loader in the browser tab, connected to the language model and cloud storage">
       <defs>
         <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z"/></marker>
       </defs>
@@ -97,116 +97,66 @@
 
       <!-- browser row 1 -->
       <a href="../index.html" aria-label="Open the chat"><rect class="b web" x="40" y="80" width="200" height="150" rx="10"/>
-      <text class="t" x="54" y="106">Chat page</text>
-      <text class="p" x="54" y="125">index.html, Web_code/ui/app.js</text>
-      <text class="d" x="54" y="152">Enter keys form: database</text>
-      <text class="d" x="54" y="170">key and AI API key, not saved.</text>
-      <text class="d" x="54" y="194">Attach a client report.</text>
-      <text class="d" x="54" y="212">Shows answers and results.</text></a>
+      <text class="t" x="140" y="160" style="text-anchor:middle">Chat page</text></a>
 
       <rect class="b ai" x="290" y="80" width="220" height="150" rx="10"/>
-      <text class="t" x="304" y="106">Agent</text>
-      <text class="p" x="304" y="125">Web_code/agent/agent.js, retrieve.js</text>
-      <text class="d" x="304" y="152">Retrieves facts first, then</text>
-      <text class="d" x="304" y="170">sends the request: 7 tools,</text>
-      <text class="d" x="304" y="194">9 with a report. Runs each</text>
-      <text class="d" x="304" y="212">tool call, up to 12 rounds or 60 s.</text>
+      <text class="t" x="400" y="160" style="text-anchor:middle">Agent</text>
 
       <!-- browser row 2 -->
       <rect class="b web" x="40" y="330" width="200" height="130" rx="10"/>
-      <text class="t" x="54" y="356">Report checker</text>
-      <text class="p" x="54" y="375">Web_code/reports/attachments.js</text>
-      <text class="p" x="54" y="391">conformance.js</text>
-      <text class="p" x="54" y="407">client_report.js</text>
-      <text class="d" x="54" y="430">Checks each test step;</text>
-      <text class="d" x="54" y="448">writes the client report.</text>
+      <text class="t" x="140" y="400" style="text-anchor:middle">Report checker</text>
 
       <rect class="b data" x="290" y="330" width="220" height="130" rx="10"/>
-      <text class="t" x="304" y="356">In-browser database</text>
-      <text class="p" x="304" y="375">DuckDB-WASM, in memory</text>
-      <text class="d" x="304" y="402">9 gold tables. File, network</text>
-      <text class="d" x="304" y="420">and settings access switched</text>
-      <text class="d" x="304" y="438">off after loading.</text>
+      <text class="t" x="400" y="400" style="text-anchor:middle">In-browser database</text>
 
       <rect class="b ai" x="540" y="330" width="180" height="130" rx="10"/>
-      <text class="t" x="554" y="356">Reference files</text>
-      <text class="p" x="554" y="375">Web_code/knowledge/</text>
-      <text class="d" x="554" y="402">core.md with every</text>
-      <text class="d" x="554" y="420">question; 13 topic files and</text>
-      <text class="d" x="554" y="438">reject_codes.json on request</text>
+      <text class="t" x="630" y="400" style="text-anchor:middle">Reference files</text>
 
       <!-- browser row 3 -->
       <rect class="b cfg" x="40" y="540" width="200" height="150" rx="10"/>
-      <text class="t" x="54" y="566">Memory</text>
-      <text class="p" x="54" y="585">agent/memory.js, IndexedDB</text>
-      <text class="d" x="54" y="612">Saved conversations and</text>
-      <text class="d" x="54" y="630">memory notes, in this</text>
-      <text class="d" x="54" y="648">browser only. Notes are</text>
-      <text class="d" x="54" y="666">sent with every question.</text>
+      <text class="t" x="140" y="620" style="text-anchor:middle">In-browser memory</text>
 
       <rect class="b data" x="290" y="560" width="220" height="110" rx="10"/>
-      <text class="t" x="304" y="586">Data loader</text>
-      <text class="p" x="304" y="605">Web_code/agent/data.js</text>
-      <text class="d" x="304" y="632">Downloads gold/ from cloud</text>
-      <text class="d" x="304" y="650">storage, creates the 9 tables.</text>
+      <text class="t" x="400" y="620" style="text-anchor:middle">Data loader</text>
 
       <rect class="b data" x="800" y="570" width="360" height="100" rx="10"/>
-      <text class="t" x="814" y="596">Cloud storage</text>
-      <text class="p" x="814" y="615">private folder gold/</text>
-      <text class="d" x="814" y="640">9 Parquet files and manifest.json</text>
+      <text class="t" x="980" y="625" style="text-anchor:middle">Cloud storage</text>
 
       <!-- arrows: chat and agent -->
       <path class="arrow" d="M240,130 H286"/>
       <path class="arrow ret" d="M286,180 H244"/>
-      <text class="al" x="244" y="122">question</text>
-      <text class="al" x="248" y="198">answer</text>
 
       <!-- chat and report checker -->
       <path class="arrow" d="M100,230 V326"/>
       <path class="arrow ret" d="M180,326 V234"/>
-      <text class="al" x="108" y="274">report</text>
-      <text class="al" x="108" y="290">file</text>
-      <text class="al" x="188" y="274">results,</text>
-      <text class="al" x="188" y="290">files</text>
 
       <!-- report checker and database -->
       <path class="arrow" d="M240,375 H286"/>
       <path class="arrow ret" d="M286,425 H244"/>
-      <text class="alm" x="244" y="368">IDs</text>
-      <text class="al" x="250" y="443">rows</text>
 
       <!-- language model -->
       <rect class="b ai" x="800" y="80" width="360" height="110" rx="10"/>
-      <text class="t" x="814" y="106">Language model</text>
-      <text class="d" x="814" y="134">Model used:</text>
-      <text class="p" x="814" y="156">nvidia/nemotron-3.5-lightning:free</text>
+      <text class="t" x="980" y="128" style="text-anchor:middle">Language model</text>
+      <text class="p" x="980" y="156" style="text-anchor:middle">nvidia/nemotron-3.5-lightning:free</text>
 
       <!-- agent and language model -->
       <path class="arrow" d="M510,120 H796"/>
-      <text class="al" x="520" y="112">conversation, tool definitions, language model key</text>
       <path class="arrow ret" d="M796,170 H514"/>
-      <text class="al" x="520" y="162">a tool call, or the answer text</text>
 
       <!-- agent and database -->
       <path class="arrow" d="M380,230 V326"/>
       <path class="arrow ret" d="M430,326 V234"/>
-      <text class="alm" x="324" y="282">SELECT</text>
-      <text class="al" x="438" y="282">at most 200 rows</text>
 
       <!-- reference to agent -->
       <path class="arrow ret" d="M630,326 V205 H514"/>
-      <text class="al" x="638" y="268">reference text</text>
 
       <!-- memory and agent: notes and earlier conversations sent with each question; notes saved by the model -->
       <path class="arrow" d="M240,600 H273 V216 H286"/>
       <path class="arrow ret" d="M283,222 V640 H244"/>
-      <text class="al" transform="translate(267,520) rotate(-90)" style="text-anchor:middle">notes, conversations</text>
 
       <!-- loader -->
       <path class="arrow" d="M400,560 V464"/>
       <path class="arrow" d="M800,620 H514"/>
-      <text class="al" x="530" y="612">gold/ files, downloaded with the</text>
-      <text class="al" x="530" y="640">cloud storage publishable key</text>
     </svg>
     <div class="legend">
       <span class="l-web">Chat page and report checker</span>

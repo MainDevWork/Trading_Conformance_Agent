@@ -99,20 +99,15 @@
       <text class="ph" x="130" y="30">ONCE, WHEN THE DATABASE KEY IS ENTERED</text>
 
       <rect class="b web" x="130" y="45" width="340" height="70" rx="10"/>
-      <text class="t" x="300" y="75">Analyst enters the database key</text>
-      <text class="sm" x="300" y="97">Web_code/ui/app.js</text>
+      <text class="t" x="300" y="85">Analyst enters the database key</text>
       <g class="badge"><circle cx="130" cy="45" r="13"/><text x="130" y="45">A</text></g>
 
       <rect class="b data" x="130" y="145" width="340" height="80" rx="10"/>
-      <text class="t" x="300" y="173">Get the 9 gold tables</text>
-      <text class="s" x="300" y="194">from cloud storage, or from the copy</text>
-      <text class="s" x="300" y="211">saved in this browser</text>
+      <text class="t" x="300" y="190">Load data sets</text>
       <g class="badge"><circle cx="130" cy="145" r="13"/><text x="130" y="145">B</text></g>
 
       <rect class="b data" x="130" y="255" width="340" height="80" rx="10"/>
-      <text class="t" x="300" y="283">Create the tables in the browser</text>
-      <text class="s" x="300" y="304">in-browser database (DuckDB-WASM);</text>
-      <text class="s" x="300" y="321">file and network access switched off</text>
+      <text class="t" x="300" y="300">Create the tables in the browser</text>
       <g class="badge"><circle cx="130" cy="255" r="13"/><text x="130" y="255">C</text></g>
 
       <path class="arrow" d="M300,115 V141"/>
@@ -122,35 +117,26 @@
       <text class="ph" x="610" y="30">WHEN A CLIENT REPORT IS ATTACHED</text>
 
       <rect class="b web" x="610" y="45" width="370" height="70" rx="10"/>
-      <text class="t" x="795" y="75">Analyst attaches the client's report</text>
-      <text class="s" x="795" y="97">read in the browser; only its name is shown</text>
+      <text class="t" x="795" y="85">Analyst attaches the client's report</text>
       <g class="badge"><circle cx="610" cy="45" r="13"/><text x="610" y="45">R1</text></g>
 
       <rect class="b data" x="610" y="145" width="370" height="80" rx="10"/>
-      <text class="t" x="795" y="171">First prompt: check each test step</text>
-      <text class="s" x="795" y="192">the client's IDs looked up in the tables;</text>
-      <text class="s" x="795" y="209">one result per step by a fixed rule, not the model</text>
+      <text class="t" x="795" y="190">First prompt: check each test step</text>
       <g class="badge"><circle cx="610" cy="145" r="13"/><text x="610" y="145">R2</text></g>
 
       <rect class="b web" x="610" y="255" width="370" height="80" rx="10"/>
-      <text class="t" x="795" y="283">Closed section under the first answer</text>
-      <text class="s" x="795" y="304">opened by a click: the result of each step,</text>
-      <text class="s" x="795" y="321">Excel and PDF report buttons</text>
+      <text class="t" x="795" y="300">Closed section under the first answer</text>
       <g class="badge"><circle cx="610" cy="255" r="13"/><text x="610" y="255">R3</text></g>
 
       <path class="arrow" d="M795,115 V141" style="stroke-dasharray:5 4"/>
       <path class="arrow" d="M795,225 V251"/>
       <path class="arrow" d="M470,410 H540 V185 H606" style="stroke-dasharray:5 4"/>
-      <text class="s" x="548" y="375" style="text-anchor:start">first prompt after attaching</text>
       <path class="arrow" d="M795,335 V456" style="stroke-dasharray:5 4"/>
-      <text class="s" x="803" y="388" style="text-anchor:start">results kept until the</text>
-      <text class="s" x="803" y="405" style="text-anchor:start">report is removed</text>
 
       <text class="ph" x="130" y="375">FOR EVERY QUESTION</text>
 
       <rect class="b web" x="130" y="390" width="340" height="70" rx="10"/>
-      <text class="t" x="300" y="420">Analyst asks a question</text>
-      <text class="s" x="300" y="442">added to the conversation</text>
+      <text class="t" x="300" y="430">Analyst asks a question</text>
       <g class="badge"><circle cx="130" cy="390" r="13"/><text x="130" y="390">1</text></g>
 
       <polygon class="b dec" points="300,485 450,535 300,585 150,535"/>
@@ -163,33 +149,20 @@
       <text class="yn" x="308" y="606">No</text>
 
       <rect class="b web" x="610" y="460" width="370" height="100" rx="10"/>
-      <text class="t" x="795" y="488">Answer with no model request</text>
-      <text class="s" x="795" y="510">every word is on a fixed list, such as "give me the</text>
-      <text class="s" x="795" y="527">results" or "what failed"; the page writes the table</text>
-      <text class="s" x="795" y="544">or the report file from the fixed-rule results</text>
-      <path class="arrow" d="M795,560 V581" style="stroke-dasharray:5 4"/>
+      <text class="t" x="795" y="515">Answer with no model request</text>
       <path class="arrow" d="M980,510 H994 V1855 H474"/>
 
       <g transform="translate(0,130)">
       <rect class="b data" x="130" y="490" width="340" height="100" rx="10"/>
-      <text class="t" x="300" y="518">Agent retrieves before asking the model</text>
-      <text class="s" x="300" y="537">summary queries and reference topics, added to</text>
-      <text class="s" x="300" y="553">the question; skipped for a greeting or small talk,</text>
-      <text class="s" x="300" y="569">which gets one request with tools switched off</text>
-      <text class="sm" x="300" y="585">Web_code/agent/retrieve.js</text>
+      <text class="t" x="300" y="545">Agent retrieves before asking the model</text>
       <g class="badge"><circle cx="130" cy="490" r="13"/><text x="130" y="490">2</text></g>
 
       <rect class="b ai" x="130" y="620" width="340" height="100" rx="10"/>
-      <text class="t" x="300" y="646">Agent builds the request</text>
-      <text class="s" x="300" y="668">same instructions, example queries, core reference</text>
-      <text class="s" x="300" y="685">and table columns every time, + memory notes</text>
-      <text class="s" x="300" y="702">+ the conversation · 7 tools (9 with a report)</text>
+      <text class="t" x="300" y="675">Agent builds the request</text>
       <g class="badge"><circle cx="130" cy="620" r="13"/><text x="130" y="620">3</text></g>
 
       <rect class="b ai" x="130" y="750" width="340" height="70" rx="10"/>
-      <text class="t" x="300" y="776">Send the request to the language model</text>
-      <text class="s" x="300" y="798">reasoning off; reply streamed; the Stop button cancels</text>
-      <text class="sm" x="300" y="814">nvidia/nemotron-3.5-lightning:free</text>
+      <text class="t" x="300" y="790">Send the request to the language model</text>
       <g class="badge"><circle cx="130" cy="750" r="13"/><text x="130" y="750">4</text></g>
 
       <polygon class="b dec" points="300,845 440,895 300,945 160,895"/>
@@ -198,15 +171,11 @@
       <g class="badge"><circle cx="160" cy="895" r="13"/><text x="160" y="895">5</text></g>
 
       <rect class="b data" x="130" y="975" width="340" height="80" rx="10"/>
-      <text class="t" x="300" y="1003">Agent runs each tool call</text>
-      <text class="s" x="300" y="1024">on the in-browser tables or</text>
-      <text class="s" x="300" y="1041">the reference files</text>
+      <text class="t" x="300" y="1020">Agent runs each tool call</text>
       <g class="badge"><circle cx="130" cy="975" r="13"/><text x="130" y="975">6</text></g>
 
       <rect class="b ai" x="130" y="1085" width="340" height="80" rx="10"/>
-      <text class="t" x="300" y="1113">Add the results to the conversation</text>
-      <text class="s" x="300" y="1134">each result cut to at most 200 rows</text>
-      <text class="s" x="300" y="1151">and 30,000 characters</text>
+      <text class="t" x="300" y="1130">Add the results to the conversation</text>
       <g class="badge"><circle cx="130" cy="1085" r="13"/><text x="130" y="1085">7</text></g>
 
       <polygon class="b dec" points="300,1190 440,1240 300,1290 160,1240"/>
@@ -215,9 +184,7 @@
       <g class="badge"><circle cx="160" cy="1240" r="13"/><text x="160" y="1240">8</text></g>
 
       <rect class="b ai" x="130" y="1320" width="340" height="80" rx="10"/>
-      <text class="t" x="300" y="1348">One last request, tools switched off</text>
-      <text class="s" x="300" y="1369">the model must answer from the</text>
-      <text class="s" x="300" y="1386">results it already has</text>
+      <text class="t" x="300" y="1365">One last request, tools switched off</text>
 
       <polygon class="b dec" points="300,1425 440,1475 300,1525 160,1475"/>
       <text class="dt" x="300" y="1470">Does the answer</text>
@@ -225,22 +192,16 @@
       <g class="badge"><circle cx="160" cy="1475" r="13"/><text x="160" y="1475">9</text></g>
 
       <rect class="b ai" x="130" y="1555" width="340" height="80" rx="10"/>
-      <text class="t" x="300" y="1583">One rewrite request, tools off</text>
-      <text class="s" x="300" y="1604">the same numbers and conclusions,</text>
-      <text class="s" x="300" y="1621">in plain words</text>
+      <text class="t" x="300" y="1600">One rewrite request, tools off</text>
 
       <rect class="b web" x="130" y="1665" width="340" height="70" rx="10"/>
-      <text class="t" x="300" y="1695">Page shows the answer text</text>
-      <text class="s" x="300" y="1717">table and column names replaced with plain words</text>
+      <text class="t" x="300" y="1705">Page shows the answer text</text>
       <g class="badge"><circle cx="130" cy="1665" r="13"/><text x="130" y="1665">10</text></g>
 
       <rect class="b web" x="130" y="1765" width="340" height="80" rx="10"/>
-      <text class="t" x="300" y="1793">Save the conversation in the browser</text>
-      <text class="s" x="300" y="1814">and update the context bar</text>
-      <text class="sm" x="300" y="1832">Web_code/agent/memory.js</text>
+      <text class="t" x="300" y="1810">Save the conversation in the browser</text>
       <g class="badge"><circle cx="130" cy="1765" r="13"/><text x="130" y="1765">11</text></g>
       <path class="arrow" d="M300,1735 V1761"/>
-      <path class="arrow" d="M474,1805 H795 V1714" style="stroke-dasharray:5 4"/>
 
       <!-- main arrows -->
       <path class="arrow" d="M300,590 V616"/>
@@ -260,68 +221,15 @@
       <!-- No from decision 5: the reply is the answer, checked at decision 9 -->
       <path class="arrow" d="M160,895 H60 V1475 H156"/>
       <text class="yn" x="100" y="887">No</text>
-      <text class="yn" transform="translate(52,1185) rotate(-90)" style="text-anchor:middle">No tool call: the reply is the answer</text>
 
       <!-- No from decision 8: next round -->
       <path class="arrow" d="M440,1240 H560 V785 H474"/>
       <text class="yn" x="450" y="1230">No</text>
-      <text class="s" x="568" y="850" style="text-anchor:start">next round, unless a report file was written</text>
-      <text class="s" x="568" y="867" style="text-anchor:start">or a note saved with the full answer: that</text>
-      <text class="s" x="568" y="884" style="text-anchor:start">reply goes straight to step 9</text>
 
       <!-- No from decision 9: show the answer -->
       <path class="arrow" d="M440,1475 H520 V1700 H474"/>
       <text class="yn" x="450" y="1465">No</text>
 
-      <!-- what step 2 retrieves -->
-      <rect class="b data" x="610" y="455" width="370" height="245" rx="10"/>
-      <text class="tl" x="626" y="481" style="font-weight:700">What step 2 adds to the question</text>
-      <text class="tl" x="626" y="507">A CompID named in it, or in an earlier question:</text>
-      <text class="tl" x="640" y="527">activity per month, messages per type,</text>
-      <text class="tl" x="640" y="547">rejections per reject code with meanings,</text>
-      <text class="tl" x="640" y="567">and how its orders ended</text>
-      <text class="tl" x="626" y="593">A month: the same facts for that month only</text>
-      <text class="tl" x="626" y="613">A reject code: its meaning</text>
-      <text class="tl" x="626" y="639">Words such as test, session or logon: up to 2 topics</text>
-      <text class="tl" x="626" y="665">An attached report: the result of every test step;</text>
-      <text class="tl" x="640" y="685">the messages only for Fail, Needs review or named</text>
-      <path class="arrow" d="M606,540 H474" style="stroke-dasharray:5 4"/>
-
-      <!-- tools -->
-      <rect class="b data" x="610" y="930" width="370" height="330" rx="10"/>
-      <text class="tl" x="626" y="956" style="font-weight:700">The tools the model can call</text>
-      <text class="tlm" x="626" y="984">run_sql</text><text class="tl" x="730" y="984">runs one SELECT query on the tables</text>
-      <text class="tlm" x="626" y="1010">describe_table</text><text class="tl" x="738" y="1010">common values of each column</text>
-      <text class="tlm" x="626" y="1036">read_reference</text><text class="tl" x="740" y="1036">one JSE reference topic</text>
-      <text class="tlm" x="626" y="1062">lookup_reject_codes</text><text class="tl" x="776" y="1062">reject code meanings</text>
-      <text class="tl" x="626" y="1092" style="font-weight:700">Added when a report is attached:</text>
-      <text class="tlm" x="626" y="1118">get_test_evidence</text><text class="tl" x="762" y="1118">messages of one test step</text>
-      <text class="tlm" x="626" y="1144">create_client_report</text><text class="tl" x="786" y="1144">Excel or PDF file</text>
-      <text class="tl" x="626" y="1174" style="font-weight:700">Always sent, for memory:</text>
-      <text class="tlm" x="626" y="1200">save_memory</text><text class="tl" x="718" y="1200">saves one memory note</text>
-      <text class="tlm" x="626" y="1226">forget_memory</text><text class="tl" x="732" y="1226">deletes a note</text>
-      <text class="tlm" x="626" y="1252">search_past_conversations</text>
-      <path class="arrow" d="M606,1015 H474" style="stroke-dasharray:5 4"/>
-
-      <!-- memory -->
-      <rect class="b web" x="610" y="1290" width="370" height="420" rx="10"/>
-      <text class="tl" x="626" y="1316" style="font-weight:700">Memory, kept in this browser (IndexedDB)</text>
-      <text class="tl" x="626" y="1344">Every conversation: questions, answers and</text>
-      <text class="tl" x="640" y="1364">attached reports. The last one is opened</text>
-      <text class="tl" x="640" y="1384">again after a reload; the sidebar lists the rest.</text>
-      <text class="tl" x="626" y="1412">Memory notes: facts the model saved with</text>
-      <text class="tl" x="640" y="1432">save_memory, sent with every question of</text>
-      <text class="tl" x="640" y="1452">every conversation (step 3).</text>
-      <text class="tl" x="626" y="1480">Context bar: the tokens the next request</text>
-      <text class="tl" x="640" y="1500">starts with, counted by OpenRouter for the</text>
-      <text class="tl" x="640" y="1520">last request. Amber from 32,000, red from</text>
-      <text class="tl" x="640" y="1540">64,000; the model accepts 1,000,000.</text>
-      <text class="tl" x="626" y="1568">Continue in a new conversation: one request</text>
-      <text class="tl" x="640" y="1588">with no tools writes a summary of at most</text>
-      <text class="tl" x="640" y="1608">300 words. The new conversation starts</text>
-      <text class="tl" x="640" y="1628">with it and sends it with every question.</text>
-      <text class="tl" x="626" y="1656">Not shared with other computers or analysts;</text>
-      <text class="tl" x="640" y="1676">deleted when the browser's site data is cleared.</text>
       </g>
     </svg>
     <div class="legend">
