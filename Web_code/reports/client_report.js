@@ -3,9 +3,9 @@
 // plug-in) in the trading conformance assessment layout written by assessment_pdf.js.
 // Of the test steps the client gave no response for, only required ones are included in both files, as Not attempted.
 
-import { loadScript } from "./attachments.js?v=27";
-import { RESULTS, fmtClock, fmtDate, isRequired } from "./conformance.js?v=27";
-import { buildAssessmentPdf } from "./assessment_pdf.js?v=27";
+import { loadScript } from "./attachments.js?v=28";
+import { RESULTS, fmtClock, fmtDate, isRequired } from "./conformance.js?v=28";
+import { buildAssessmentPdf } from "./assessment_pdf.js?v=28";
 
 const EXCELJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
 const JSPDF_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";

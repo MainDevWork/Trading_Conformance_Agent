@@ -90,7 +90,10 @@ main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: r
 /* The button that hides and shows the sidebar (Web_code/app.js adds the class sidebar-hidden to body). */
 #toggle-sidebar { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; padding: 6px; color: var(--muted); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
 #toggle-sidebar:hover { color: var(--text); }
-body.sidebar-hidden #sidebar { margin-left: -320px; }
+/* visibility: hidden stops the Tab key from moving to the buttons of a hidden sidebar. It is applied 0.2 seconds
+   late, after the sidebar has finished moving out of view, and removed at once when the sidebar is shown. */
+#sidebar { transition: margin-left .2s, visibility 0s; }
+body.sidebar-hidden #sidebar { margin-left: -320px; visibility: hidden; transition: margin-left .2s, visibility 0s .2s; }
 main.dropping { outline: 3px dashed var(--accent); outline-offset: -8px; }
 /* The icon and title in the middle of the chat area, shown only while there are no messages. */
 #welcome { position: absolute; top: 0; left: 0; right: 0; bottom: 100px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; pointer-events: none; text-align: center; padding: 0 16px; }

@@ -1,26 +1,15 @@
-import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=27";
-import { loadStore } from "../agent/data.js?v=27";
-import { readAttachment } from "../reports/attachments.js?v=27";
-import { checkReport } from "../reports/conformance.js?v=27";
-import { makeClientReport, preloadReportLibraries } from "../reports/client_report.js?v=27";
-import * as memoryStore from "../agent/memory.js?v=27";
-import { isSmallTalk } from "../agent/retrieve.js?v=27";
+import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=28";
+import { loadStore } from "../agent/data.js?v=28";
+import { readAttachment } from "../reports/attachments.js?v=28";
+import { checkReport } from "../reports/conformance.js?v=28";
+import { makeClientReport, preloadReportLibraries } from "../reports/client_report.js?v=28";
+import * as memoryStore from "../agent/memory.js?v=28";
+import { isSmallTalk } from "../agent/retrieve.js?v=28";
 
 window.appStarted = true;
 
-// The sidebar is hidden and shown by the button at the top left of the chat area. Whether it is hidden is kept in
-// this browser's local storage, so it stays the same after a reload.
-const sidebarButton = document.getElementById("toggle-sidebar");
-function setSidebar(hidden) {
-  document.body.classList.toggle("sidebar-hidden", hidden);
-  sidebarButton.setAttribute("aria-expanded", String(!hidden));
-  sidebarButton.title = hidden ? "Show the sidebar" : "Hide the sidebar";
-  try { localStorage.setItem("sidebarHidden", hidden ? "1" : "0"); } catch {}
-}
-let sidebarHidden = false;
-try { sidebarHidden = localStorage.getItem("sidebarHidden") === "1"; } catch {}
-setSidebar(sidebarHidden);
-sidebarButton.addEventListener("click", () => setSidebar(!document.body.classList.contains("sidebar-hidden")));
+// The button that hides and shows the sidebar is set up by a script in index.html, not here, so that it works
+// before this file and the files it imports have downloaded, and still works if one of them fails to download.
 
 const messagesEl = document.getElementById("messages");
 const form = document.getElementById("composer");

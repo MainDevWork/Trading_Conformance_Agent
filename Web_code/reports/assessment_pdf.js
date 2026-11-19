@@ -8,7 +8,7 @@
 // required ones are counted and listed as Not attempted, so the counts add up to the number of tests; the others are
 // left out.
 
-import { RESULTS, criteriaFor, isRequired, notCheckable } from "./conformance.js?v=27";
+import { RESULTS, criteriaFor, isRequired, notCheckable } from "./conformance.js?v=28";
 
 const C = {
   green: "#78BE20", darkBlue: "#163A5F", teal: "#00787A", red: "#D64541", grey: "#5A6770", orange: "#F5A623",
