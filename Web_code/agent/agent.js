@@ -12,10 +12,10 @@
 // an attached report already answer gets no request at all (direct_answer.js). Replies are streamed, so the page shows
 // the answer as the model writes it.
 
-import { retrieve } from "./retrieve.js?v=29";
-import { evidenceFor, resultsText } from "../reports/conformance.js?v=29";
-import { isSmallTalk } from "./retrieve.js?v=29";
-import { directAnswer, fileFormatAsked } from "../reports/direct_answer.js?v=29";
+import { retrieve } from "./retrieve.js?v=30";
+import { evidenceFor, resultsText } from "../reports/conformance.js?v=30";
+import { isSmallTalk } from "./retrieve.js?v=30";
+import { directAnswer, fileFormatAsked } from "../reports/direct_answer.js?v=30";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -47,6 +47,9 @@ export const CONTEXT_LIMIT_TOKENS = 64_000;
 // provider that keeps a copy of a repeated prompt start can reuse it. Facts that change per question are sent with
 // the question instead (see retrieve.js).
 const SYSTEM_PROMPT = `You are the Trading Conformance Agent for JSE Trading Operations.
+When asked who or what you are, say you are the Trading Conformance Agent, which checks clients' conformance test
+reports against their trading messages and answers questions about them. Do not name the language model, its maker or
+NVIDIA then. Name the language model, ${MODEL}, only when the analyst asks which AI or language model you use.
 
 Background: before a client may trade on the JSE production market or consume production market data, it must pass
 conformance testing. The client sends messages from its test system using a CompID (the identifier of the client's
@@ -143,7 +146,15 @@ const SMALL_TALK_PROMPT = `You are the Trading Conformance Agent, a colleague of
 Besides checking clients' conformance tests, you chat with the analyst like a person would. The analyst's message is a
 greeting, thanks or small talk. Reply to it the way a friendly colleague would, in one or two short sentences: answer
 what they said, and if it fits, offer help in a few words. Do not describe any data, plan, method or analysis, do not
-say what you are going to do, and do not repeat an earlier answer.`;
+say what you are going to do, and do not repeat an earlier answer.
+When asked who or what you are, say you are the Trading Conformance Agent, which checks clients' conformance test
+reports against their trading messages and answers questions about them. Do not name the language model, its maker or
+NVIDIA then. Name the language model, ${MODEL}, only when the analyst asks which AI or language model you use.`;
+
+const MODEL_NAMED = /nemotron|nvidia|language model|\bLLM\b|AI model/i;
+const MODEL_ASKED = /\b(model|llm|ai|a\.i\.|engine|powered|built (on|with)|run(s|ning)? on|underlying|gpt|nvidia|nemotron)\b/i;
+const WHO_I_AM = "I'm the Trading Conformance Agent. I check clients' conformance test reports against their trading " +
+  "messages and answer questions about those messages. Attach a client's report or ask about a CompID to start.";
 
 // The topics of knowledge/*.md that read_reference can return (core.md is always in the system prompt).
 const REFERENCE_TOPICS = {
@@ -644,6 +655,9 @@ ${resultsText(attachment.checked, asked)}`;
     // Only the short system message and the conversation are sent: no tables, reference, memory notes or tools.
     const short = [{ role: "system", content: SMALL_TALK_PROMPT }, ...turns.slice(-6)];
     answer = (await ask(false, short, [])).content || "Hello. Ask me about a CompID's conformance test messages, or attach a client's report.";
+    // The model names itself (NVIDIA Nemotron) when asked who it is, even when told not to. Its name is given only
+    // when the analyst asks which AI or language model the agent uses.
+    if (MODEL_NAMED.test(answer) && !MODEL_ASKED.test(asked)) answer = WHO_I_AM;
   }
   for (let round = 0; round < MAX_TOOL_ROUNDS && answer === null; round++) {
     if (round > 0 && Date.now() - startedAt > TOOL_TIME_LIMIT_MS) break;

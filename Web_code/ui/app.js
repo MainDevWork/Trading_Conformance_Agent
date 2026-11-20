@@ -1,10 +1,10 @@
-import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=29";
-import { loadStore } from "../agent/data.js?v=29";
-import { readAttachment } from "../reports/attachments.js?v=29";
-import { checkReport } from "../reports/conformance.js?v=29";
-import { makeClientReport, preloadReportLibraries } from "../reports/client_report.js?v=29";
-import * as memoryStore from "../agent/memory.js?v=29";
-import { isSmallTalk } from "../agent/retrieve.js?v=29";
+import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=30";
+import { loadStore } from "../agent/data.js?v=30";
+import { readAttachment } from "../reports/attachments.js?v=30";
+import { checkReport } from "../reports/conformance.js?v=30";
+import { makeClientReport, preloadReportLibraries } from "../reports/client_report.js?v=30";
+import * as memoryStore from "../agent/memory.js?v=30";
+import { isSmallTalk } from "../agent/retrieve.js?v=30";
 
 window.appStarted = true;
 
