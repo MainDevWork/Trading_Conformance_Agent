@@ -1,10 +1,11 @@
-import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=30";
-import { loadStore } from "../agent/data.js?v=30";
-import { readAttachment } from "../reports/attachments.js?v=30";
-import { checkReport } from "../reports/conformance.js?v=30";
-import { makeClientReport, preloadReportLibraries } from "../reports/client_report.js?v=30";
-import * as memoryStore from "../agent/memory.js?v=30";
-import { isSmallTalk } from "../agent/retrieve.js?v=30";
+import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=31";
+import { loadStore } from "../agent/data.js?v=31";
+import { readAttachment } from "../reports/attachments.js?v=31";
+import { checkReport } from "../reports/conformance.js?v=31";
+import { makeClientReport, preloadReportLibraries } from "../reports/client_report.js?v=31";
+import * as memoryStore from "../agent/memory.js?v=31";
+import { isSmallTalk } from "../agent/retrieve.js?v=31";
+import { directAnswer } from "../reports/direct_answer.js?v=31";
 
 window.appStarted = true;
 
@@ -177,9 +178,12 @@ async function send(text) {
     else if (!redraw) redraw = setTimeout(draw, wait);
   };
   showStep();
-  // The results of a report checked for this question are added under its answer, in a closed section.
+  // The results of a report checked for this question are added under its answer, in a closed section. The section
+  // is added again under the answer to any later prompt that asks for the results or the files, such as "show the
+  // results again" or "give me the excel and pdf", so its Excel report and PDF report buttons are under that answer.
   const showResultsOnce = () => {
-    if (!attached?.checked || attached.shown) return;
+    if (!attached?.checked) return;
+    if (attached.shown && !directAnswer(attached.checked, text)) return;
     attached.shown = true;
     showChecked(addMessage("attachment", ""), attached.checked);
     conv.items.push({ role: "attachment", checked: attached.checked });

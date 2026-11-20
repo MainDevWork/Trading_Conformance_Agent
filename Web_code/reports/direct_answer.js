@@ -2,12 +2,13 @@
 // request to the language model. A question is answered here only when every word in it is on the lists below; any
 // other word, such as "why", sends the question to the model.
 
-import { RESULTS } from "./conformance.js?v=30";
+import { RESULTS } from "./conformance.js?v=31";
 
 const FILLER = new Set(("give me the show list all what are is was were of for this that these those in from on please " +
   "can could would you i we want need see get tell attached client clients report reports file test tests step steps " +
-  "so far a an and or which many number count to it they them their its our my").split(" "));
-const RESULT_WORDS = new Set("result results outcome outcomes summary summarise summarize verdict overall status check checked".split(" "));
+  "so far a an and or which many number count to it they them their its our my no meant mean section box table " +
+  "buttons here again set").split(" "));
+const RESULT_WORDS = new Set("result results outcome outcomes summary summarise summarize verdict overall status check checked checking".split(" "));
 const FILTER_WORDS = {
   fail: RESULTS.FAIL, fails: RESULTS.FAIL, failed: RESULTS.FAIL, failure: RESULTS.FAIL, failures: RESULTS.FAIL, failing: RESULTS.FAIL,
   pass: RESULTS.PASS, passes: RESULTS.PASS, passed: RESULTS.PASS, passing: RESULTS.PASS,
@@ -15,7 +16,26 @@ const FILTER_WORDS = {
 };
 const FILE_WORDS = new Set(("create make write generate produce download as document version both again another new " +
   "copy one more send export redo regenerate recreate remake rewrite resend updated latest format with").split(" "));
-const FILE_TYPE_WORDS = { excel: "excel", xlsx: "excel", spreadsheet: "excel", workbook: "excel", pdf: "pdf" };
+const FILE_TYPE_WORDS = { excel: "excel", xlsx: "excel", xls: "excel", spreadsheet: "excel", workbook: "excel", pdf: "pdf" };
+
+// The number of single-letter changes (add, remove, replace) that turn a into b.
+function editDistance(a, b) {
+  let row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    row = next;
+  }
+  return row[b.length];
+}
+
+// "excel" or "pdf" for a word that names the file type, also when it is misspelt ("ecvel", "exel", "pfd"); else null.
+function fileType(word) {
+  if (FILE_TYPE_WORDS[word]) return FILE_TYPE_WORDS[word];
+  if (word.length >= 4 && word.length <= 6 && word[0] === "e" && editDistance(word, "excel") <= 2) return "excel";
+  if (word.length === 3 && word[0] === "p" && (editDistance(word, "pdf") <= 1 || [...word].sort().join("") === "dfp")) return "pdf";
+  return null;
+}
 // Words that ask for a file to be written, as opposed to a question about a file ("why does the pdf say T3 failed").
 const MAKE_WORDS = new Set(("give send create make write generate produce download export redo regenerate recreate " +
   "remake rewrite resend again another new want need get").split(" "));
@@ -55,7 +75,7 @@ function resultsAnswer(checked, named, filters) {
 // even when the model replied without calling create_client_report.
 export function fileFormatAsked(question) {
   const words = question.toLowerCase().match(/[a-z]+/g) || [];
-  const types = new Set(words.map((w) => FILE_TYPE_WORDS[w]).filter(Boolean));
+  const types = new Set(words.map(fileType).filter(Boolean));
   if (!types.size || !words.some((w) => MAKE_WORDS.has(w))) return null;
   return types.size === 2 ? "both" : [...types][0];
 }
@@ -63,6 +83,8 @@ export function fileFormatAsked(question) {
 // Returns { text } for a question about the results, { format } for a request for the report file, or null when the
 // question must go to the language model.
 export function directAnswer(checked, question) {
+  // The report's file name, pasted from the results section, is not a word of the question.
+  if (checked.file) question = question.split(checked.file).join(" ");
   const words = question.toLowerCase().replace(/[’']s\b/g, "").replace(/\bhow many\b/g, "many")
     .replace(/\bnot attempted\b/g, "not_attempted").replace(/\bnot checkable\b/g, "not_checkable").replace(/\bneeds? review\b/g, "review")
     .match(/[a-z0-9_]+(?:[.-][a-z0-9]+)*/g) || [];
@@ -75,8 +97,8 @@ export function directAnswer(checked, question) {
     if (FILTER_WORDS[w]) { filters.add(FILTER_WORDS[w]); wantsResults = true; }
     else if (RESULT_WORDS.has(w)) wantsResults = true;
     else if (OVERALL_WORDS.has(w)) overall = true;
-    else if (FILE_TYPE_WORDS[w] === "excel") excel = true;
-    else if (FILE_TYPE_WORDS[w] === "pdf") pdf = true;
+    else if (fileType(w) === "excel") excel = true;
+    else if (fileType(w) === "pdf") pdf = true;
     else if (FILE_WORDS.has(w)) fileWord = true;
     else if (STEP_ID.test(w)) {
       const step = checked.results.find((r) => r.id.toLowerCase() === w || r.ref.toLowerCase() === w);
@@ -86,6 +108,7 @@ export function directAnswer(checked, question) {
   }
   // "the excel results" or "a pdf of the results" asks for the file; "the failed steps in the pdf" goes to the model.
   if ((excel || pdf) && !filters.size && !named.length) return { format: excel && pdf ? "both" : excel ? "excel" : "pdf" };
-  if (excel || pdf || fileWord || !(wantsResults || named.length)) return null;
+  // "produce another set of results" asks for the results again; "write the report" with no file type goes to the model.
+  if (excel || pdf || !(wantsResults || named.length)) return null;
   return { text: resultsAnswer(checked, named, overall ? new Set() : filters) };
 }
