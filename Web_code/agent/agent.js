@@ -12,10 +12,10 @@
 // an attached report already answer gets no request at all (direct_answer.js). Replies are streamed, so the page shows
 // the answer as the model writes it.
 
-import { retrieve } from "./retrieve.js?v=28";
-import { evidenceFor, resultsText } from "../reports/conformance.js?v=28";
-import { isSmallTalk } from "./retrieve.js?v=28";
-import { directAnswer } from "../reports/direct_answer.js?v=28";
+import { retrieve } from "./retrieve.js?v=29";
+import { evidenceFor, resultsText } from "../reports/conformance.js?v=29";
+import { isSmallTalk } from "./retrieve.js?v=29";
+import { directAnswer, fileFormatAsked } from "../reports/direct_answer.js?v=29";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -110,7 +110,9 @@ Each test step has a result: Pass, Fail, Needs review, Not checkable or Not atte
   named in the message; call get_test_evidence only for another step or for details the block does not give.
 - Use these results. Do not change a result yourself; explain it. When the analyst disagrees with a result, they can
   ask for it to be changed in the report to the client.
-- When the analyst asks for a report, file, Excel or PDF for the client, call create_client_report. Pass format
+- When the analyst asks for a report, file, Excel or PDF for the client, call create_client_report, every time they ask,
+  also when a file was written earlier in the conversation: a file from an earlier answer is not written again unless
+  you call the tool, and saying it is ready without calling the tool leaves the analyst with no file. Pass format
   "excel", "pdf" or "both"; summary: a short plain paragraph to the client stating the overall result, which steps
   failed and what they must redo; and changes only for results the analyst has asked to change, each with their
   reason. Then tell the analyst the file is ready below the answer. The files leave out steps with no response.
@@ -694,6 +696,17 @@ ${resultsText(attachment.checked, asked)}`;
     const rewrite = await ask(false);
     steps.push({ tool: "rewrite", args: {}, result: "" });
     if (rewrite.content) answer = plainNames(store, rewrite.content);
+  }
+  // A prompt that asks for the Excel or PDF file always ends with a new file: the model sometimes replies that the file
+  // is ready, because an earlier answer in the conversation said so, without calling create_client_report.
+  const format = attachment ? fileFormatAsked(asked) : null;
+  if (format && !steps.some((s) => s.tool === "create_client_report" && !/"error"/.test(s.result))) {
+    onStep(STEP_TEXT.create_client_report);
+    const made = await attachment.makeReport({ format });
+    steps.push({ tool: "create_client_report", args: { format }, result: JSON.stringify(made).slice(0, 4000) });
+    if (!answer.includes(FILE_READY)) answer = `${answer.trim()}
+
+${FILE_READY}`.trim();
   }
   return { answer, steps, model, tokens, timing };
 }
