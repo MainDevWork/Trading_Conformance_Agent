@@ -12,10 +12,10 @@
 // an attached report already answer gets no request at all (direct_answer.js). Replies are streamed, so the page shows
 // the answer as the model writes it.
 
-import { retrieve } from "./retrieve.js?v=31";
-import { evidenceFor, resultsText } from "../reports/conformance.js?v=31";
-import { isSmallTalk } from "./retrieve.js?v=31";
-import { directAnswer, fileFormatAsked } from "../reports/direct_answer.js?v=31";
+import { retrieve } from "./retrieve.js?v=32";
+import { evidenceFor, resultsText } from "../reports/conformance.js?v=32";
+import { isSmallTalk } from "./retrieve.js?v=32";
+import { directAnswer, fileFormatAsked } from "../reports/direct_answer.js?v=32";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOOL_ROUNDS = 12;
@@ -108,6 +108,9 @@ fixed rules, and sends the results with each question in a block headed "Attache
 Each test step has a result: Pass, Fail, Needs review, Not checkable or Not attempted, with the reason.
 - Do only what the analyst's message asks about the report. Do not list the results of all the test steps or give an
   overall verdict unless the message asks for them.
+- When you give results, give only steps that passed, failed, need review or are not checkable, and the required steps
+  that were not attempted. Leave out the steps that were not attempted and are not required, and do not count them,
+  unless the analyst asks for all the results or every test step.
 - Answer from this block without calling a tool whenever it holds the answer. To state or explain a result you do not
   need to read a reference topic. "What the messages show" is given for each Fail, each Needs review and each step
   named in the message; call get_test_evidence only for another step or for details the block does not give.
@@ -118,7 +121,8 @@ Each test step has a result: Pass, Fail, Needs review, Not checkable or Not atte
   you call the tool, and saying it is ready without calling the tool leaves the analyst with no file. Pass format
   "excel", "pdf" or "both"; summary: a short plain paragraph to the client stating the overall result, which steps
   failed and what they must redo; and changes only for results the analyst has asked to change, each with their
-  reason. Then tell the analyst the file is ready below the answer. The files leave out steps with no response.
+  reason. Then tell the analyst the file is ready below the answer. The files leave out steps that were not
+  attempted and are not required.
 - Present several test steps as a table: test, result, reason.
 
 Memory: the page saves every conversation and a list of notes in the analyst's browser.
@@ -191,7 +195,7 @@ const REPORT_TOOLS = [
     type: "function",
     function: {
       name: "create_client_report",
-      description: "Write the results of the attached client report as a file for the client: Excel (summary sheet and one row per test step) or PDF (trading conformance assessment: overall result, counts, decision, and the criteria and evidence of each passed, failed and review test). Steps with no client response are left out of both. The page shows a download link below the answer.",
+      description: "Write the results of the attached client report as a file for the client: Excel (summary sheet and one row per test step) or PDF (trading conformance assessment: overall result, counts, decision, and the criteria and evidence of each passed, failed and review test, and the required tests not attempted). Steps that were not attempted and are not required are left out of both. The page shows a download link below the answer.",
       parameters: {
         type: "object",
         properties: {

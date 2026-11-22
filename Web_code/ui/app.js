@@ -1,11 +1,11 @@
-import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=31";
-import { loadStore } from "../agent/data.js?v=31";
-import { readAttachment } from "../reports/attachments.js?v=31";
-import { checkReport } from "../reports/conformance.js?v=31";
-import { makeClientReport, preloadReportLibraries } from "../reports/client_report.js?v=31";
-import * as memoryStore from "../agent/memory.js?v=31";
-import { isSmallTalk } from "../agent/retrieve.js?v=31";
-import { directAnswer } from "../reports/direct_answer.js?v=31";
+import { chat, summarise, startingChars, plainNames, MODEL_CONTEXT_TOKENS, CONTEXT_WARN_TOKENS, CONTEXT_LIMIT_TOKENS } from "../agent/agent.js?v=32";
+import { loadStore } from "../agent/data.js?v=32";
+import { readAttachment } from "../reports/attachments.js?v=32";
+import { checkReport, countLabel, countsOf, listedResults } from "../reports/conformance.js?v=32";
+import { makeClientReport, preloadReportLibraries } from "../reports/client_report.js?v=32";
+import * as memoryStore from "../agent/memory.js?v=32";
+import { isSmallTalk } from "../agent/retrieve.js?v=32";
+import { directAnswer } from "../reports/direct_answer.js?v=32";
 
 window.appStarted = true;
 
@@ -498,13 +498,15 @@ function escapeHtml(text) {
 function showChecked(card, checked) {
   const body = card.querySelector(".body");
   const answered = checked.results.filter((r) => r.answered);
+  const listed = listedResults(checked.results);
+  const left = checked.results.length - listed.length;
   const cls = (r) => `result-${r.result.toLowerCase().replace(/\s+/g, "-")}`;
   body.innerHTML = `<details><summary>Results of checking ${escapeHtml(checked.file)}</summary>` +
     `<p><strong>${escapeHtml(checked.file)}</strong>: ${checked.results.length} test steps, ${answered.length} answered by the client` +
     ` (CompID ${escapeHtml(checked.compids.join(", ") || "none")}). Overall: <strong>${escapeHtml(checked.overall)}</strong>.</p>` +
-    `<p>${Object.entries(checked.counts).map(([k, v]) => `${escapeHtml(k)}: ${v}`).join(" · ")}</p>` +
-    (checked.mandatoryMissing.length ? `<p>Mandatory steps with no response: ${escapeHtml(checked.mandatoryMissing.map((r) => r.id).join(", "))}</p>` : "") +
-    `<table><thead><tr><th>Ref</th><th>Test</th><th>Result</th><th>Reason</th></tr></thead><tbody>${answered.map((r) =>
+    `<p>${Object.entries(countsOf(listed)).map(([k, v]) => `${escapeHtml(countLabel(k))}: ${v}`).join(" · ")}</p>` +
+    (left ? `<p>${left} test step${left === 1 ? " was" : "s were"} not attempted and ${left === 1 ? "is" : "are"} not required, so ${left === 1 ? "it is" : "they are"} left out. Ask the agent for all the results to include them.</p>` : "") +
+    `<table><thead><tr><th>Ref</th><th>Test</th><th>Result</th><th>Reason</th></tr></thead><tbody>${listed.map((r) =>
       `<tr><td>${escapeHtml(r.ref)}</td><td>${escapeHtml(r.id)} ${escapeHtml(r.title.slice(0, 70))}</td><td class="${cls(r)}">${escapeHtml(r.result)}</td><td>${escapeHtml(r.reason)}</td></tr>`).join("")}</tbody></table>` +
     `<p class="hint">Ask the agent about any test step, or write the report for the client:</p></details>`;
   const buttons = document.createElement("div");
