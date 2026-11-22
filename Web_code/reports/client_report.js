@@ -4,7 +4,7 @@
 // Of the test steps the client gave no response for, only required ones are included in both files, as Not attempted.
 
 import { loadScript } from "./attachments.js?v=31";
-import { RESULTS, fmtClock, fmtDate, isRequired } from "./conformance.js?v=31";
+import { RESULTS, fmtClock, fmtDate, listedResults } from "./conformance.js?v=32";
 import { buildAssessmentPdf } from "./assessment_pdf.js?v=31";
 
 const EXCELJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
@@ -23,7 +23,7 @@ export const RESULT_MEANINGS = [
 ];
 
 // The steps written to the files: every step the client answered, and the required steps it did not.
-const listed = (results) => results.filter((r) => r.result !== RESULTS.NOT_ATTEMPTED || isRequired(r));
+const listed = listedResults;
 
 // The columns of the "Test results" table: heading, width in Excel characters, and the value for one test step.
 export const RESULT_COLUMNS = [

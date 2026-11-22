@@ -531,6 +531,13 @@ export function criteriaFor(r) {
 // A required test step: Mandatory Y, for All or Equity Market, with no agreed exemption.
 export const isRequired = (r) => /^y/i.test(r.mandatory) && !/^y/i.test(r.exemption) && /^(all|equity)/i.test(r.market);
 
+// The steps given in results unless every step is asked for: each step the client answered, and the required steps
+// it did not. A step that was not attempted and is not required is left out.
+export const listedResults = (results) => results.filter((r) => r.result !== RESULTS.NOT_ATTEMPTED || isRequired(r));
+export const countsOf = (steps) => Object.fromEntries(Object.values(RESULTS).map((v) => [v, steps.filter((r) => r.result === v).length]));
+// A count's label: "Not attempted (required)" when only the required steps that were not attempted are counted.
+export const countLabel = (result, everything = false) => result === RESULTS.NOT_ATTEMPTED && !everything ? `${result} (required)` : result;
+
 // The columns of fact_message that hold an ID a client can write in a report.
 const ID_COLUMNS = ["order_id", "execution_id", "client_order_id", "orig_client_order_id", "public_order_id"];
 
@@ -738,26 +745,22 @@ export function resultsText(checked, question = "") {
   const asked = ` ${question.toUpperCase().replace(/[^A-Z0-9.-]+/g, " ").replace(/\.(\s)/g, "$1")} `;
   const named = (r) => [r.id, r.ref].some((v) => v && asked.includes(` ${v.toUpperCase()} `));
   const showsFor = (r) => r.shows && (r.result === RESULTS.FAIL || r.result === RESULTS.REVIEW || named(r));
-  const c = checked.counts;
+  const listed = listedResults(checked.results);
   const lines = [
     `# Attached client conformance test report: ${checked.file}`,
     `CompIDs in the report: ${checked.compids.join(", ") || "none"}. Test steps in the report: ${checked.results.length}.`,
-    `Results from the automatic checks: ${Object.entries(c).map(([k, v]) => `${k} ${v}`).join(", ")}. Overall: ${checked.overall}.`,
-    "Each test step the client answered (reference | test ID | test | mandatory | CompID | test time in the report | result | reason | what the messages show, when given):",
+    `Results from the automatic checks: ${Object.entries(countsOf(listed)).map(([k, v]) => `${countLabel(k)} ${v}`).join(", ")}. Overall: ${checked.overall}.`,
+    "Each test step the client answered, then each required step it did not attempt (reference | test ID | test | mandatory | CompID | test time in the report | result | reason | what the messages show, when given):",
   ];
-  for (const r of checked.results.filter((x) => x.answered)) {
+  for (const r of listed) {
     lines.push(`- ${r.ref} | ${r.id} | ${r.title.slice(0, 110)} | mandatory ${r.mandatory || "?"} | ${r.compid || "-"} | ${r.time || "-"} | ` +
       `${r.result} | ${r.reason}${showsFor(r) ? ` | ${r.shows.replace(/\n/g, " ")}` : ""}${r.clientComment ? ` | client comment: "${r.clientComment}"` : ""}` +
       `${r.jseComment ? ` | JSE comment: "${r.jseComment}"` : ""}`);
   }
-  const notAttempted = checked.results.filter((x) => !x.answered);
-  if (notAttempted.length) {
-    const marked = notAttempted.filter((x) => x.clientComment).map((x) => `${x.id} ("${x.clientComment}")`);
-    const blank = notAttempted.filter((x) => !x.clientComment).map((x) => x.id);
-    lines.push(`Not attempted: ${marked.join(", ")}${marked.length && blank.length ? "; " : ""}${blank.length ? `no response at all: ${blank.join(", ")}` : ""}.`);
-  }
-  if (checked.mandatoryMissing.length) {
-    lines.push(`Mandatory steps (market All or Equity Market) with no response and no N/A comment: ${checked.mandatoryMissing.map((x) => x.id).join(", ")}.`);
+  const notRequired = checked.results.filter((x) => !listed.includes(x));
+  if (notRequired.length) {
+    lines.push(`Not attempted and not required (${notRequired.length}; give these only when the analyst asks for all the results or every test step): ` +
+      `${notRequired.map((x) => (x.clientComment ? `${x.id} ("${x.clientComment}")` : x.id)).join(", ")}.`);
   }
   return lines.join("\n");
 }
