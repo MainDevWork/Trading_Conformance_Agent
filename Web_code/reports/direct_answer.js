@@ -2,7 +2,7 @@
 // request to the language model. A question is answered here only when every word in it is on the lists below; any
 // other word, such as "why", sends the question to the model.
 
-import { RESULTS } from "./conformance.js?v=31";
+import { RESULTS, countLabel, countsOf, listedResults } from "./conformance.js?v=32";
 
 const FILLER = new Set(("give me the show list all what are is was were of for this that these those in from on please " +
   "can could would you i we want need see get tell attached client clients report reports file test tests step steps " +
@@ -39,6 +39,8 @@ function fileType(word) {
 // Words that ask for a file to be written, as opposed to a question about a file ("why does the pdf say T3 failed").
 const MAKE_WORDS = new Set(("give send create make write generate produce download export redo regenerate recreate " +
   "remake rewrite resend again another new want need get").split(" "));
+// Words that ask for every test step, including those not attempted and not required.
+const EVERYTHING_WORDS = new Set("all everything every full complete entire".split(" "));
 // "did it pass" asks for the overall result, so its "pass" does not limit the table to the steps that passed.
 const OVERALL_WORDS = new Set(["did", "has", "have"]);
 
@@ -51,19 +53,20 @@ function table(steps) {
   return ["| Test | What it tests | Result | Reason |", "| --- | --- | --- | --- |", ...rows].join("\n");
 }
 
-function resultsAnswer(checked, named, filters) {
+// Unless every step is asked for, a step that was not attempted and is not required is left out of the counts and table.
+function resultsAnswer(checked, named, filters, everything) {
   const lines = [];
   if (named.length) {
     lines.push(table(named));
   } else {
+    const steps = everything ? checked.results : listedResults(checked.results);
     lines.push(`**${checked.file}**: ${checked.overall}.`);
-    lines.push(Object.entries(checked.counts).map(([k, v]) => `${k}: ${v}`).join(" · "));
-    const wanted = checked.results.filter((r) => (filters.size ? filters.has(r.result) : r.answered && r.result !== RESULTS.NOT_ATTEMPTED));
+    lines.push(Object.entries(countsOf(steps)).map(([k, v]) => `${countLabel(k, everything)}: ${v}`).join(" · "));
+    const wanted = steps.filter((r) => !filters.size || filters.has(r.result));
     lines.push(wanted.length ? table(wanted) : "No test step has this result.");
-    if (!filters.size) {
-      const skipped = checked.results.filter((r) => r.result === RESULTS.NOT_ATTEMPTED).map((r) => r.id);
-      if (skipped.length) lines.push(`Not attempted: ${skipped.join(", ")}.`);
-      if (checked.mandatoryMissing.length) lines.push(`Mandatory steps with no response and no N/A comment: ${checked.mandatoryMissing.map((r) => r.id).join(", ")}.`);
+    const left = checked.results.length - steps.length;
+    if (left && (!filters.size || filters.has(RESULTS.NOT_ATTEMPTED))) {
+      lines.push(`${left} test step${left === 1 ? " was" : "s were"} not attempted and ${left === 1 ? "is" : "are"} not required, so ${left === 1 ? "it is" : "they are"} left out. Ask for all the results to include them.`);
     }
   }
   lines.push("These results come from the fixed rules that check the report against the messages.");
@@ -92,9 +95,10 @@ export function directAnswer(checked, question) {
 
   const named = [];
   const filters = new Set();
-  let wantsResults = false, overall = false, excel = false, pdf = false, fileWord = false;
+  let wantsResults = false, overall = false, excel = false, pdf = false, fileWord = false, everything = false;
   for (const w of words) {
-    if (FILTER_WORDS[w]) { filters.add(FILTER_WORDS[w]); wantsResults = true; }
+    if (EVERYTHING_WORDS.has(w)) everything = true;
+    else if (FILTER_WORDS[w]) { filters.add(FILTER_WORDS[w]); wantsResults = true; }
     else if (RESULT_WORDS.has(w)) wantsResults = true;
     else if (OVERALL_WORDS.has(w)) overall = true;
     else if (fileType(w) === "excel") excel = true;
@@ -110,5 +114,5 @@ export function directAnswer(checked, question) {
   if ((excel || pdf) && !filters.size && !named.length) return { format: excel && pdf ? "both" : excel ? "excel" : "pdf" };
   // "produce another set of results" asks for the results again; "write the report" with no file type goes to the model.
   if (excel || pdf || !(wantsResults || named.length)) return null;
-  return { text: resultsAnswer(checked, named, overall ? new Set() : filters) };
+  return { text: resultsAnswer(checked, named, overall ? new Set() : filters, everything) };
 }
