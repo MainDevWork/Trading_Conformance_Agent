@@ -1,6 +1,6 @@
 # Trading Conformance Agent: project report
 
-20/11/2026 · Tshephang Tsheoga and Ndivhuwo Makhavhu
+27/11/2026 · Tshephang Tsheoga and Ndivhuwo Makhavhu
 
 ## The problem
 
@@ -99,4 +99,30 @@ Prices as of 20/11/2026: [Supabase pricing](https://supabase.com/pricing), [Open
 6. **Test on the live site, not only locally.** Windows treats `pages` and `Pages` as one folder name and GitHub Pages does not, so 6 of the 7 diagram links failed only on the live site. Opening the page as a file stops its scripts from running, so a local test needs a local web server.
 7. **Office networks can hold back a streamed answer.** On one laptop the answer appeared only when complete, because a program such as an antivirus or a company proxy held the streamed reply.
 
-To run at the JSE, the system would move to the approved platforms named in the brief: Azure AI Foundry for the model and Azure Data Lake for the data, in place of OpenRouter and Supabase, which are not on that list. It would then need the ADA, security and legal reviews.
+## Moving to production
+
+In production the system runs on the JSE's Microsoft Azure, under one JSE Azure subscription, in place of OpenRouter, Supabase and GitHub Pages, which are not on the list of approved platforms in the brief. The language model is deployed in Microsoft Foundry (formerly Azure AI Foundry), and each analyst gets one key through Azure API Management. The code base is kept in an Azure DevOps repository. Two copies of the agent are set up and tested. Analysts use the agent through a web application on Azure that only the team can open, or by opening the code base in Visual Studio on their own laptops.
+
+The agent can get the FIX messages in two ways:
+
+- **Upload an extract.** The analyst extracts the FIX messages from Vonnegut, as analysts do now, and uploads the extract to the agent in the same way as the client's conformance test report. The agent checks the report against the extract. This is the faster and cheaper way to start using the agent, but the analyst still makes the extract by hand.
+- **Direct connection.** Vonnegut follows the OSI (Open Systems Interconnection) model, a standard set of layers for network communication. It receives FIX messages at the network layer as raw bits, and its own decoding code in the layers above turns them into the tables that the exports for this project came from. Trading Operations cannot provide that decoding code. The agent's code would therefore connect to the trading gateways through the IP network ports, capture the FIX messages as raw bits, and decode them into tables with its own decoding code. The decoded messages are stored in an Azure SQL Database, and the agent works from that database. This removes the manual extract, but it is a complex task, and it costs more and takes longer to build than uploading an extract.
+
+**Estimated cost on Azure.** The Azure prices below are Microsoft's list prices in rand for the South Africa North region, taken from Microsoft's Azure Retail Prices API on 25/11/2026. They exclude VAT and any discount the JSE has with Microsoft. Monthly figures use 730 hours a month, the figure the Azure pricing calculator uses.
+
+| Cost | Microsoft Azure service, or basis | Estimate |
+| --- | --- | ---: |
+| Database (two instances) | Azure SQL Database, Standard S2 | R3,583 a month |
+| Language model | Microsoft Foundry, GPT-5 mini, Global Standard | R275 a month |
+| One key per analyst, with a monthly token limit on each key | Azure API Management, Basic v2 | R2,501 a month |
+| Hosting (two copies of the agent) | Azure App Service, Premium v3 P0v3, Linux | R2,349 a month |
+| Code repository | Azure DevOps, Basic plan | R0 for up to 5 users |
+| **Running cost** | | **R8,708 a month** |
+| Development | One developer for 3 months (OfferZen 2026 salary data) | R144,600 once |
+| **First year** | 12 months of running cost plus development | **R249,100** |
+
+The language model cost assumes about 100 client conformance test reports a month, each checked with about 10 requests to the model of about 50,000 input tokens each (a token is a piece of a word, about 4 characters). That is 50 million tokens sent to the model and 2 million tokens written by it each month, at R4.1681 per million input tokens and R33.345 per million output tokens. The development cost uses OfferZen's 2026 average salary of R48,200 a month for a developer with four or more years of experience. It does not include writing the decoding code for the direct connection, which would add development time and cost. The price records and calculations are in Documents/Cost_Evidence.
+
+Sources, as of 25/11/2026: [Azure Retail Prices API](https://learn.microsoft.com/en-us/rest/api/cost-management/retail-prices/azure-retail-prices), [Azure pricing calculator](https://azure.microsoft.com/en-us/pricing/calculator/), [Azure API Management token limit policy](https://learn.microsoft.com/azure/api-management/llm-token-limit-policy), [Azure DevOps pricing](https://azure.microsoft.com/en-us/pricing/details/devops/azure-devops-services/), [OfferZen developer salaries](https://www.offerzen.com/blog/software-developer-salary-south-africa).
+
+Before going live, the system needs the ADA, security and legal reviews, and a trial with Trading Operations analysts on real client test reports, run alongside the manual review.
